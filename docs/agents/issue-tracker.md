@@ -26,6 +26,12 @@ When set to `yes`, PRs run through the same labels and states as issues, using t
 
 GitHub shares one number space across issues and PRs, so a bare `#42` may be either: resolve with `gh pr view 42` and fall back to `gh issue view 42`.
 
+## Extra labels
+
+These labels sit outside the triage roles in `triage-labels.md` and can go on an issue alongside them.
+
+- **`china-facing`**: the issue retargets a skill or its content at a China-facing audience. Apply it when you create or triage an issue with that goal.
+
 ## When a skill says "publish to the issue tracker"
 
 Create a GitHub issue.

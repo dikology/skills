@@ -1,7 +1,7 @@
 """What a session changed in a vault: snapshot before, snapshot after, diff.
 
-`.claude/` is the harness's install location for the skill, not vault content,
-so it is left out of every snapshot.
+`.claude/skills/` is where the harness installs the skill, not vault content,
+so it is left out of every snapshot. The rest of `.claude/` is still watched.
 """
 
 from __future__ import annotations
@@ -9,14 +9,14 @@ from __future__ import annotations
 import difflib
 from pathlib import Path
 
-IGNORED = {".claude"}
+SKILL_INSTALL = (".claude", "skills")
 
 
 def snapshot(vault: Path) -> dict:
     """{relative posix path: text} for every file in the vault."""
     return {p.relative_to(vault).as_posix(): p.read_text(errors="replace")
             for p in sorted(vault.rglob("*"))
-            if p.is_file() and not IGNORED & set(p.relative_to(vault).parts)}
+            if p.is_file() and p.relative_to(vault).parts[:2] != SKILL_INSTALL}
 
 
 def diff(before: dict, after: dict) -> dict:

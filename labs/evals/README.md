@@ -60,7 +60,8 @@ python3 labs/evals/run_evals.py --skill labs/evals/mutants/companion-paraphrase
 
 Add an object to `cases.json`: `id`, `vault`, `overlay` (Markdown, or null for a
 vault with no Overlay), `turns`, `graders` (names from `graders.GRADERS`), and
-optionally `"judge": true`. Write the grader test-first in `test_graders.py`,
+optionally `"judge": true`. `what_it_tests` and `expectations` are for the
+human reading the case; nothing grades them. Write the grader test-first in `test_graders.py`,
 including a mutant reply that must fail it.
 
 Adapted from ae-daily-driver's `labs/evals`, with no dependency on that repo.

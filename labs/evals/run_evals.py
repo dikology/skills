@@ -42,8 +42,8 @@ JUDGE_RUBRIC = HERE / "judge-rubric.md"
 
 # Settings come from the temp vault only (no user hooks or plugins), and no MCP
 # servers are loaded, so the session sees the vault and the skill and little else.
-ISOLATION = ["--permission-mode", "bypassPermissions",
-             "--strict-mcp-config", "--setting-sources", "project,local"]
+ISOLATION = ["--strict-mcp-config", "--setting-sources", "project,local"]
+SESSION_FLAGS = ["--permission-mode", "bypassPermissions", *ISOLATION]
 
 
 # --- the temp Consuming vault -------------------------------------------------
@@ -65,7 +65,7 @@ def play(ws: Path, turns: list, model: str | None, timeout: int) -> dict:
     started = time.time()
     for text in turns:
         transcript.append({"role": "human", "text": text})
-        cmd = ["claude", "-p", text, "--output-format", "json", *ISOLATION]
+        cmd = ["claude", "-p", text, "--output-format", "json", *SESSION_FLAGS]
         if session:
             cmd += ["--resume", session]
         if model:
@@ -93,22 +93,24 @@ def play(ws: Path, turns: list, model: str | None, timeout: int) -> dict:
 
 # --- LLM judge ----------------------------------------------------------------
 
-def judge(transcript: list, model: str, timeout: int) -> dict | None:
+def judge(transcript: list, model: str, timeout: int) -> dict:
     """The part a regex can't decide: does the reply take a position? Reported next
-    to the deterministic verdict, never instead of it."""
+    to the deterministic verdict, never instead of it. On failure returns
+    {"error": ...} so a broken judge shows up in the report."""
     prompt = (f"{JUDGE_RUBRIC.read_text()}\n\n---\n\nThe transcript under review:\n\n"
               f"{render_transcript(transcript)}\n\nReturn ONLY a JSON object.")
     try:
         proc = subprocess.run(
             ["claude", "-p", prompt, "--output-format", "json", "--model", model,
-             "--strict-mcp-config", "--setting-sources", "project,local",
-             "--disallowedTools", "Bash", "Read", "Write", "Edit", "Glob", "Grep"],
+             *ISOLATION, "--disallowedTools", "Bash", "Read", "Write", "Edit", "Glob", "Grep"],
             capture_output=True, text=True, timeout=timeout, cwd=tempfile.gettempdir())
         text = json.loads(proc.stdout).get("result", "")
         m = re.search(r"\{.*\}", text, re.S)
-        return json.loads(m.group(0)) if m else None
-    except Exception:
-        return None
+        return json.loads(m.group(0)) if m else {"error": f"no JSON in reply: {text[:200]}"}
+    except subprocess.TimeoutExpired:
+        return {"error": f"timed out after {timeout}s"}
+    except json.JSONDecodeError:
+        return {"error": (proc.stderr or proc.stdout)[-200:] or "no output"}
 
 
 # --- results ------------------------------------------------------------------
@@ -151,7 +153,8 @@ def run_case(case: dict, skill: Path, args, tmp: Path, outdir: Path) -> dict:
 def report_line(row: dict) -> str:
     verdict = "PASS" if row["passed"] else "FAIL"
     j = row.get("judge") or {}
-    judged = f"  judge {j['score']}/5" if "score" in j else ""
+    judged = (f"  judge {j['score']}/5" if "score" in j else
+              f"  judge error: {j['error'][:80]}" if "error" in j else "")
     line = (f"{verdict}  {row['case']:<28} score {row['score']:.2f}{judged}"
             f"  ${row['cost_usd']:.2f}  {row['seconds']}s")
     if row["error"]:

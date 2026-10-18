@@ -46,6 +46,12 @@ class VaultDiff(unittest.TestCase):
         (self.vault / ".claude" / "skills" / "SKILL.md").write_text("x")
         self.assertEqual(diff(before, snapshot(self.vault))["added"], {})
 
+    def test_other_files_under_dot_claude_are_still_seen(self):
+        before = snapshot(self.vault)
+        (self.vault / ".claude").mkdir()
+        (self.vault / ".claude" / "session.md").write_text("whole chat\n")
+        self.assertEqual(list(diff(before, snapshot(self.vault))["added"]), [".claude/session.md"])
+
 
 if __name__ == "__main__":
     unittest.main()

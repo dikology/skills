@@ -37,19 +37,31 @@ class Result:
 
 # --- quotes and links --------------------------------------------------------
 
-# A wikilink followed on the same line by a quoted span: [[note]] — "text".
-QUOTE_RE = re.compile(
-    r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\][^\n\"“«]*?[\"“«]([^\"”»\n]+)[\"”»]")
+# A wikilink and a quoted span on the same line, in either order:
+# [[note]] — "text"  or  "text" — [[note]]. The gap between them holds no other
+# link or quote, so a quote is credited to the link nearest it.
+_LINK = r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]"
+_QUOTED = r"[\"“«]([^\"”»\n]+)[\"”»]"
+_GAP = r"[^\n\"“«\[\]]*?"
+QUOTE_RE = re.compile(f"{_LINK}{_GAP}{_QUOTED}|{_QUOTED}{_GAP}{_LINK}")
+
+# A quote this short ("Pottery", "Thursday evenings") could match a heading or a
+# name; it doesn't show the reply read the note.
+MIN_QUOTE_WORDS = 3
 
 
 def quotes(text: str) -> list:
     """(link target, quoted text) pairs, in order of appearance."""
-    return [(m.group(1).strip(), m.group(2)) for m in QUOTE_RE.finditer(text)]
+    out = []
+    for m in QUOTE_RE.finditer(text):
+        target, quote = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
+        out.append((target.strip(), quote))
+    return out
 
 
 def notes(vault: Path) -> dict:
     """Obsidian resolves a wikilink by note name, case-insensitively."""
-    return {p.stem.lower(): p for p in vault.rglob("*.md") if ".claude" not in p.parts}
+    return {p.stem.lower(): p for p in vault.rglob("*.md")}
 
 
 def _norm(s: str) -> str:
@@ -84,7 +96,8 @@ def first_reply(ev: Evidence) -> str:
 def g_orient_quotes_corpus(ev: Evidence) -> Result:
     """Orient quotes at least one real note verbatim, wrapped in a link that resolves."""
     found = quotes(first_reply(ev))
-    good = [(t, q) for t, q in found if check_quote(t, q, ev.vault) is None]
+    good = [(t, q) for t, q in found if len(q.split()) >= MIN_QUOTE_WORDS
+            and check_quote(t, q, ev.vault) is None]
     if good:
         return Result("orient_quotes_corpus", True,
                       f"{len(good)}/{len(found)} quotes verified, e.g. [[{good[0][0]}]]")

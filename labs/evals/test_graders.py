@@ -74,6 +74,20 @@ class OrientQuotesCorpus(unittest.TestCase):
         reply = '- [[the band]] — "The wheel is the only place my hands stop asking what time it is."'
         self.assertFalse(grade(["orient_quotes_corpus"], evidence(reply))["passed"])
 
+    def test_quote_is_credited_to_the_nearest_link(self):
+        reply = ('- [[pottery]] and [[the band]] — '
+                 '"I joined the band to have a reason to leave the house on Thursdays."')
+        out = grade(["orient_quotes_corpus", "quotes_verbatim"], evidence(reply))
+        self.assertTrue(out["passed"], out)
+
+    def test_quote_before_its_link_passes(self):
+        reply = '- "Studio membership costs more than my rehearsal room ever did." — [[money 2026]]'
+        self.assertTrue(grade(["orient_quotes_corpus"], evidence(reply))["passed"])
+
+    def test_one_or_two_word_quote_does_not_count_as_quoting_the_corpus(self):
+        for reply in ('- [[pottery]] — "Pottery"', '- [[pottery]] — "Thursday evenings"'):
+            self.assertFalse(grade(["orient_quotes_corpus"], evidence(reply))["passed"], reply)
+
     def test_quote_only_after_orient_does_not_count(self):
         ev = evidence("What's pulling you toward pottery right now?")
         ev.transcript += [{"role": "human", "text": "the calm"},

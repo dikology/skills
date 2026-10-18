@@ -48,10 +48,14 @@ The skill lists what it expects from your vault in one place, its
 - filing target: `## Lines I said`
 - skip list: the `clippings/` folder
 - soft topics: `health/`, #grief
-- lang: (follow me)
+- lang: zh
 
 Also: when I mention a book, check `reading/` first.
 ```
+
+Here `lang: zh` pins replies to 中文, which turns thinking sessions into language
+practice. Leave it out and companion replies in whatever language you write in.
+Quotes from your notes always stay in their original language.
 
 Anything after the fields is your own instruction. The skill follows it but never
 depends on it, so the same skill works in a vault that has none.

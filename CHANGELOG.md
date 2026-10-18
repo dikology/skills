@@ -13,3 +13,6 @@ workaround and its evals pass.
   chat-only when the vault has no notes.
 - Claude Code marketplace `dikology-skills` with one plugin, `dikology`.
 - `CONTEXT.md` glossary and ADR-0001, "Overlay, not fork".
+- Eval harness in `labs/evals/`: runs companion unmodified against a Fixture
+  vault, grades the transcript and the vault diff, and keeps both as results.
+  First case: `orient-quotes-corpus`.

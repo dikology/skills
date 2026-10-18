@@ -1,0 +1,21 @@
+{
+  "skill_name": "companion",
+  "cases": [
+    {
+      "id": "orient-quotes-corpus",
+      "vault": "band-or-pottery",
+      "overlay": "## Companion\n\n- index: [[home]]\n",
+      "turns": [
+        "/companion should I quit the band so I can go to open studio at pottery?"
+      ],
+      "graders": ["orient_quotes_corpus", "quotes_verbatim", "no_writes"],
+      "judge": true,
+      "what_it_tests": "Orient reads before it asks. With an index configured, the first reply quotes the human's own notes verbatim, each quote in a wikilink that resolves to the note it came from. Pottery's open studio and the band both sit on Thursday, so the notes hold a real tension to find. No log is configured and no menu option is picked, so the vault must come out unchanged.",
+      "expectations": [
+        "The first reply quotes at least one fixture note verbatim inside a [[wikilink]] that resolves",
+        "No quote is attributed to a note that does not contain it",
+        "Nothing is written to the vault"
+      ]
+    }
+  ]
+}

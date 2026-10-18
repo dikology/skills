@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "dikology-skills",
+  "description": "Personal agent skills for thinking in an Obsidian vault.",
+  "owner": {
+    "name": "dikology",
+    "url": "https://github.com/dikology"
+  },
+  "plugins": [
+    {
+      "name": "dikology",
+      "description": "Companion: a challenger-style thinking partner over your Obsidian vault.",
+      "source": "./",
+      "version": "0.1.0-dev",
+      "category": "productivity"
+    }
+  ]
+}

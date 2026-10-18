@@ -1,0 +1,72 @@
+# skills
+
+Agent skills for people who think in an Obsidian vault. MIT licensed, versioned,
+and installable as a Claude Code plugin marketplace.
+
+| Skill | What it does |
+|---|---|
+| [`companion`](skills/companion/SKILL.md) | A challenger-style thinking partner. It reads your notes before it speaks, takes a position, quotes your own past writing where it contradicts you, and ends every session with a next-move menu. |
+
+Status: **0.1.0-dev**. See [CHANGELOG](CHANGELOG.md).
+
+## Install
+
+**Claude Code**
+
+```
+/plugin marketplace add dikology/skills
+/plugin install dikology@dikology-skills
+```
+
+Open your vault in Claude Code and run `/companion`, or say "challenge me on <topic>".
+
+**Cursor, Codex or any agent that reads Agent Skills.** Each folder under `skills/`
+is a plain skill. Copy `skills/companion/` into your agent's skills directory.
+
+## The pattern: generic skill + Overlay
+
+A skill you use every day ends up full of your own specifics: your index page, your
+log format, your folder names, examples from your own life. Publishing a "clean" fork
+gives you two copies. You keep using the private one, and the public one rots.
+
+This Library takes a different route ([ADR-0001](docs/adr/0001-overlay-not-fork.md)):
+
+- **The skill is generic.** It assumes an Obsidian vault and nothing else.
+- **Your vault holds an Overlay**, a short section in its `CLAUDE.md` or `AGENTS.md`
+  that tells the skill where your things are.
+- **Every Overlay field has a fallback**, and the skill says out loud when it uses
+  one. A vault with no Overlay still gets a working session.
+
+The skill lists what it expects from your vault in one place, its
+`Requires from the consuming vault` section. An Overlay looks like this:
+
+```markdown
+## Companion
+
+- index: [[home]]
+- log: `journal/thinking-log.md`
+- filing target: `## Lines I said`
+- skip list: the `clippings/` folder
+- soft topics: `health/`, #grief
+- lang: (follow me)
+
+Also: when I mention a book, check `reading/` first.
+```
+
+Anything after the fields is your own instruction. The skill follows it but never
+depends on it, so the same skill works in a vault that has none.
+
+Every skill in this Library follows the same rule, so you can borrow the pattern for
+your own skills: keep the skill generic, declare what it needs from the vault with a
+fallback for each item, and let each vault say the rest.
+
+## Repo map
+
+- `skills/` holds the stable skills, the ones the plugin ships.
+- `.claude-plugin/` holds the marketplace and plugin manifests.
+- `CONTEXT.md` is the glossary: Overlay, Corpus, Consuming vault, Fixture vault, Stable/Candidate.
+- `docs/adr/` holds the decisions and the reasons behind them.
+
+## License
+
+[MIT](LICENSE)

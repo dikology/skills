@@ -24,3 +24,9 @@ workaround and its evals pass.
   names an unpicked menu once, before orient.
 - Evals: multi-session cases, a vault snapshot after every turn, graders with
   parameters, and six cases for first-run setup, the index, and the log.
+- `[a]` files the human's own line, verbatim and dated, under the filing target on
+  the note the session was about. With no filing target it writes nothing and gives
+  the line back in chat. With no line of the human's to file, `[a]` is left off the
+  menu and the other options keep their letters.
+- Evals: graders `line_filed_under_target`, `line_handed_back`, `file_option_absent`,
+  and `no_transcript`, which runs on every case. Three cases for `[a]`.

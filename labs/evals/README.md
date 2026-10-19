@@ -40,6 +40,10 @@ The LLM judge (`judge-rubric.md`) scores only what a regex can't decide, such as
 whether the reply takes a position. Its score is printed next to the verdict and
 never changes it. Turn it off with `--no-judge`.
 
+`no_transcript` is graded on every case, named or not: no file a session writes may
+hold two or more of one session's human turns. A one-turn session can't be told apart
+from a filed line that way, so those cases also grade `no_writes`.
+
 ## Fixture vaults
 
 Small, hand-written and synthetic. Each one is built to provoke one behaviour.
@@ -47,9 +51,9 @@ None contains real notes.
 
 | Vault | Built to provoke |
 |---|---|
-| `band-or-pottery` | Orient: two hobbies competing for the only free evening, with lines worth quoting. Also the vault with no Overlay, for first-run setup |
+| `band-or-pottery` | Orient: two hobbies competing for the only free evening, with lines worth quoting. Also the vault with no Overlay, for first-run setup, and the one where the human refuses the take with a line worth filing |
 | `lisbon-offer` | Orient from the index: the notes about a job offer never name the city; only the index does, and an unindexed note that does name it is a decoy |
-| `spanish-and-the-car` | The log: two unrelated topics, so one session's unpicked menu is easy to spot in the next, and a log with one earlier line |
+| `spanish-and-the-car` | The log: two unrelated topics, so one session's unpicked menu is easy to spot in the next, and a log with one earlier line. Also the session where the human only asks, so there is no line to file |
 
 ## Showing a case can fail
 

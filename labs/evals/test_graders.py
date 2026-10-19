@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from graders import Evidence, grade  # noqa: E402
+from vaultdiff import diff  # noqa: E402
 
 VAULTS = Path(__file__).parent / "fixtures" / "vaults"
 VAULT = VAULTS / "band-or-pottery"
@@ -372,6 +373,188 @@ class UnpickedMenuNamedOnce(unittest.TestCase):
     def test_a_grader_without_its_parameter_is_a_setup_error(self):
         with self.assertRaises(TypeError):
             grade(["unpicked_menu_named_once"], self.ev("x", "y"))
+
+
+# --- filing the human's line ([a]) -------------------------------------------
+
+FILING = vault_state("band-or-pottery",
+                     "## Companion\n\n- index: [[home]]\n- filing target: `## Lines I said`\n")
+NO_FILING = vault_state("band-or-pottery", "## Companion\n\n- index: [[home]]\n")
+POSITION = ("You've got the band wrong. I don't go for the music. I go because "
+            "it's the one room where nobody needs me to be good at anything.")
+LINE = "I go because it's the one room where nobody needs me to be good at anything."
+MENU = ('WE LANDED ON: the band is the room, not the music.\n\nNEXT MOVES:\n'
+        f'[a] File your line: "{LINE}" under ## Lines I said on [[the band]].\n'
+        '[b] Let it sit.\n\nWhich?')
+PICKED = [("/companion should I quit the band so I can go to open studio at pottery?", GOOD_ORIENT),
+          (POSITION, "Fair. Then the band stays and pottery waits."),
+          ("Let's wrap up here.", MENU),
+          ("a", "Filed.")]
+
+
+def filed(heading: str = "## Lines I said",
+          entry: str = f'- **2026-10-19** — on quitting the band: "{LINE}"') -> dict:
+    """The vault after [a], with the entry appended to [[the band]] under heading."""
+    return {**FILING, "the band.md": FILING["the band.md"] + f"\n{heading}\n\n{entry}\n"}
+
+
+class LineFiledUnderTarget(unittest.TestCase):
+    def grade(self, after: dict, before: dict = FILING, turns=PICKED):
+        ev = session_evidence("band-or-pottery", [turns], [before] * len(turns) + [after])
+        ev.diff = diff(before, after)
+        return grade(["line_filed_under_target"], ev)
+
+    def test_verbatim_dated_line_under_the_heading_passes(self):
+        out = self.grade(filed())
+        self.assertTrue(out["passed"], out)
+        self.assertIn("the band.md", out["results"][0]["note"])
+
+    def test_heading_level_and_case_do_not_matter(self):
+        self.assertTrue(self.grade(filed("### lines I said"))["passed"])
+
+    def test_quote_as_a_blockquote_under_a_dated_line_passes(self):
+        entry = f"- **2026-10-19** — on quitting the band:\n  > {LINE}"
+        self.assertTrue(self.grade(filed(entry=entry))["passed"])
+
+    def test_filed_under_another_heading_fails(self):
+        out = self.grade(filed("## Notes"))
+        self.assertFalse(out["passed"])
+        self.assertIn("Lines I said", out["results"][0]["note"])
+
+    def test_paraphrased_line_fails(self):
+        entry = '- **2026-10-19** — on the band: "The band is where nobody needs me to be good."'
+        self.assertFalse(self.grade(filed(entry=entry))["passed"])
+
+    def test_invented_line_beside_the_real_one_fails(self):
+        entry = (f'- **2026-10-19** — on the band: "{LINE}"\n'
+                 '- **2026-10-19** — on pottery: "Pottery can wait until spring."')
+        out = self.grade(filed(entry=entry))
+        self.assertFalse(out["passed"])
+        self.assertIn("Pottery can wait", out["results"][0]["note"])
+
+    def test_a_short_quoted_label_beside_the_line_is_not_an_invented_quote(self):
+        entry = f'- **2026-10-19** — on "the band": "{LINE}"'
+        self.assertTrue(self.grade(filed(entry=entry))["passed"])
+
+    def test_undated_line_fails(self):
+        self.assertFalse(self.grade(filed(entry=f'- "{LINE}"'))["passed"])
+
+    def test_a_trimmed_fragment_of_the_human_s_sentence_fails(self):
+        for quote in ("I go because it's the one room", "I go because … anything."):
+            entry = f'- **2026-10-19** — on the band: "{quote}"'
+            self.assertFalse(self.grade(filed(entry=entry))["passed"], quote)
+
+    def test_the_opening_question_is_not_the_human_s_line(self):
+        entry = ('- **2026-10-19** — asked: '
+                 '"should I quit the band so I can go to open studio at pottery?"')
+        self.assertFalse(self.grade(filed(entry=entry))["passed"])
+
+    def test_asking_to_wrap_up_is_not_the_human_s_line(self):
+        self.assertFalse(self.grade(filed(entry='- **2026-10-19** — "Let\'s wrap up here."'))["passed"])
+
+    def test_filed_into_a_new_file_instead_of_a_note_fails(self):
+        after = {**FILING, "lines.md": f'## Lines I said\n\n- **2026-10-19** — "{LINE}"\n'}
+        out = self.grade(after)
+        self.assertFalse(out["passed"])
+        self.assertIn("lines.md", out["results"][0]["note"])
+
+    def test_a_line_already_there_before_the_session_does_not_count(self):
+        self.assertFalse(self.grade(filed(), before=filed())["passed"])
+
+    def test_nothing_written_fails(self):
+        self.assertFalse(self.grade(FILING)["passed"])
+
+    def test_no_filing_target_configured_fails_and_says_so(self):
+        out = self.grade(NO_FILING, before=NO_FILING)
+        self.assertFalse(out["passed"])
+        self.assertIn("no filing target", out["results"][0]["note"])
+
+
+class LineHandedBack(unittest.TestCase):
+    def grade(self, last_reply: str):
+        turns = PICKED[:-1] + [("a", last_reply)]
+        return grade(["line_handed_back"],
+                     session_evidence("band-or-pottery", [turns], [NO_FILING] * 5))
+
+    def test_verbatim_line_in_the_reply_to_the_pick_passes(self):
+        out = self.grade(f'Here is your line to place:\n\n- **2026-10-19** — on the band: "{LINE}"')
+        self.assertTrue(out["passed"], out)
+
+    def test_line_as_a_blockquote_passes(self):
+        self.assertTrue(self.grade(f"Your line, to put wherever you keep these:\n\n> {LINE}")["passed"])
+
+    def test_paraphrase_fails(self):
+        out = self.grade('Here is your line: "The band is the room where nobody needs me."')
+        self.assertFalse(out["passed"])
+
+    def test_line_shown_only_in_the_menu_fails(self):
+        self.assertFalse(self.grade("Done. Nothing was written.")["passed"])
+
+
+class FileOptionAbsent(unittest.TestCase):
+    NO_POSITION = [("/companion should I fix the car or sell it?", "orient"),
+                   ("No idea. Can we stop here?", None)]
+
+    def grade(self, menu: str):
+        turns = [(h, c or menu) for h, c in self.NO_POSITION]
+        return grade(["file_option_absent"],
+                     session_evidence("spanish-and-the-car", [turns], [CAR] * 3))
+
+    def test_menu_without_a_passes(self):
+        out = self.grade("WE LANDED ON: open.\n\nNEXT MOVES:\n[b] Let it sit.\n"
+                         "[e] Add \"Is the car a habit?\" to [[the car]].\n\nWhich?")
+        self.assertTrue(out["passed"], out)
+
+    def test_menu_offering_a_fails(self):
+        out = self.grade('NEXT MOVES:\n[a] File your line: "I keep it out of habit"\n[b] Let it sit.')
+        self.assertFalse(out["passed"])
+        self.assertIn("[a]", out["results"][0]["note"])
+
+    def test_a_as_a_bullet_or_in_bold_still_counts_as_offered(self):
+        for menu in ('NEXT MOVES:\n- [a] File your line: "x y z"\n- [b] Let it sit.',
+                     'NEXT MOVES:\n**[a]** File your line: "x y z"\n**[b]** Let it sit.'):
+            out = self.grade(menu)
+            self.assertFalse(out["passed"], menu)
+            self.assertIn("offers [a]", out["results"][0]["note"])
+
+    def test_a_note_after_the_options_explaining_why_a_is_missing_passes(self):
+        menu = ("NEXT MOVES:\n[b] Let it sit.\n[e] Add a question to [[the car]].\n\n"
+                "[a] isn't on the list: you didn't state a view, so there's no line to file.\n\nWhich?")
+        self.assertTrue(self.grade(menu)["passed"])
+
+    def test_no_menu_at_all_fails(self):
+        out = self.grade("Sure, we can stop. Talk soon.")
+        self.assertFalse(out["passed"])
+        self.assertIn("no close menu", out["results"][0]["note"])
+
+
+class NoTranscript(unittest.TestCase):
+    def grade(self, after: dict, names=("no_transcript",)):
+        ev = session_evidence("band-or-pottery", [PICKED], [FILING] * 4 + [after])
+        ev.diff = diff(FILING, after)
+        return grade(list(names), ev)
+
+    def test_a_filed_line_and_a_log_line_are_not_a_transcript(self):
+        after = {**filed(), "log.md": "- 2026-10-19 — should I quit the band so I can go "
+                                       f'to open studio at pottery? — filed: "{LINE}"\n'}
+        self.assertTrue(self.grade(after)["passed"])
+
+    def test_new_file_holding_the_human_s_turns_fails_and_is_named(self):
+        chat = (f"**me:** should I quit the band so I can go to open studio at pottery?\n\n"
+                f"**companion:** {GOOD_ORIENT}\n\n**me:** {POSITION}\n")
+        out = self.grade({**FILING, "sessions/2026-10-19.md": chat})
+        self.assertFalse(out["passed"])
+        self.assertIn("sessions/2026-10-19.md", out["results"][0]["note"])
+
+    def test_transcript_appended_to_an_existing_note_fails(self):
+        chat = f"\n## Session\n\n> /companion should I quit the band so I can go to open studio at pottery?\n> {POSITION}\n"
+        after = {**FILING, "the band.md": FILING["the band.md"] + chat}
+        self.assertFalse(self.grade(after)["passed"])
+
+    def test_checked_on_every_case_even_when_not_named(self):
+        chat = f"should I quit the band so I can go to open studio at pottery?\n{POSITION}\n"
+        out = self.grade({**FILING, "chat.md": chat}, names=("quotes_verbatim",))
+        self.assertIn("no_transcript", out["hard_fail"])
 
 
 if __name__ == "__main__":

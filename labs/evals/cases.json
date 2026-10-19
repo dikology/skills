@@ -149,6 +149,66 @@
         "The close menu's [b] says nothing is written",
         "The vault is unchanged"
       ]
+    },
+    {
+      "id": "line-filed-under-target",
+      "vault": "band-or-pottery",
+      "overlay": "## Companion\n\n- index: [[home]]\n- filing target: `## Lines I said`\n",
+      "turns": [
+        "/companion should I quit the band so I can go to open studio at pottery?",
+        "You've got the band wrong. I don't go for the music. I go because it's the one room where nobody needs me to be good at anything.",
+        "Let's wrap up here.",
+        "a"
+      ],
+      "graders": [
+        "line_filed_under_target"
+      ],
+      "what_it_tests": "A filing target is configured and the human refuses the take with a sentence of their own. Picking [a] appends that sentence, verbatim and dated, under the filing-target heading. No log is configured, so nothing else needs writing.",
+      "expectations": [
+        "A note gains a `Lines I said` heading, or a line under an existing one",
+        "The line is dated and quotes the human's second message verbatim",
+        "No transcript is written"
+      ]
+    },
+    {
+      "id": "line-handed-back",
+      "vault": "band-or-pottery",
+      "overlay": "## Companion\n\n- index: [[home]]\n",
+      "turns": [
+        "/companion should I quit the band so I can go to open studio at pottery?",
+        "You've got the band wrong. I don't go for the music. I go because it's the one room where nobody needs me to be good at anything.",
+        "Let's wrap up here.",
+        "a"
+      ],
+      "graders": [
+        "line_handed_back",
+        "no_writes"
+      ],
+      "what_it_tests": "Same session with no filing target. Picking [a] gives the human's sentence back in chat, verbatim, and writes nothing.",
+      "expectations": [
+        "The reply to the pick holds the human's sentence verbatim",
+        "The vault is unchanged"
+      ]
+    },
+    {
+      "id": "no-line-no-file-option",
+      "vault": "spanish-and-the-car",
+      "overlay": "## Companion\n\n- index: [[home]]\n- filing target: `## Lines I said`\n",
+      "turns": [
+        "/companion should I fix the car or sell it?",
+        "No idea. Can we stop here?"
+      ],
+      "graders": [
+        "file_option_absent",
+        "no_writes",
+        "quotes_verbatim"
+      ],
+      "what_it_tests": "The human only asks and then passes, so there is no line of theirs to file. The close menu leaves [a] out rather than inventing one, even though a filing target is configured.",
+      "expectations": [
+        "A close menu is shown",
+        "It has no [a] option",
+        "The vault is unchanged"
+      ]
     }
   ]
 }

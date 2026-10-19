@@ -55,7 +55,8 @@ MIN_QUOTE_WORDS = 3
 
 # A close-menu option ("[e] Add "<question>" to [[note]]") proposes new text for a
 # note. Its quotes are not claims about what the note already says.
-MENU_OPTION = re.compile(r"^\s*\[[a-z]\]", re.M)
+MENU_OPTION = re.compile(r"^\s*(?:[-*]\s+)?(?:\*\*)?\[[a-z]\]", re.M)
+FILE_OPTION = re.compile(r"^\s*(?:[-*]\s+)?(?:\*\*)?\[a\]", re.M)
 
 
 def quotes(text: str) -> list:
@@ -334,6 +335,197 @@ def g_unpicked_menu_named_once(ev: Evidence, topic: str) -> Result:
     return Result(name, True, "named once, in the second session's first reply")
 
 
+# --- the human's line ([a]) and transcripts -------------------------------------
+
+def human_turns(ev: Evidence, session: int | None = None) -> list:
+    return [t["text"] for t in ev.transcript if t["role"] == "human"
+            and (session is None or t.get("session", 0) == session)]
+
+
+def said_by_human(ev: Evidence, text: str) -> bool:
+    """The text is long enough to be a line, and verbatim somewhere the human said it.
+    Loose on purpose: used to catch a quote the human never said."""
+    return (len(text.split()) >= MIN_QUOTE_WORDS
+            and any(verbatim(text, turn) for turn in human_turns(ev)))
+
+
+def thinking_turns(ev: Evidence) -> list:
+    """The human turns a fileable line can come from: not a /command that opens a
+    session, and nothing from the turn that asked to close onwards."""
+    out = []
+    for t in ev.transcript:
+        if t["role"] == "human":
+            out.append(t["text"])
+        elif MENU_OPTION.search(t["text"]):
+            out = out[:-1]
+            break
+    return [t for t in out if not _COMMAND.match(t)]
+
+
+def _sentences(turn: str) -> list:
+    return [s for s in re.split(r"(?<=[.!?])\s+", _norm(turn)) if s]
+
+
+def fileable(ev: Evidence, text: str) -> bool:
+    """The text is one or more whole sentences of a turn the human thought aloud in,
+    copied exactly: no trimmed fragment, no ellipsis, no closing request."""
+    line = _norm(text).rstrip(".!?")
+    if len(line.split()) < MIN_QUOTE_WORDS or "…" in line or "..." in line:
+        return False
+    for turn in thinking_turns(ev):
+        sents = _sentences(turn)
+        for i in range(len(sents)):
+            for j in range(i + 1, len(sents) + 1):
+                if " ".join(sents[i:j]).rstrip(".!?") == line:
+                    return True
+    return False
+
+
+_DECORATION = re.compile(r"^[\s>*\-`\"“«]+|[\s`\"”»*]+$")
+
+
+def possible_lines(text: str) -> list:
+    """Every "quoted" span, and every line with its bullet, blockquote marker or
+    wrapping quotes removed: the forms a filed or handed-back line can take."""
+    spans = [m.group(1) for m in re.finditer(_QUOTED, text)]
+    return spans + [_DECORATION.sub("", line) for line in text.splitlines()]
+
+
+def human_line_in(ev: Evidence, text: str) -> str | None:
+    return next((c for c in possible_lines(text) if fileable(ev, c)), None)
+
+
+def written(ev: Evidence) -> dict:
+    """{path: text the session wrote}: an added file whole, a modified file's new lines."""
+    out = dict(ev.diff["added"])
+    out.update({p: "\n".join(new_lines(old, new.splitlines()))
+                for p, (old, new) in ev.diff["modified"].items()})
+    return out
+
+
+_HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
+
+
+def heading_name(text: str) -> str:
+    return re.sub(r"\s+", " ", text.strip().lstrip("#").strip()).lower()
+
+
+def under_heading(text: str, name: str) -> list:
+    """The lines of every section whose heading reads `name`, at any level."""
+    out, level = [], None
+    for line in text.splitlines():
+        h = _HEADING.match(line)
+        if h and level is not None and len(h.group(1)) <= level:
+            level = None
+        if h and heading_name(h.group(2)) == name:
+            level = len(h.group(1))
+            continue
+        if level is not None:
+            out.append(line)
+    return out
+
+
+def new_lines(before: str, after: list) -> list:
+    """The lines in `after` that `before` did not already hold, counting repeats."""
+    left = {}
+    for line in before.splitlines():
+        left[line] = left.get(line, 0) + 1
+    out = []
+    for line in after:
+        if left.get(line):
+            left[line] -= 1
+        else:
+            out.append(line)
+    return out
+
+
+_COMMAND = re.compile(r"^\s*/\S+\s*")
+DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+
+
+def g_line_filed_under_target(ev: Evidence) -> Result:
+    """[a] wrote, under the configured filing target on a note that was already in the
+    vault, a dated line the human said, whole and verbatim, and quoted nothing there
+    that the human didn't say."""
+    name = "line_filed_under_target"
+    target = at_start(ev, lambda snap: overlay_field(snap, "filing target"))
+    if not target:
+        return Result(name, False, "no filing target configured in the Overlay")
+    heading = heading_name(target)
+    before = ev.snapshots[0] if ev.snapshots else {}
+    after = ev.snapshots[-1] if ev.snapshots else {}
+    for path in sorted(set(ev.diff["added"]) | set(ev.diff["modified"])):
+        added = [l for l in new_lines(before.get(path, ""), under_heading(after.get(path, ""), heading))
+                 if l.strip()] if ev.snapshots else []
+        if not added:
+            continue
+        if path not in before or path in OVERLAY_FILES or path == at_start(ev, log_path):
+            return Result(name, False, f"filed into {path}, not a note the session was about")
+        block = "\n".join(added)
+        invented = [q for q in (m.group(1) for m in re.finditer(_QUOTED, block))
+                    if len(q.split()) >= MIN_QUOTE_WORDS and not said_by_human(ev, q)]
+        if invented:
+            return Result(name, False, f"{path}: quoted under {target} but never said: "
+                                       f"\"{invented[0]}\"")
+        if not DATE.search(block):
+            return Result(name, False, f"{path}: the line under {target} has no date")
+        line = human_line_in(ev, block)
+        if line:
+            return Result(name, True, f"{path}: \"{line}\" under {target}")
+        return Result(name, False, f"{path}: nothing under {target} is a whole sentence "
+                                   "the human said")
+    return Result(name, False, f"no new line under a {target} heading anywhere in the vault")
+
+
+def g_line_handed_back(ev: Evidence) -> Result:
+    """With no filing target, the reply to the [a] pick gives the human their own line,
+    verbatim, to place themselves."""
+    name = "line_handed_back"
+    last = next((t["text"] for t in reversed(ev.transcript) if t["role"] == "companion"), "")
+    line = human_line_in(ev, last)
+    if line:
+        return Result(name, True, f"handed back: \"{line}\"")
+    return Result(name, False, "the last reply holds no line the human said verbatim")
+
+
+def offers_a(menu: str) -> str | None:
+    """The menu's [a] option line, or None. Options run in letter order, so an [a] line
+    after another option is a note about the menu (why [a] is missing), not an offer."""
+    first = next((l for l in menu.splitlines() if MENU_OPTION.match(l)), None)
+    return first if first and FILE_OPTION.match(first) else None
+
+
+def g_file_option_absent(ev: Evidence) -> Result:
+    """The human never said a fileable line, so no close menu offers [a]."""
+    name = "file_option_absent"
+    menus = [t["text"] for t in ev.transcript
+             if t["role"] == "companion" and MENU_OPTION.search(t["text"])]
+    if not menus:
+        return Result(name, False, "no close menu shown")
+    for menu in menus:
+        line = offers_a(menu)
+        if line:
+            return Result(name, False, f"menu offers [a]: {line.strip()[:120]}")
+    return Result(name, True, f"{len(menus)} menu(s), none offering [a]")
+
+
+def g_no_transcript(ev: Evidence) -> Result:
+    """No file the session wrote holds two or more of one session's human turns.
+    A filed line or a log topic holds one; a transcript holds them all. A one-turn
+    session can't be told apart this way, so cases like that grade `no_writes`."""
+    name = "no_transcript"
+    files = written(ev)
+    sids = sorted({t.get("session", 0) for t in ev.transcript if t["role"] == "human"})
+    for path, text in files.items():
+        for sid in sids:
+            turns = [_COMMAND.sub("", t) for t in human_turns(ev, sid)]
+            hits = [t for t in turns if len(t.split()) >= MIN_QUOTE_WORDS and verbatim(t, text)]
+            if len(hits) >= 2:
+                return Result(name, False, f"{path} holds {len(hits)} of the human's turns "
+                                           f"from session {sid + 1}")
+    return Result(name, True, f"{len(files)} written file(s), none a transcript")
+
+
 GRADERS = {
     "orient_quotes_corpus": g_orient_quotes_corpus,
     "quotes_verbatim": g_quotes_verbatim,
@@ -345,7 +537,14 @@ GRADERS = {
     "writes_only_log": g_writes_only_log,
     "unpicked_menu_logged": g_unpicked_menu_logged,
     "unpicked_menu_named_once": g_unpicked_menu_named_once,
+    "line_filed_under_target": g_line_filed_under_target,
+    "line_handed_back": g_line_handed_back,
+    "file_option_absent": g_file_option_absent,
+    "no_transcript": g_no_transcript,
 }
+
+# Graded on every case, named or not: no session may leave a transcript in the vault.
+EVERY_CASE = ("no_transcript",)
 
 
 def spec(entry) -> tuple:
@@ -357,7 +556,9 @@ def spec(entry) -> tuple:
 
 
 def grade(entries: list, ev: Evidence) -> dict:
-    results = [GRADERS[name](ev, **params) for name, params in map(spec, entries)]
+    named = [spec(e) for e in entries]
+    named += [(n, {}) for n in EVERY_CASE if n not in {name for name, _ in named}]
+    results = [GRADERS[name](ev, **params) for name, params in named]
     total = sum(r.weight for r in results) or 1.0
     return {
         "passed": all(r.passed for r in results if r.hard),

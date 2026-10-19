@@ -137,9 +137,17 @@ Word each option for what this vault can do: with no filing target, [a] reads
 "Here is your line to place"; with no log, [b] reads "Let it sit — nothing is written".
 
 **[a] is the default offer.** The session's thinking is the sentence the human said
-when they refused or sharpened a position. File their words verbatim:
-`- **YYYY-MM-DD** — on <what it answered>: "<quote>"`. If the human said no such
-sentence, leave [a] off the menu.
+when they refused or sharpened a position. The line is
+`- **YYYY-MM-DD** — on <what it answered>: "<quote>"`, the quote copied from their
+message character for character: never trimmed into a better sentence, never yours.
+
+- **Filing target set:** append the line under that heading on the note the session
+  was about, adding the heading at the end of the note if it isn't there yet.
+- **No filing target:** write nothing. Give the line back in chat for the human to place.
+
+If the human said no such sentence (only asked questions, or agreed, or passed),
+leave [a] off the menu and keep the other options' letters. Never put your own
+words in their mouth to fill the slot.
 
 ## Persistence
 

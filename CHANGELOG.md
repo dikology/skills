@@ -16,3 +16,11 @@ workaround and its evals pass.
 - Eval harness in `labs/evals/`: runs companion unmodified against a Fixture
   vault, grades the transcript and the vault diff, and keeps both as results.
   First case: `orient-quotes-corpus`.
+- First-run setup: with no Overlay, companion says so, asks for every field in
+  one message, shows the section, and writes it only after an approving reply.
+  Declining writes nothing and the session runs on vault search.
+- The log takes its one line per session when the Close menu is shown, as
+  `menu unpicked`, and that line is rewritten if the human picks. The next session
+  names an unpicked menu once, before orient.
+- Evals: multi-session cases, a vault snapshot after every turn, graders with
+  parameters, and six cases for first-run setup, the index, and the log.

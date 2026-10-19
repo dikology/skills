@@ -19,10 +19,12 @@ For each case in `cases.json`:
    Overlay to its `CLAUDE.md`.
 2. Install the skill under `.claude/skills/companion/`, unmodified, the way a
    Consuming vault installs it.
-3. Play the human turns in one headless `claude -p` session, resuming it for each
-   turn after the first. User settings, plugins and MCP servers stay out.
-4. Snapshot the vault before and after, then grade the **transcript** and the
-   **vault diff**.
+3. Play each session's human turns in headless `claude -p`, resuming the session
+   for each turn after the first and starting fresh for the next session. User
+   settings, plugins and MCP servers stay out.
+4. Snapshot the vault before the first turn and after every turn, then grade the
+   **transcript**, the **vault diff** and, where order matters (first-run setup,
+   one log line per session), the snapshots between turns.
 5. Print one `PASS`/`FAIL` line per case and keep, under `results/<timestamp>/<case>/`:
    `transcript.md`, `transcript.json`, `vault.diff`, `grade.json`.
 
@@ -45,7 +47,9 @@ None contains real notes.
 
 | Vault | Built to provoke |
 |---|---|
-| `band-or-pottery` | Orient: two hobbies competing for the only free evening, with lines worth quoting |
+| `band-or-pottery` | Orient: two hobbies competing for the only free evening, with lines worth quoting. Also the vault with no Overlay, for first-run setup |
+| `lisbon-offer` | Orient from the index: the notes about a job offer never name the city; only the index does, and an unindexed note that does name it is a decoy |
+| `spanish-and-the-car` | The log: two unrelated topics, so one session's unpicked menu is easy to spot in the next, and a log with one earlier line |
 
 ## Showing a case can fail
 
@@ -59,8 +63,12 @@ python3 labs/evals/run_evals.py --skill labs/evals/mutants/companion-paraphrase
 ## Adding a case
 
 Add an object to `cases.json`: `id`, `vault`, `overlay` (Markdown, or null for a
-vault with no Overlay), `turns`, `graders` (names from `graders.GRADERS`), and
-optionally `"judge": true`. `what_it_tests` and `expectations` are for the
+vault with no Overlay), either `turns` (one session) or `sessions` (a list of turn
+lists, each a fresh session), `graders`, and optionally `"judge": true`. A grader is
+named as a string from `graders.GRADERS`, or as `{"name": ..., <parameter>: ...}`
+when it takes one (`unpicked_menu_named_once` takes `topic`). The runner checks
+names and parameters before it makes any API call. In a first-run case, the last
+turn is the one that approves the Overlay. `what_it_tests` and `expectations` are for the
 human reading the case; nothing grades them. Write the grader test-first in `test_graders.py`,
 including a mutant reply that must fail it.
 

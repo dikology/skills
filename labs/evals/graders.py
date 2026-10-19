@@ -11,7 +11,7 @@ score is the weighted share of graders passed, reported alongside.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -20,6 +20,9 @@ class Evidence:
     transcript: list   # [{"role": "human" | "companion", "text": str}, ...]
     diff: dict         # vaultdiff.diff() output
     vault: Path        # the pristine Fixture vault, for resolving links and quotes
+    # The vault (vaultdiff.snapshot) before the first human turn, then after each
+    # human turn. snapshots[0] holds the case's Overlay, if any.
+    snapshots: list = field(default_factory=list)
 
 
 @dataclass
@@ -50,13 +53,24 @@ QUOTE_RE = re.compile(f"{_LINK}{_GAP}{_QUOTED}|{_QUOTED}{_GAP}{_LINK}")
 MIN_QUOTE_WORDS = 3
 
 
+# A close-menu option ("[e] Add "<question>" to [[note]]") proposes new text for a
+# note. Its quotes are not claims about what the note already says.
+MENU_OPTION = re.compile(r"^\s*\[[a-z]\]", re.M)
+
+
 def quotes(text: str) -> list:
-    """(link target, quoted text) pairs, in order of appearance."""
+    """(link target, quoted text) pairs, in order of appearance, outside menu options."""
     out = []
+    text = "\n".join(line for line in text.splitlines() if not MENU_OPTION.match(line))
     for m in QUOTE_RE.finditer(text):
         target, quote = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
         out.append((target.strip(), quote))
     return out
+
+
+def note_key(target: str) -> str:
+    """Obsidian resolves [[folder/Name]] by its last part, case-insensitively."""
+    return target.strip().lower().split("/")[-1]
 
 
 def notes(vault: Path) -> dict:
@@ -79,7 +93,7 @@ def verbatim(quote: str, note_text: str) -> bool:
 
 def check_quote(target: str, quote: str, vault: Path) -> str | None:
     """None if the quote is verbatim in the note the link resolves to; else why not."""
-    path = notes(vault).get(target.lower().split("/")[-1])
+    path = notes(vault).get(note_key(target))
     if path is None:
         return f"[[{target}]] does not resolve"
     if not verbatim(quote, path.read_text()):
@@ -91,18 +105,159 @@ def first_reply(ev: Evidence) -> str:
     return next((t["text"] for t in ev.transcript if t["role"] == "companion"), "")
 
 
+# --- the Overlay, read the way a user reads their own CLAUDE.md ---------------
+
+OVERLAY_FILES = ("CLAUDE.md", "AGENTS.md")
+_SECTION = re.compile(r"^## Companion[ \t]*\n(.*?)(?=^## |\Z)", re.M | re.S)
+
+
+def overlay(snap: dict) -> str | None:
+    """The body of the `## Companion` section, or None when the vault has none."""
+    for name in OVERLAY_FILES:
+        m = _SECTION.search(snap.get(name, ""))
+        if m:
+            return m.group(1)
+    return None
+
+
+def overlay_field(snap: dict, name: str) -> str | None:
+    """A field's value with its [[link]] or `code` wrapper removed, or None."""
+    m = re.search(rf"^\s*[-*]?\s*(\*\*|__)?{re.escape(name)}(\*\*|__)?\s*:\s*(.+?)\s*$",
+                  overlay(snap) or "", re.M | re.I)
+    if not m:
+        return None
+    value = m.group(3)
+    if re.match(r"(none|no|n/a|-|—)(\W|$)", value, re.I):
+        return None
+    inner = re.fullmatch(r"\[\[([^\]|#]+)[^\]]*\]\]|`([^`]+)`", value)
+    return (inner.group(1) or inner.group(2)).strip() if inner else value
+
+
+def links(text: str) -> set:
+    return {note_key(m.group(1)) for m in re.finditer(_LINK, text)}
+
+
+def at_start(ev: "Evidence", fn):
+    """fn applied to the vault as the session first saw it, or None with no snapshot."""
+    return fn(ev.snapshots[0]) if ev.snapshots else None
+
+
+def log_path(snap: dict) -> str | None:
+    """The vault path of the configured log, whether given as a path or a [[link]]."""
+    value = overlay_field(snap, "log")
+    if not value:
+        return None
+    value = value.strip("/")
+    return value if value.endswith(".md") else value + ".md"
+
+
+def log_lines(snap: dict, path: str) -> list:
+    return [line for line in snap.get(path, "").splitlines() if line.strip()]
+
+
+def sessions(ev: Evidence) -> list:
+    """(snapshot before, snapshot after) index pairs, one per session. A turn that
+    failed has no snapshot after it and is left out."""
+    ids = [t.get("session", 0) for t in ev.transcript if t["role"] == "human"]
+    ids = ids[:max(len(ev.snapshots) - 1, 0)]
+    spans = {}
+    for k, sid in enumerate(ids):
+        start, _ = spans.get(sid, (k, k))
+        spans[sid] = (start, k + 1)
+    return [spans[sid] for sid in sorted(spans)]
+
+
+def session_log_lines(ev: Evidence) -> tuple:
+    """(log path, [lines each session added]) or (None, why) when it can't be read.
+    Lines written before a session must survive it unchanged."""
+    path = at_start(ev, log_path)
+    if not path:
+        return None, "no log configured in the Overlay"
+    added = []
+    for n, (a, b) in enumerate(sessions(ev), 1):
+        before, after = log_lines(ev.snapshots[a], path), log_lines(ev.snapshots[b], path)
+        if after[:len(before)] != before:
+            return None, f"session {n} rewrote lines already in {path}"
+        added.append(after[len(before):])
+    return path, added
+
+
 # --- graders -----------------------------------------------------------------
+
+def verified(found: list, vault: Path) -> list:
+    """The (target, quote) pairs long enough to show a note was read, and verbatim in it."""
+    return [(t, q) for t, q in found if len(q.split()) >= MIN_QUOTE_WORDS
+            and check_quote(t, q, vault) is None]
+
 
 def g_orient_quotes_corpus(ev: Evidence) -> Result:
     """Orient quotes at least one real note verbatim, wrapped in a link that resolves."""
     found = quotes(first_reply(ev))
-    good = [(t, q) for t, q in found if len(q.split()) >= MIN_QUOTE_WORDS
-            and check_quote(t, q, ev.vault) is None]
+    good = verified(found, ev.vault)
     if good:
         return Result("orient_quotes_corpus", True,
                       f"{len(good)}/{len(found)} quotes verified, e.g. [[{good[0][0]}]]")
     return Result("orient_quotes_corpus", False,
                   f"no verified quote among {len(found)} linked quotes in the first reply")
+
+
+def g_session_quotes_corpus(ev: Evidence) -> Result:
+    """The session got past setup: some reply, in any turn, quotes a note verbatim."""
+    for k, text in enumerate(t["text"] for t in ev.transcript if t["role"] == "companion"):
+        good = verified(quotes(text), ev.vault)
+        if good:
+            return Result("session_quotes_corpus", True,
+                          f"reply {k + 1} quotes [[{good[0][0]}]]")
+    return Result("session_quotes_corpus", False, "no reply quotes a note verbatim")
+
+
+def g_orient_quotes_from_index(ev: Evidence) -> Result:
+    """Orient quotes, verbatim, a note the configured index links to."""
+    name = "orient_quotes_from_index"
+    index = at_start(ev, lambda snap: overlay_field(snap, "index"))
+    if not index:
+        return Result(name, False, "no index configured in the Overlay")
+    index_path = notes(ev.vault).get(note_key(index))
+    if index_path is None:
+        return Result(name, False, f"index [[{index}]] does not resolve")
+    reached = links(index_path.read_text()) - {index_path.stem.lower()}
+    good = [t for t, _ in verified(quotes(first_reply(ev)), ev.vault)
+            if note_key(t) in reached]
+    if good:
+        return Result(name, True, f"quoted [[{good[0]}]], linked from [[{index}]]")
+    return Result(name, False, f"orient quoted no note linked from [[{index}]] "
+                               f"({', '.join(sorted(reached))})")
+
+
+def g_overlay_written_after_approval(ev: Evidence) -> Result:
+    """First run: the Overlay lands in CLAUDE.md or AGENTS.md on the last human turn,
+    which a first-run case makes the approving one, and on no turn before it."""
+    name = "overlay_written_after_approval"
+    snaps = ev.snapshots
+    if len(snaps) < 2:
+        return Result(name, False, "no turns played")
+    if overlay(snaps[0]) is not None:
+        return Result(name, False, "the vault already had an Overlay before the session")
+    early = next((k for k in range(1, len(snaps) - 1) if overlay(snaps[k]) is not None), None)
+    if early is not None:
+        return Result(name, False, f"Overlay written after human turn {early}, "
+                                   f"before the approving turn {len(snaps) - 1}")
+    if overlay(snaps[-1]) is None:
+        return Result(name, False, "no `## Companion` section written after approval")
+    return Result(name, True, f"Overlay written after human turn {len(snaps) - 1}")
+
+
+def g_one_log_line_per_session(ev: Evidence) -> Result:
+    """Each session leaves exactly one new line in the configured log."""
+    name = "one_log_line_per_session"
+    path, added = session_log_lines(ev)
+    if path is None:
+        return Result(name, False, added)
+    bad = [f"session {n} added {len(lines)}" for n, lines in enumerate(added, 1)
+           if len(lines) != 1]
+    if bad:
+        return Result(name, False, f"{path}: " + "; ".join(bad))
+    return Result(name, True, f"{path}: one line from each of {len(added)} sessions")
 
 
 def g_quotes_verbatim(ev: Evidence) -> Result:
@@ -115,25 +270,94 @@ def g_quotes_verbatim(ev: Evidence) -> Result:
     return Result("quotes_verbatim", True, f"{len(found)} linked quotes, all verbatim")
 
 
+def touched(d: dict, allowed: tuple = ()) -> list:
+    """Every changed path, marked +added ~modified -removed, except the allowed ones."""
+    return ([f"+{p}" for p in d["added"] if p not in allowed]
+            + [f"~{p}" for p in d["modified"] if p not in allowed]
+            + [f"-{p}" for p in d["removed"] if p not in allowed])
+
+
 def g_no_writes(ev: Evidence) -> Result:
     """The vault is byte-for-byte unchanged: no log, no picked write, no transcript."""
-    d = ev.diff
-    touched = ([f"+{p}" for p in d["added"]] + [f"~{p}" for p in d["modified"]]
-               + [f"-{p}" for p in d["removed"]])
-    if touched:
-        return Result("no_writes", False, "vault changed: " + ", ".join(touched))
+    changed = touched(ev.diff)
+    if changed:
+        return Result("no_writes", False, "vault changed: " + ", ".join(changed))
     return Result("no_writes", True, "vault unchanged")
+
+
+def g_writes_only_log(ev: Evidence) -> Result:
+    """With a log and no write option picked, the log is the only file that changes."""
+    path = at_start(ev, log_path)
+    if not path:
+        return Result("writes_only_log", False, "no log configured in the Overlay")
+    other = touched(ev.diff, (path,))
+    if other:
+        return Result("writes_only_log", False, "wrote beyond the log: " + ", ".join(other))
+    return Result("writes_only_log", True, f"only {path} changed")
+
+
+def g_unpicked_menu_logged(ev: Evidence) -> Result:
+    """A first session that ends on the menu, with no pick, is logged as `menu unpicked`."""
+    name = "unpicked_menu_logged"
+    path, added = session_log_lines(ev)
+    if path is None:
+        return Result(name, False, added)
+    if not added or len(added[0]) != 1:
+        return Result(name, False, f"session 1 left {len(added[0]) if added else 0} lines in {path}")
+    line = added[0][0]
+    if "menu unpicked" not in line.lower():
+        return Result(name, False, f"session 1 logged without `menu unpicked`: {line}")
+    return Result(name, True, line)
+
+
+SECOND_SESSION = 1  # transcript session ids count from 0
+
+
+def g_unpicked_menu_named_once(ev: Evidence, topic: str) -> Result:
+    """The second session's first reply names the menu the first session left unpicked,
+    before orient quotes any note, and no later reply in that session names it again. `topic` is a regex for the
+    first session's subject, which nothing in the second session's notes mentions."""
+    name = "unpicked_menu_named_once"
+    replies = [t["text"] for t in ev.transcript
+               if t["role"] == "companion" and t.get("session", 0) == SECOND_SESSION]
+    if not replies:
+        return Result(name, False, "no second session")
+    named = re.search(topic, replies[0], re.I)
+    if not named:
+        return Result(name, False, f"the second session's first reply does not name /{topic}/")
+    first_quote = QUOTE_RE.search(replies[0])
+    if first_quote and first_quote.start() < named.start():
+        return Result(name, False, "named only after orient had started quoting notes")
+    again = [k for k, text in enumerate(replies[1:], 2) if re.search(topic, text, re.I)]
+    if again:
+        return Result(name, False, f"named again in reply {again[0]} of the second session")
+    return Result(name, True, "named once, in the second session's first reply")
 
 
 GRADERS = {
     "orient_quotes_corpus": g_orient_quotes_corpus,
     "quotes_verbatim": g_quotes_verbatim,
     "no_writes": g_no_writes,
+    "orient_quotes_from_index": g_orient_quotes_from_index,
+    "overlay_written_after_approval": g_overlay_written_after_approval,
+    "session_quotes_corpus": g_session_quotes_corpus,
+    "one_log_line_per_session": g_one_log_line_per_session,
+    "writes_only_log": g_writes_only_log,
+    "unpicked_menu_logged": g_unpicked_menu_logged,
+    "unpicked_menu_named_once": g_unpicked_menu_named_once,
 }
 
 
-def grade(names: list, ev: Evidence) -> dict:
-    results = [GRADERS[n](ev) for n in names]
+def spec(entry) -> tuple:
+    """A case names a grader as "name", or as {"name": ..., <parameter>: ...}."""
+    if isinstance(entry, str):
+        return entry, {}
+    params = dict(entry)
+    return params.pop("name"), params
+
+
+def grade(entries: list, ev: Evidence) -> dict:
+    results = [GRADERS[name](ev, **params) for name, params in map(spec, entries)]
     total = sum(r.weight for r in results) or 1.0
     return {
         "passed": all(r.passed for r in results if r.hard),

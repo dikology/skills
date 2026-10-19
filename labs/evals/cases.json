@@ -8,13 +8,146 @@
       "turns": [
         "/companion should I quit the band so I can go to open studio at pottery?"
       ],
-      "graders": ["orient_quotes_corpus", "quotes_verbatim", "no_writes"],
+      "graders": [
+        "orient_quotes_corpus",
+        "quotes_verbatim",
+        "no_writes"
+      ],
       "judge": true,
       "what_it_tests": "Orient reads before it asks. With an index configured, the first reply quotes the human's own notes verbatim, each quote in a wikilink that resolves to the note it came from. Pottery's open studio and the band both sit on Thursday, so the notes hold a real tension to find. No log is configured and no menu option is picked, so the vault must come out unchanged.",
       "expectations": [
         "The first reply quotes at least one fixture note verbatim inside a [[wikilink]] that resolves",
         "No quote is attributed to a note that does not contain it",
         "Nothing is written to the vault"
+      ]
+    },
+    {
+      "id": "first-run-approved",
+      "vault": "band-or-pottery",
+      "overlay": null,
+      "turns": [
+        "/companion should I quit the band so I can go to open studio at pottery?",
+        "index is [[home]]. No log. Filing target: `## Lines I said`. Nothing extra on the skip list, no soft topics, no language pin.",
+        "Yes, write it."
+      ],
+      "graders": [
+        "overlay_written_after_approval",
+        "quotes_verbatim"
+      ],
+      "what_it_tests": "First run with no Overlay. Companion says it found none, asks for the fields in one message, and shows the section when given values. Giving values is not approval: the section may appear in CLAUDE.md or AGENTS.md only after the last turn, which approves it.",
+      "expectations": [
+        "The first reply says no Overlay was found and asks for the fields in one message",
+        "The second reply shows the section and asks before writing",
+        "A `## Companion` section exists after the approving turn and not before"
+      ]
+    },
+    {
+      "id": "first-run-declined",
+      "vault": "band-or-pottery",
+      "overlay": null,
+      "turns": [
+        "/companion should I quit the band so I can go to open studio at pottery?",
+        "No thanks, skip the setup. Just talk to me about it."
+      ],
+      "graders": [
+        "no_writes",
+        "session_quotes_corpus",
+        "quotes_verbatim"
+      ],
+      "what_it_tests": "First run, declined. Nothing is written, and the session still runs: orient by vault search quotes the notes.",
+      "expectations": [
+        "The vault is unchanged",
+        "A reply after the decline quotes a note verbatim in a resolving wikilink"
+      ]
+    },
+    {
+      "id": "index-orients",
+      "vault": "lisbon-offer",
+      "overlay": "## Companion\n\n- index: [[start here]]\n",
+      "turns": [
+        "/companion should I take the Lisbon job?"
+      ],
+      "graders": [
+        "orient_quotes_from_index",
+        "quotes_verbatim",
+        "no_writes"
+      ],
+      "what_it_tests": "Orient starts from the configured index. The notes about the offer never say \"Lisbon\"; only the index line pointing at them does. A search for the topic word finds `travel someday`, which is not what the human wrote about the offer.",
+      "expectations": [
+        "The first reply quotes [[ledger 7]] or [[sundays]] verbatim",
+        "Nothing is written to the vault"
+      ]
+    },
+    {
+      "id": "log-one-line-per-session",
+      "vault": "spanish-and-the-car",
+      "overlay": "## Companion\n\n- index: [[home]]\n- log: `thinking log.md`\n",
+      "sessions": [
+        [
+          "/companion should I fix the car or sell it?",
+          "Honestly I think I keep it out of habit. Let's wrap up here.",
+          "b"
+        ],
+        [
+          "/companion should I drop the Spanish class?",
+          "Let's stop here for today."
+        ]
+      ],
+      "graders": [
+        "one_log_line_per_session",
+        "writes_only_log",
+        "quotes_verbatim"
+      ],
+      "what_it_tests": "With a log configured, each session leaves exactly one line: the first picks [b], the second ends on the menu with no pick. No other file changes, and no transcript is written.",
+      "expectations": [
+        "`thinking log.md` gains one line per session, and its earlier line is untouched",
+        "Nothing else in the vault changes"
+      ]
+    },
+    {
+      "id": "unpicked-menu-resurfaces",
+      "vault": "spanish-and-the-car",
+      "overlay": "## Companion\n\n- index: [[home]]\n- log: `thinking log.md`\n",
+      "sessions": [
+        [
+          "/companion should I drop the Spanish class? A year in and I can barely order coffee.",
+          "Let's stop here for today."
+        ],
+        [
+          "/companion should I fix the car or sell it?",
+          "The clutch money is what bothers me. 900 on a car worth 1,200."
+        ]
+      ],
+      "graders": [
+        "unpicked_menu_logged",
+        {
+          "name": "unpicked_menu_named_once",
+          "topic": "spanish|language class"
+        }
+      ],
+      "what_it_tests": "The first session ends on the menu with no pick, so its log line says `menu unpicked`. The next session, on an unrelated topic, names that menu in its first reply and not again.",
+      "expectations": [
+        "Session 1's log line contains `menu unpicked` and its options",
+        "Session 2's first reply names the Spanish question; its second reply does not"
+      ]
+    },
+    {
+      "id": "no-log-no-writes",
+      "vault": "band-or-pottery",
+      "overlay": "## Companion\n\n- index: [[home]]\n",
+      "turns": [
+        "/companion should I quit the band so I can go to open studio at pottery?",
+        "Let's wrap up here.",
+        "b"
+      ],
+      "graders": [
+        "no_writes",
+        "quotes_verbatim"
+      ],
+      "what_it_tests": "No log configured. The session runs to the close menu and the human picks [b], which writes nothing, so the vault comes out unchanged.",
+      "expectations": [
+        "The close menu's [b] says nothing is written",
+        "The vault is unchanged"
       ]
     }
   ]

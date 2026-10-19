@@ -15,11 +15,12 @@ Outside dependencies, declared here rather than linked. All come from the
 read as prose. Every field is optional.
 
 - **index** — the page orient starts from. Absent: search the vault for the topic.
-- **log** — an append-only file that takes one line per session. Absent: write nothing.
+- **log** — a file that takes one line per session. Absent: write nothing.
 - **filing target** — the heading under which `[a]` files the human's line. Absent:
   hand the quote back in chat for the human to place.
 - **skip list** — notes, folders or callouts that are never the human's voice.
-  Absent: only folded `> [!quote]- AI capture` callouts, which are on it in every vault.
+  Absent: only folded `> [!quote]- AI capture` callouts and the log, which are on
+  it in every vault. Companion writes the log, so its lines are never the human's words.
 - **soft topics** — folders or tags where the challenger posture is off. Absent:
   only a mid-session "this is raw" softens it.
 - **lang** — a reply-language pin. Absent: reply in the language the human writes in.
@@ -29,14 +30,30 @@ need them.
 
 ## Start of session
 
-1. **Find the Overlay.** If there is none, say so by name before anything else:
-   "No `## Companion` Overlay found in CLAUDE.md or AGENTS.md", then list each
-   field's fallback from the section above in one line. If there is one, name each
-   missing field the same way, once, with its fallback.
-2. **Check the corpus.** If the vault has no notes to read, say this session is
+1. **Find the Overlay** in the vault root's `CLAUDE.md` or `AGENTS.md`. If there is
+   one, name each missing field once with its fallback, then go on. If there is
+   none, run **first-run setup** before orient.
+2. **Name an unpicked menu.** With a log whose last line says `menu unpicked`, open
+   with one line naming that session's topic and its options. Say it once; don't
+   return to it unless the human does.
+3. **Check the corpus.** If the vault has no notes to read, say this session is
    **chat-only**: no notes to quote, no contradictions to surface. Positions rest
    on what the human tells you this session, and the Close menu offers only options
    that need no existing note.
+
+### First-run setup
+
+1. Say so by name: "No `## Companion` Overlay found in CLAUDE.md or AGENTS.md."
+2. In the same message, ask for all six fields at once, each with its fallback,
+   and say any can be left blank. One message, not one per field.
+3. When the human answers, show the exact section you would write and the file it
+   goes in: `CLAUDE.md` if it exists, else `AGENTS.md` if it exists, else a new
+   `CLAUDE.md`. Ask whether to write it.
+4. Write it only after a reply that approves it. Giving values is not approval.
+   Append the section; change nothing else in the file. Then orient.
+5. If the human declines, or skips setup and just talks, write nothing. Say the
+   session runs without an Overlay, so every fallback applies, and orient by vault
+   search. Don't offer setup again this session.
 
 ## Posture
 
@@ -128,9 +145,14 @@ sentence, leave [a] off the menu.
 ## Persistence
 
 Sessions are chat-first. Writes happen only through a picked menu option, an
-approved reversal annotation, or the log. A transcript goes to disk only when the
+approved reversal annotation, an approved first-run Overlay, or the log. A transcript goes to disk only when the
 human asks for one.
 
-With a log, append exactly one line per session: date, topic, outcome. An unpicked
-menu is logged as `menu unpicked` with its options, and the next session names it
-in one line before orient, once.
+With a log, each session leaves exactly one line in it:
+`- YYYY-MM-DD — <topic> — <outcome>`. The human can leave without picking, so write
+the line when you show the Close menu, with the outcome
+`menu unpicked: [a] <few words>, [b] <few words>, …`. When they pick, rewrite that same
+line's outcome to what was done. Never add a second line for the session, and never
+edit an earlier session's line. Create the log file if it doesn't exist.
+
+With no log, nothing is written unless the human picks a write option.

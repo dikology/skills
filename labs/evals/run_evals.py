@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Run companion eval cases and print one pass/fail line per case.
 
-A case is a Fixture vault, an optional Overlay and a scripted list of human
-turns. For each case the runner copies the vault to a temp directory, appends the
-Overlay to its CLAUDE.md, installs the skill under .claude/skills/companion
-unmodified (as a Consuming vault would), and plays the turns in one headless
-`claude -p` session, resuming it for each later turn. It then grades the
+A case is a Fixture vault, an optional Overlay and scripted human turns, in one
+session (`turns`) or several (`sessions`). For each case the runner copies the
+vault to a temp directory, appends the Overlay to its CLAUDE.md, installs the skill
+under .claude/skills/companion unmodified (as a Consuming vault would), and plays
+each session in headless `claude -p`, resuming it for each later turn and starting
+fresh for the next session. It snapshots the vault after every turn, grades the
 transcript and the vault diff, and keeps both under results/.
 
     python3 labs/evals/run_evals.py                          # all cases, stable skill
@@ -19,6 +20,7 @@ Exit status: 0 when every case passes, 1 when any fails, 2 on setup errors.
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import re
 import shutil
@@ -59,12 +61,23 @@ def build_vault(root: Path, case: dict, skill: Path) -> Path:
     return ws
 
 
-def play(ws: Path, turns: list, model: str | None, timeout: int) -> dict:
-    """Play the human turns in one session. Stops at the first failed turn."""
-    transcript, cost, session, error = [], 0.0, None, None
+def case_sessions(case: dict) -> list:
+    """The human turns, one list per session."""
+    return case.get("sessions") or [case["turns"]]
+
+
+def play(ws: Path, sessions: list, model: str | None, timeout: int) -> dict:
+    """Play each session's human turns, snapshotting the vault before the first turn
+    and after each one. Stops at the first failed turn."""
+    transcript, cost, error, ids = [], 0.0, None, []
+    snapshots = [vaultdiff.snapshot(ws)]
     started = time.time()
-    for text in turns:
-        transcript.append({"role": "human", "text": text})
+    turns = [(n, text) for n, texts in enumerate(sessions) for text in texts]
+    session, current = None, 0
+    for n, text in turns:
+        if n != current:
+            session, current = None, n
+        transcript.append({"role": "human", "text": text, "session": n})
         cmd = ["claude", "-p", text, "--output-format", "json", *SESSION_FLAGS]
         if session:
             cmd += ["--resume", session]
@@ -74,7 +87,7 @@ def play(ws: Path, turns: list, model: str | None, timeout: int) -> dict:
             proc = subprocess.run(cmd, cwd=ws, capture_output=True, text=True,
                                   timeout=timeout)
         except subprocess.TimeoutExpired:
-            error = f"turn {len(transcript) // 2 + 1} timed out after {timeout}s"
+            error = f"turn {len(snapshots)} timed out after {timeout}s"
             break
         try:
             payload = json.loads(proc.stdout)
@@ -85,10 +98,15 @@ def play(ws: Path, turns: list, model: str | None, timeout: int) -> dict:
             error = payload.get("result") or proc.stderr[-2000:] or "non-zero exit"
             break
         session = payload.get("session_id", session)
+        if not ids or ids[-1] != session:
+            ids.append(session)
         cost += payload.get("total_cost_usd") or 0.0
-        transcript.append({"role": "companion", "text": payload.get("result", "")})
-    return {"transcript": transcript, "session_id": session, "error": error,
-            "cost_usd": round(cost, 4), "seconds": round(time.time() - started, 1)}
+        transcript.append({"role": "companion", "text": payload.get("result", ""),
+                           "session": n})
+        snapshots.append(vaultdiff.snapshot(ws))
+    return {"transcript": transcript, "session_ids": ids, "error": error,
+            "snapshots": snapshots, "cost_usd": round(cost, 4),
+            "seconds": round(time.time() - started, 1)}
 
 
 # --- LLM judge ----------------------------------------------------------------
@@ -116,7 +134,13 @@ def judge(transcript: list, model: str, timeout: int) -> dict:
 # --- results ------------------------------------------------------------------
 
 def render_transcript(transcript: list) -> str:
-    return "\n\n".join(f"## {t['role']}\n\n{t['text']}" for t in transcript) + "\n"
+    out, current = [], None
+    for t in transcript:
+        if t.get("session", 0) != current:
+            current = t.get("session", 0)
+            out.append(f"# session {current + 1}")
+        out.append(f"## {t['role']}\n\n{t['text']}")
+    return "\n\n".join(out) + "\n"
 
 
 def keep(outdir: Path, case: dict, session: dict, d: dict, scored: dict) -> None:
@@ -127,18 +151,18 @@ def keep(outdir: Path, case: dict, session: dict, d: dict, scored: dict) -> None
     (out / "transcript.md").write_text(render_transcript(session["transcript"]))
     (out / "vault.diff").write_text(vaultdiff.render(d))
     (out / "grade.json").write_text(json.dumps(
-        {**scored, "error": session["error"], "session_id": session["session_id"],
+        {**scored, "error": session["error"], "session_ids": session["session_ids"],
          "cost_usd": session["cost_usd"], "seconds": session["seconds"]},
         indent=2, ensure_ascii=False))
 
 
 def run_case(case: dict, skill: Path, args, tmp: Path, outdir: Path) -> dict:
     ws = build_vault(tmp, case, skill)
-    before = vaultdiff.snapshot(ws)
-    session = play(ws, case["turns"], args.model, args.timeout)
-    d = vaultdiff.diff(before, vaultdiff.snapshot(ws))
+    session = play(ws, case_sessions(case), args.model, args.timeout)
+    snaps = session["snapshots"]
+    d = vaultdiff.diff(snaps[0], snaps[-1])
     ev = graders.Evidence(transcript=session["transcript"], diff=d,
-                          vault=VAULTS / case["vault"])
+                          vault=VAULTS / case["vault"], snapshots=snaps)
     scored = graders.grade(case["graders"], ev)
     if session["error"]:
         scored["passed"] = False
@@ -163,6 +187,23 @@ def report_line(row: dict) -> str:
         if not r["passed"]:
             line += f"\n      {r['name']}: {r['note'][:200]}"
     return line
+
+
+def check_case(case: dict) -> str | None:
+    """Why a case can't run, or None. Catches a typo before any API call is made."""
+    if not (VAULTS / case["vault"]).is_dir():
+        return f"no Fixture vault {case['vault']!r}"
+    if not all(case_sessions(case)):
+        return "a session with no turns"
+    for entry in case["graders"]:
+        name, params = graders.spec(entry)
+        if name not in graders.GRADERS:
+            return f"unknown grader {name!r}"
+        try:
+            inspect.signature(graders.GRADERS[name]).bind(None, **params)
+        except TypeError as e:
+            return f"grader {name}: {e}"
+    return None
 
 
 def main() -> int:
@@ -193,10 +234,9 @@ def main() -> int:
         print("no cases matched", file=sys.stderr)
         return 2
     for c in cases:
-        unknown = set(c["graders"]) - set(graders.GRADERS)
-        if unknown:
-            print(f"error: case {c['id']} names unknown graders {sorted(unknown)}",
-                  file=sys.stderr)
+        problem = check_case(c)
+        if problem:
+            print(f"error: case {c['id']}: {problem}", file=sys.stderr)
             return 2
 
     outdir = (Path(args.output_dir) if args.output_dir

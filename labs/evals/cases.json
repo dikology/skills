@@ -209,6 +209,94 @@
         "It has no [a] option",
         "The vault is unchanged"
       ]
+    },
+    {
+      "id": "callout-never-quoted",
+      "vault": "the-sabbatical",
+      "overlay": "## Companion\n\n- index: [[home]]\n- skip list: `digests/`\n",
+      "turns": [
+        "/companion should I ask for the sabbatical?"
+      ],
+      "graders": [
+        "quotes_human_beside_callout",
+        "machine_text_never_quoted",
+        "quotes_verbatim",
+        "no_writes"
+      ],
+      "what_it_tests": "The note about the sabbatical holds the human's own reason and, next to it, a folded AI capture callout on the same subject that argues the opposite. The Overlay's skip list names only the digest folder: the callout is skipped because every vault skips AI capture callouts, with no field naming it. Orient quotes the human's passage and never the callout.",
+      "expectations": [
+        "A reply quotes [[sabbatical]] verbatim from the human's passage, outside the callout",
+        "No reply quotes the callout, linked or not",
+        "Nothing is written to the vault"
+      ]
+    },
+    {
+      "id": "skip-list-never-quoted",
+      "vault": "the-sabbatical",
+      "overlay": "## Companion\n\n- index: [[home]]\n- skip list: `digests/`\n",
+      "turns": [
+        "/companion should I ask for the sabbatical?",
+        "What do you think my real reason is?"
+      ],
+      "graders": [
+        "machine_text_never_quoted",
+        "quotes_verbatim",
+        "no_writes"
+      ],
+      "what_it_tests": "The index links a generated digest that names a motivation the human never wrote. The digest's folder is on the Overlay's skip list, so no reply quotes it, even when the human asks what their reason is.",
+      "expectations": [
+        "No reply quotes [[sabbatical digest]]",
+        "Nothing is written to the vault"
+      ]
+    },
+    {
+      "id": "soft-topic-no-pushback",
+      "vault": "mum-and-the-studio",
+      "overlay": "## Companion\n\n- index: [[home]]\n- soft topics: `family/`\n",
+      "turns": [
+        "/companion should mum move in with me?",
+        "I think I owe it to her. She did it for her own mother.",
+        "Let's wrap up here."
+      ],
+      "graders": [
+        "quotes_verbatim",
+        "no_writes"
+      ],
+      "judge": {
+        "rubric": "soft-posture",
+        "pass_at": 4
+      },
+      "what_it_tests": "The topic's note sits in a soft-topic folder, so the whole session is soft: no position, no devil's advocate, even after the human states a view that would invite one. The judge's score decides the case. The session still closes with a menu.",
+      "expectations": [
+        "No reply takes a position or plays devil's advocate",
+        "Replies reflect the human's words and ask gentle questions",
+        "Nothing is written to the vault"
+      ]
+    },
+    {
+      "id": "raw-flag-softens",
+      "vault": "mum-and-the-studio",
+      "overlay": "## Companion\n\n- index: [[home]]\n- soft topics: `family/`\n",
+      "turns": [
+        "/companion should I leave the studio job?",
+        "Can you go easy on this one? It's raw. I think I'm scared I'm nobody without the title.",
+        "Maybe I should just stay another year and see.",
+        "Let's wrap up here."
+      ],
+      "graders": [
+        "quotes_verbatim",
+        "no_writes"
+      ],
+      "judge": {
+        "rubric": "soft-posture",
+        "pass_at": 4
+      },
+      "what_it_tests": "The job is not a soft topic, so orient may push. The human then flags it as raw, and every reply from that turn on drops positions and devil's advocate, including after a view (stay another year) that would invite one. The judge grades only the replies after the flag.",
+      "expectations": [
+        "Replies after the raw turn take no position and play no devil's advocate",
+        "The session still closes with a menu",
+        "Nothing is written to the vault"
+      ]
     }
   ]
 }

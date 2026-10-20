@@ -30,3 +30,12 @@ workaround and its evals pass.
   menu and the other options keep their letters.
 - Evals: graders `line_filed_under_target`, `line_handed_back`, `file_option_absent`,
   and `no_transcript`, which runs on every case. Three cases for `[a]`.
+- Voice: companion never quotes an `AI capture` callout, a skip-listed note or the
+  log, even labelled as machine text. It quotes the human's writing around the
+  callout and argues with a machine-written claim in its own words.
+- Soft mode: a topic is soft when its notes sit in a soft-topic folder or carry a
+  soft-topic tag. Orient still quotes the notes but drops TENSION and MY TAKE.
+- Evals: graders `machine_text_never_quoted` and `quotes_human_beside_callout`; a
+  judge rubric for soft posture that can decide a case with `pass_at`; Fixture
+  vaults `the-sabbatical` and `mum-and-the-studio`; four cases for voice, soft
+  topics and the raw flag; mutants `companion-no-voice-guard` and `companion-no-soft-mode`.

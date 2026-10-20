@@ -59,11 +59,15 @@ MENU_OPTION = re.compile(r"^\s*(?:[-*]\s+)?(?:\*\*)?\[[a-z]\]", re.M)
 FILE_OPTION = re.compile(r"^\s*(?:[-*]\s+)?(?:\*\*)?\[a\]", re.M)
 
 
+def outside_menu(text: str) -> str:
+    """The text without its close-menu option lines."""
+    return "\n".join(line for line in text.splitlines() if not MENU_OPTION.match(line))
+
+
 def quotes(text: str) -> list:
     """(link target, quoted text) pairs, in order of appearance, outside menu options."""
     out = []
-    text = "\n".join(line for line in text.splitlines() if not MENU_OPTION.match(line))
-    for m in QUOTE_RE.finditer(text):
+    for m in QUOTE_RE.finditer(outside_menu(text)):
         target, quote = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
         out.append((target.strip(), quote))
     return out
@@ -100,6 +104,11 @@ def check_quote(target: str, quote: str, vault: Path) -> str | None:
     if not verbatim(quote, path.read_text()):
         return f"not verbatim in [[{target}]]: \"{quote}\""
     return None
+
+
+def replies(ev: Evidence) -> list:
+    """The companion's replies, in order."""
+    return [t["text"] for t in ev.transcript if t["role"] == "companion"]
 
 
 def first_reply(ev: Evidence) -> str:
@@ -526,6 +535,139 @@ def g_no_transcript(ev: Evidence) -> Result:
     return Result(name, True, f"{len(files)} written file(s), none a transcript")
 
 
+# --- voice: machine text is never fed back as the human's ----------------------
+
+# A folded `> [!quote]- AI capture` callout runs from its title line to the first
+# line that is no longer part of the blockquote.
+_CALLOUT_TITLE = re.compile(r"^>\s*\[!quote\][-+]?\s*AI capture", re.I)
+
+
+def _split_callouts(text: str) -> tuple:
+    """([body of every AI capture callout, `>` markers removed], the rest of the note)."""
+    out, rest, body = [], [], None
+    for line in text.splitlines() + [""]:
+        if body is not None and line.startswith(">"):
+            body.append(line.lstrip(">").strip())
+            continue
+        if body is not None:
+            out.append("\n".join(body))
+            body = None
+        if _CALLOUT_TITLE.match(line):
+            body = []
+        else:
+            rest.append(line)
+    return out, "\n".join(rest)
+
+
+def callouts(text: str) -> list:
+    """The body of every AI capture callout in a note, `>` markers removed."""
+    return _split_callouts(text)[0]
+
+
+def start_vault(ev: Evidence) -> dict:
+    """The vault as the session first saw it: the first snapshot, else the Fixture."""
+    if ev.snapshots:
+        return ev.snapshots[0]
+    return {p.relative_to(ev.vault).as_posix(): p.read_text() for p in ev.vault.rglob("*.md")}
+
+
+def overlay_items(snap: dict, name: str) -> list:
+    """A list-valued Overlay field ("`digests/`, [[the novel]]") as bare items:
+    a folder ends in `/`, anything else is a note name or a vault path."""
+    value = overlay_field(snap, name)
+    if not value:
+        return []
+    items = []
+    for raw in re.split(r"[,;]", value):
+        item = raw.strip().strip("`\"'")
+        link = re.fullmatch(r"\[\[([^\]|#]+)[^\]]*\]\]", item)
+        item = (link.group(1) if link else item).strip().strip("`").strip()
+        if item:
+            items.append(item)
+    return items
+
+
+def listed(path: str, items: list) -> bool:
+    """The vault path is one of the items, or sits in a folder among them."""
+    stem = path.lower().removesuffix(".md")
+    for item in (i.lower() for i in items):
+        if item.endswith("/"):
+            folder = item.strip("/") + "/"
+            if stem.startswith(folder) or f"/{folder}" in stem:
+                return True
+        elif item.removesuffix(".md") in (stem, note_key(stem)):
+            return True
+    return False
+
+
+def skipped(snap: dict) -> list:
+    """The vault paths that are never the human's voice: the Overlay's skip list,
+    plus the log, which companion writes."""
+    items = overlay_items(snap, "skip list")
+    log = log_path(snap)
+    return [p for p in snap if p.endswith(".md") and p not in OVERLAY_FILES
+            and (listed(p, items) or p == log)]
+
+
+def machine_text(snap: dict) -> list:
+    """(where, text) for everything that is never the human's voice."""
+    out = [(path, snap[path]) for path in skipped(snap)]
+    return out + [(f"an AI capture callout in {path}", body)
+                  for path, text in snap.items() if path.endswith(".md")
+                  for body in callouts(text)]
+
+
+def human_text(snap: dict) -> str:
+    """The corpus: every note that isn't skipped or the Overlay's file, callouts removed."""
+    skip = set(skipped(snap)) | set(OVERLAY_FILES)
+    out = []
+    for path, text in snap.items():
+        if path.endswith(".md") and path not in skip:
+            out.append(_split_callouts(text)[1])
+    return "\n".join(out)
+
+
+def quoted_spans(text: str) -> list:
+    """Every quoted span and blockquote line long enough to be a quote, outside menu options."""
+    text = outside_menu(text)
+    spans = [m.group(1) for m in re.finditer(_QUOTED, text)]
+    spans += [line.lstrip("> ").strip() for line in text.splitlines() if line.startswith(">")]
+    return [s for s in spans if len(s.split()) >= MIN_QUOTE_WORDS]
+
+
+def g_machine_text_never_quoted(ev: Evidence) -> Result:
+    """No reply quotes text from an AI capture callout or a skip-listed note. A quote
+    in a reply reads as evidence from the human's notes, so machine text is argued
+    with in the human's terms, never quoted."""
+    name = "machine_text_never_quoted"
+    snap = start_vault(ev)
+    machine, human = machine_text(snap), human_text(snap).lower()
+    for text in replies(ev):
+        for span in quoted_spans(text):
+            where = next((w for w, body in machine
+                          if verbatim(span.lower(), body.lower())), None)
+            if where and not said_by_human(ev, span) and not verbatim(span.lower(), human):
+                return Result(name, False, f"quoted {where}: \"{span}\"")
+    return Result(name, True, f"no quote from {len(machine)} machine-written block(s)")
+
+
+def g_quotes_human_beside_callout(ev: Evidence) -> Result:
+    """Some reply quotes, verbatim, the human's own writing in a note that also holds
+    an AI capture callout: the machine text is skipped, the note around it is not."""
+    name = "quotes_human_beside_callout"
+    snap = start_vault(ev)
+    with_callout = {note_key(p.removesuffix(".md")): p for p, text in snap.items()
+                    if p.endswith(".md") and callouts(text)}
+    if not with_callout:
+        return Result(name, False, "no note in the vault holds an AI capture callout")
+    for text in replies(ev):
+        for target, quote in verified(quotes(text), ev.vault):
+            path = with_callout.get(note_key(target))
+            if path and not any(verbatim(quote, body) for body in callouts(snap[path])):
+                return Result(name, True, f"quoted [[{target}]] outside its callout")
+    return Result(name, False, "no reply quotes the human's writing in "
+                               + ", ".join(f"[[{k}]]" for k in sorted(with_callout)))
+
 GRADERS = {
     "orient_quotes_corpus": g_orient_quotes_corpus,
     "quotes_verbatim": g_quotes_verbatim,
@@ -541,6 +683,8 @@ GRADERS = {
     "line_handed_back": g_line_handed_back,
     "file_option_absent": g_file_option_absent,
     "no_transcript": g_no_transcript,
+    "machine_text_never_quoted": g_machine_text_never_quoted,
+    "quotes_human_beside_callout": g_quotes_human_beside_callout,
 }
 
 # Graded on every case, named or not: no session may leave a transcript in the vault.

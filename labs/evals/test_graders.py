@@ -557,5 +557,104 @@ class NoTranscript(unittest.TestCase):
         self.assertIn("no_transcript", out["hard_fail"])
 
 
+# --- voice: machine text is never quoted as the human's -----------------------
+
+SABBATICAL = vault_state("the-sabbatical", "## Companion\n\n- index: [[home]]\n")
+SKIPPING = vault_state("the-sabbatical",
+                       "## Companion\n\n- index: [[home]]\n- skip list: `digests/`\n")
+HUMAN_PASSAGE = "I want it to find out whether I still like my own company."
+CALLOUT = "six uninterrupted months is exactly what a half-finished manuscript needs"
+
+
+def voice_ev(reply: str, start: dict = SABBATICAL) -> Evidence:
+    return session_evidence("the-sabbatical",
+                            [[("/companion should I ask for the sabbatical?", reply)]],
+                            [start, start])
+
+
+class MachineTextNeverQuoted(unittest.TestCase):
+    def test_quoting_only_the_human_s_passage_passes(self):
+        out = grade(["machine_text_never_quoted"], voice_ev(f'- [[sabbatical]] — "{HUMAN_PASSAGE}"'))
+        self.assertTrue(out["passed"], out)
+
+    def test_quoting_the_ai_capture_callout_fails_and_says_where_it_came_from(self):
+        out = grade(["machine_text_never_quoted"], voice_ev(f'- [[sabbatical]] — "{CALLOUT}"'))
+        self.assertFalse(out["passed"])
+        self.assertIn("AI capture", out["results"][0]["note"])
+
+    def test_an_unlinked_fragment_of_the_callout_still_fails(self):
+        reply = 'You called it "exactly what a half-finished manuscript needs". Do you still think so?'
+        self.assertFalse(grade(["machine_text_never_quoted"], voice_ev(reply))["passed"])
+
+    def test_the_callout_quoted_in_another_case_still_fails(self):
+        reply = 'The AI capture in [[sabbatical]] calls the novel "the clearest case." Yours rejects it.'
+        self.assertFalse(grade(["machine_text_never_quoted"], voice_ev(reply))["passed"])
+
+    def test_the_callout_as_a_blockquote_fails(self):
+        reply = f"From [[sabbatical]]:\n\n> {CALLOUT}."
+        self.assertFalse(grade(["machine_text_never_quoted"], voice_ev(reply))["passed"])
+
+    def test_quoting_a_skip_listed_note_fails_and_names_it(self):
+        reply = '- [[sabbatical digest]] — "recovering from burnout after the spring reorg"'
+        out = grade(["machine_text_never_quoted"], voice_ev(reply, SKIPPING))
+        self.assertFalse(out["passed"])
+        self.assertIn("digests/sabbatical digest.md", out["results"][0]["note"])
+
+    def test_skip_list_given_as_links_and_paths(self):
+        reply = '- [[sabbatical digest]] — "recovering from burnout after the spring reorg"'
+        for value in ("[[sabbatical digest]]", "`digests/sabbatical digest.md`",
+                      "digests/, [[the novel]]", "[[Sabbatical Digest|the digest]]"):
+            start = vault_state("the-sabbatical", f"## Companion\n\n- skip list: {value}\n")
+            out = grade(["machine_text_never_quoted"], voice_ev(reply, start))
+            self.assertFalse(out["passed"], value)
+
+    def test_a_note_off_the_skip_list_may_be_quoted(self):
+        reply = '- [[sabbatical digest]] — "recovering from burnout after the spring reorg"'
+        self.assertTrue(grade(["machine_text_never_quoted"], voice_ev(reply))["passed"])
+
+    def test_quoting_the_log_fails(self):
+        start = vault_state("spanish-and-the-car", "## Companion\n\n- log: `thinking log.md`\n")
+        log_line = next(l for l in start["thinking log.md"].splitlines() if l.startswith("-"))
+        quote = log_line.lstrip("- ").split(" — ", 1)[1]
+        ev = session_evidence("spanish-and-the-car", [[("/companion car?", f'- [[thinking log]] — "{quote}"')]],
+                              [start, start])
+        out = grade(["machine_text_never_quoted"], ev)
+        self.assertFalse(out["passed"], quote)
+        self.assertIn("thinking log.md", out["results"][0]["note"])
+
+    def test_a_human_line_that_a_skip_listed_note_repeats_may_still_be_quoted(self):
+        start = {**SKIPPING, "digests/sabbatical digest.md":
+                 SKIPPING["digests/sabbatical digest.md"] + f"\n- Key quote: {HUMAN_PASSAGE}\n"}
+        out = grade(["machine_text_never_quoted"], voice_ev(f'- [[sabbatical]] — "{HUMAN_PASSAGE}"', start))
+        self.assertTrue(out["passed"], out)
+
+    def test_echoing_the_human_s_own_words_from_this_session_passes(self):
+        ev = voice_ev("noted")
+        ev.transcript += [{"role": "human", "text": "the novel is exactly what a half-finished manuscript needs, they say"},
+                          {"role": "companion", "text": 'You said "exactly what a half-finished manuscript needs". Whose words are those?'}]
+        self.assertTrue(grade(["machine_text_never_quoted"], ev)["passed"])
+
+
+class QuotesHumanBesideCallout(unittest.TestCase):
+    def test_quoting_the_human_passage_in_the_callout_s_note_passes(self):
+        out = grade(["quotes_human_beside_callout"], voice_ev(f'- [[sabbatical]] — "{HUMAN_PASSAGE}"'))
+        self.assertTrue(out["passed"], out)
+        self.assertIn("sabbatical", out["results"][0]["note"])
+
+    def test_quoting_the_callout_itself_fails(self):
+        out = grade(["quotes_human_beside_callout"], voice_ev(f'- [[sabbatical]] — "{CALLOUT}"'))
+        self.assertFalse(out["passed"])
+
+    def test_quoting_only_a_note_with_no_callout_fails(self):
+        reply = '- [[the novel]] — "I haven\'t opened the manuscript since January and I don\'t miss it."'
+        self.assertFalse(grade(["quotes_human_beside_callout"], voice_ev(reply))["passed"])
+
+    def test_a_quote_in_a_later_reply_counts(self):
+        ev = voice_ev("What do you want the time for?")
+        ev.transcript += [{"role": "human", "text": "not sure"},
+                          {"role": "companion", "text": f'- [[sabbatical]] — "{HUMAN_PASSAGE}"'}]
+        self.assertTrue(grade(["quotes_human_beside_callout"], ev)["passed"])
+
+
 if __name__ == "__main__":
     unittest.main()

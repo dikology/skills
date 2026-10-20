@@ -40,7 +40,6 @@ REPO = HERE.parent.parent
 STABLE = REPO / "skills" / "companion"
 VAULTS = HERE / "fixtures" / "vaults"
 RESULTS = HERE / "results"
-JUDGE_RUBRIC = HERE / "judge-rubric.md"
 
 # Settings come from the temp vault only (no user hooks or plugins), and no MCP
 # servers are loaded, so the session sees the vault and the skill and little else.
@@ -111,11 +110,32 @@ def play(ws: Path, sessions: list, model: str | None, timeout: int) -> dict:
 
 # --- LLM judge ----------------------------------------------------------------
 
-def judge(transcript: list, model: str, timeout: int) -> dict:
-    """The part a regex can't decide: does the reply take a position? Reported next
-    to the deterministic verdict, never instead of it. On failure returns
-    {"error": ...} so a broken judge shows up in the report."""
-    prompt = (f"{JUDGE_RUBRIC.read_text()}\n\n---\n\nThe transcript under review:\n\n"
+def judge_spec(case: dict):
+    """(rubric path, pass mark) for a case's judge, or None when it has none.
+    `"judge": true` is the default rubric, reported only. `{"rubric": "<name>",
+    "pass_at": <1-5>}` reads judge-<name>.md, and a pass mark makes the score decide."""
+    j = case.get("judge")
+    if not j:
+        return None
+    if j is True:
+        return HERE / "judge-rubric.md", None
+    return HERE / f"judge-{j.get('rubric', '')}.md", j.get("pass_at")
+
+
+def apply_judge(scored: dict, verdict: dict, pass_at) -> dict:
+    """Record the judge's verdict. With a pass mark, a lower score or a broken judge
+    fails the case; without one, the score is reported and never changes the verdict."""
+    scored["judge"] = verdict
+    if pass_at is not None and ("score" not in verdict or verdict["score"] < pass_at):
+        scored["passed"] = False
+        scored["hard_fail"].append("judge")
+    return scored
+
+
+def judge(transcript: list, rubric: Path, model: str, timeout: int) -> dict:
+    """The part a regex can't decide, such as whether a reply takes a position. On
+    failure returns {"error": ...} so a broken judge shows up in the report."""
+    prompt = (f"{rubric.read_text()}\n\n---\n\nThe transcript under review:\n\n"
               f"{render_transcript(transcript)}\n\nReturn ONLY a JSON object.")
     try:
         proc = subprocess.run(
@@ -167,8 +187,14 @@ def run_case(case: dict, skill: Path, args, tmp: Path, outdir: Path) -> dict:
     if session["error"]:
         scored["passed"] = False
         scored["hard_fail"].insert(0, "session")
-    if args.judge and case.get("judge") and not session["error"]:
-        scored["judge"] = judge(session["transcript"], args.judge_model, args.timeout)
+    spec = judge_spec(case)
+    if spec and not args.judge and spec[1] is not None:
+        # Reported, not failed: --no-judge is a choice to leave posture ungraded.
+        scored["judge"] = {"error": "skipped by --no-judge; posture not graded"}
+    elif args.judge and spec and not session["error"]:
+        rubric, pass_at = spec
+        apply_judge(scored, judge(session["transcript"], rubric, args.judge_model,
+                                  args.timeout), pass_at)
     keep(outdir, case, session, d, scored)
     return {"case": case["id"], **scored, "error": session["error"],
             "cost_usd": session["cost_usd"], "seconds": session["seconds"]}
@@ -203,6 +229,11 @@ def check_case(case: dict) -> str | None:
             inspect.signature(graders.GRADERS[name]).bind(None, **params)
         except TypeError as e:
             return f"grader {name}: {e}"
+    spec = judge_spec(case)
+    if spec and not spec[0].exists():
+        return f"no judge rubric {spec[0].name}"
+    if spec and spec[1] is not None and spec[1] not in range(1, 6):
+        return f"judge pass_at must be 1-5, not {spec[1]!r}"
     return None
 
 

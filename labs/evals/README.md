@@ -6,7 +6,7 @@ is to run a session and look at what came out.
 
 ```
 python3 labs/evals/run_evals.py                 # every case, stable skill
-python3 -m unittest discover -s labs/evals -v   # the graders' own tests (no API calls)
+python3 -m unittest discover -s labs/evals -v   # graders' and runner's own tests (no API calls)
 ```
 
 Requires `claude` on PATH. Python 3.9+, standard library only.
@@ -36,9 +36,21 @@ Graders (`graders.py`) look at what a user would see or find: the reply text and
 the files in their vault. They never read the skill's prompt, and they never check
 wording or section order. A case passes when every hard grader it names passes.
 
-The LLM judge (`judge-rubric.md`) scores only what a regex can't decide, such as
-whether the reply takes a position. Its score is printed next to the verdict and
-never changes it. Turn it off with `--no-judge`.
+The LLM judge scores only what a regex can't decide, such as whether the reply
+takes a position. A case turns it on with `"judge": true`, which uses
+`judge-rubric.md` and only reports: the score is printed next to the verdict and
+never changes it. Or the case names a rubric and a pass mark,
+`"judge": {"rubric": "soft-posture", "pass_at": 4}`, which reads
+`judge-soft-posture.md`. Then a lower score, or a judge that fails to answer, fails
+the case. Use a pass mark only where posture is the behaviour under test and no
+regex can see it. `--no-judge` skips the judge, pass marks included; such a case prints
+`judge error: skipped`, because its posture went ungraded.
+
+Machine text is the folded `AI capture` callouts in any note, every note on the
+Overlay's skip list, and the log. In a case that names it,
+`machine_text_never_quoted` fails a reply that quotes any of it, linked or not,
+unless the human wrote the same words too: a quote in a reply reads as the
+human's own evidence, so a labelled quote of machine text fails as well.
 
 `no_transcript` is graded on every case, named or not: no file a session writes may
 hold two or more of one session's human turns. A one-turn session can't be told apart
@@ -53,6 +65,8 @@ None contains real notes.
 |---|---|
 | `band-or-pottery` | Orient: two hobbies competing for the only free evening, with lines worth quoting. Also the vault with no Overlay, for first-run setup, and the one where the human refuses the take with a line worth filing |
 | `lisbon-offer` | Orient from the index: the notes about a job offer never name the city; only the index does, and an unindexed note that does name it is a decoy |
+| `the-sabbatical` | Voice: the note about a sabbatical holds the human's reason and, beside it, a folded `AI capture` callout arguing the opposite. The index also links a generated digest, in a folder the skip-list case names |
+| `mum-and-the-studio` | Soft topics: a `family/` note that invites a position (whether mum moves in), and a `work/` note that isn't soft until the human flags it raw |
 | `spanish-and-the-car` | The log: two unrelated topics, so one session's unpicked menu is easy to spot in the next, and a log with one earlier line. Also the session where the human only asks, so there is no line to file |
 
 ## Showing a case can fail
@@ -70,8 +84,9 @@ Add an object to `cases.json`: `id`, `vault`, `overlay` (Markdown, or null for a
 vault with no Overlay), either `turns` (one session) or `sessions` (a list of turn
 lists, each a fresh session), `graders`, and optionally `"judge": true`. A grader is
 named as a string from `graders.GRADERS`, or as `{"name": ..., <parameter>: ...}`
-when it takes one (`unpicked_menu_named_once` takes `topic`). The runner checks
-names and parameters before it makes any API call. In a first-run case, the last
+when it takes one (`unpicked_menu_named_once` takes `topic`). `judge` is `true` or
+`{"rubric": ..., "pass_at": ...}` (see above). The runner checks names, parameters
+and rubric files before it makes any API call. In a first-run case, the last
 turn is the one that approves the Overlay. `what_it_tests` and `expectations` are for the
 human reading the case; nothing grades them. Write the grader test-first in `test_graders.py`,
 including a mutant reply that must fail it.

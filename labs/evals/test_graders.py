@@ -862,5 +862,144 @@ class ReversalAnnotated(unittest.TestCase):
         self.assertFalse(self.grade(after)["passed"])
 
 
+# --- language ------------------------------------------------------------------
+
+DACHA = VAULTS / "the-dacha"
+
+RU_ORIENT = """ИЗ ТВОИХ ЗАМЕТОК:
+- [[дача]] — «Дача — единственное место, где я сплю без будильника.»
+- [[выходные]] — «Три часа туда, три обратно.»
+
+НАПРЯЖЕНИЕ:
+Ты держишься за место, где отдыхаешь, но дорога съедает сам отдых.
+
+МОЯ ПОЗИЦИЯ: ты держишь не дачу, а бабушку. Где я ошибаюсь?"""
+
+ZH_ORIENT = """你的笔记里写着：
+- [[дача]] — «Бабушка сажала там яблони, когда мне было пять.»
+- [[выходные]] — «Три часа туда, три обратно.»
+
+矛盾：你说那是唯一能好好睡觉的地方，可是路上就要花掉整个周末。
+
+我的看法：你想留住的不是房子，而是奶奶。我哪里说错了？"""
+
+EN_ORIENT = """FROM YOUR NOTES:
+- [[дача]] — «Бабушка сажала там яблони, когда мне было пять.»
+- [[выходные]] — «Три часа туда, три обратно.»
+
+TENSION: the one place you sleep well costs you the whole weekend to reach.
+
+MY TAKE: you are keeping your grandmother, not the house. Where am I wrong?"""
+
+
+def lang_evidence(*replies: str, vault: Path = DACHA) -> Evidence:
+    transcript = []
+    for k, reply in enumerate(replies):
+        transcript.append({"role": "human", "text": "/companion sell the dacha?" if k == 0 else "go on"})
+        transcript.append({"role": "companion", "text": reply})
+    return Evidence(transcript=transcript, diff={"added": {}, "removed": [], "modified": {}},
+                    vault=vault)
+
+
+def in_lang(lang: str, *replies: str) -> dict:
+    return grade([{"name": "replies_in_language", "lang": lang}], lang_evidence(*replies))
+
+
+class RepliesInLanguage(unittest.TestCase):
+    def test_russian_replies_pass_ru(self):
+        self.assertTrue(in_lang("ru", RU_ORIENT, "Хорошо. А что ты скажешь бабушке?")["passed"])
+
+    def test_english_reply_fails_ru(self):
+        out = in_lang("ru", EN_ORIENT)
+        self.assertFalse(out["passed"])
+        self.assertIn("reply 1", out["results"][0]["note"])
+
+    def test_russian_quotes_do_not_make_an_english_reply_russian(self):
+        reply = EN_ORIENT + "\n\n> Продать дачу — как будто продать её руки.\n\nWhich is it?"
+        self.assertFalse(in_lang("ru", reply)["passed"])
+
+    def test_english_labels_in_a_russian_reply_pass(self):
+        reply = RU_ORIENT.replace("ИЗ ТВОИХ ЗАМЕТОК", "FROM YOUR NOTES").replace(
+            "НАПРЯЖЕНИЕ", "TENSION").replace("МОЯ ПОЗИЦИЯ", "MY TAKE")
+        self.assertTrue(in_lang("ru", reply)["passed"])
+
+    def test_chinese_reply_passes_zh(self):
+        self.assertTrue(in_lang("zh", ZH_ORIENT)["passed"])
+
+    def test_one_english_reply_among_chinese_fails_zh_and_is_named(self):
+        out = in_lang("zh", ZH_ORIENT, "Fine. Then what would you tell your grandmother?")
+        self.assertFalse(out["passed"])
+        self.assertIn("reply 2", out["results"][0]["note"])
+
+    def test_wikilinks_and_menu_letters_do_not_count(self):
+        menu = ("我们的结论：你还没决定。\n\n下一步：\n[a] 把你的话记在 [[дача]] 下面。\n"
+                "[b] 先放一放。\n\n选哪个？")
+        self.assertTrue(in_lang("zh", ZH_ORIENT, menu)["passed"])
+
+    def test_an_english_reply_with_chinese_glosses_is_not_chinese(self):
+        reply = ("FROM YOUR NOTES:\n- [[дача]] — «Бабушка сажала там яблони, когда мне было пять.» "
+                 "(gloss: 奶奶在我五岁的时候在那里种了苹果树)\n- [[выходные]] — «Три часа туда, "
+                 "три обратно.» (gloss: 去三个小时，回三个小时)\n\nMY TAKE: you are keeping "
+                 "your grandmother, not the house. Where am I wrong?")
+        self.assertFalse(in_lang("zh", reply)["passed"])
+
+    def test_english_reply_passes_en(self):
+        self.assertTrue(in_lang("en", EN_ORIENT)["passed"])
+
+
+def source_lang(lang: str, *replies: str) -> dict:
+    return grade([{"name": "quotes_stay_in_source_language", "lang": lang}],
+                 lang_evidence(*replies))
+
+
+class QuotesStayInSourceLanguage(unittest.TestCase):
+    def test_russian_quote_in_a_chinese_reply_passes(self):
+        out = source_lang("zh", ZH_ORIENT)
+        self.assertTrue(out["passed"], out)
+        self.assertIn("дача", out["results"][0]["note"])
+
+    def test_corner_brackets_are_quotes(self):
+        reply = ZH_ORIENT.replace("«", "「").replace("»", "」")
+        self.assertTrue(source_lang("zh", reply)["passed"])
+
+    def test_quote_translated_into_chinese_fails(self):
+        reply = "你的笔记：\n- [[дача]] — 「奶奶在我五岁的时候在那里种了苹果树。」\n\n我的看法：你想留住奶奶。"
+        self.assertFalse(source_lang("zh", reply)["passed"])
+
+    def test_quote_translated_into_english_fails(self):
+        reply = ('FROM YOUR NOTES:\n- [[дача]] — "Grandmother planted apple trees there when I was five."'
+                 "\n\nMY TAKE: you are keeping her, not the house.")
+        self.assertFalse(source_lang("en", reply)["passed"])
+
+    def test_russian_quote_in_an_english_reply_passes_en(self):
+        self.assertTrue(source_lang("en", EN_ORIENT)["passed"])
+
+    def test_russian_quote_in_a_reply_not_in_the_language_fails(self):
+        out = source_lang("zh", EN_ORIENT)
+        self.assertFalse(out["passed"])
+        self.assertIn("zh", out["results"][0]["note"])
+
+    def test_no_quote_at_all_fails(self):
+        self.assertFalse(source_lang("zh", "我的看法：你想留住的不是房子，而是奶奶。我哪里说错了？")["passed"])
+
+
+class QuotesStayInTheirSentence(unittest.TestCase):
+    def test_a_quote_is_not_credited_to_a_link_in_the_next_sentence(self):
+        reply = ("“换个时间见”是退出的人都会说的话，然后就再也不见了。"
+                 "你的 [[thursday evenings]] 写得很清楚，其他晚上全被占满了。")
+        out = grade(["quotes_verbatim"], evidence(reply))
+        self.assertTrue(out["passed"], out)
+
+    def test_a_quote_is_not_credited_to_a_link_in_the_previous_sentence(self):
+        reply = ("Ты сейчас повторяешь [[выходные]] почти дословно. Значит, спорить ты "
+                 "будешь только с «её руками».")
+        out = grade(["quotes_verbatim"], lang_evidence(reply))
+        self.assertTrue(out["passed"], out)
+
+    def test_a_quote_in_the_same_sentence_as_its_link_is_still_checked(self):
+        reply = "你在 [[thursday evenings]] 里写过“周四是唯一的空闲晚上”。"
+        self.assertFalse(grade(["quotes_verbatim"], evidence(reply))["passed"])
+
+
 if __name__ == "__main__":
     unittest.main()

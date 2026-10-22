@@ -42,11 +42,13 @@ class Result:
 # --- quotes and links --------------------------------------------------------
 
 # A wikilink and a quoted span on the same line, in either order:
-# [[note]] — "text"  or  "text" — [[note]]. The gap between them holds no other
-# link or quote, so a quote is credited to the link nearest it.
+# [[note]] — "text"  or  "text" — [[note]], in "", “”, «» or 「」 marks. The gap
+# between them holds no other link or quote, so a quote is credited to the link
+# nearest it. Nor does it cross a sentence end (". ", "? ", 。): a quote in one
+# sentence and a link in the next aren't a quote of that note.
 _LINK = r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]"
-_QUOTED = r"[\"“«]([^\"”»\n]+)[\"”»]"
-_GAP = r"[^\n\"“«\[\]]*?"
+_QUOTED = r"[\"“«「『]([^\"”»」』\n]+)[\"”»」』]"
+_GAP = r"(?:(?![.!?]\s)[^\n\"“«「『\[\]。！？])*?"
 QUOTE_RE = re.compile(f"{_LINK}{_GAP}{_QUOTED}|{_QUOTED}{_GAP}{_LINK}")
 
 # A quote this short ("Pottery", "Thursday evenings") could match a heading or a
@@ -797,6 +799,65 @@ def g_reversal_annotated(ev: Evidence, note: str) -> Result:
                                "in another note")
 
 
+# --- language -------------------------------------------------------------------
+
+# A reply's language is the one most of its own words are in. A word is a Latin or
+# Cyrillic run of two letters or more, so menu letters ("[a]") say nothing; Chinese
+# has no spaces, so two Han characters count as one word.
+WORDS = {
+    "zh": (re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]"), 0.5),
+    "ru": (re.compile(r"[\u0400-\u04ff]{2,}"), 1.0),
+    "en": (re.compile(r"[A-Za-z]{2,}"), 1.0),
+}
+
+
+def language(text: str) -> str | None:
+    """The language most of the text is written in, or None with no words at all."""
+    counts = {lang: len(rx.findall(text)) * weight for lang, (rx, weight) in WORDS.items()}
+    lang = max(counts, key=counts.get)
+    return lang if counts[lang] else None
+
+
+def own_words(text: str) -> str:
+    """The reply without what it quotes or links: quoted spans, blockquote lines,
+    wikilinks and code. Quotes keep their source language, so they don't count."""
+    text = re.sub(r"```.*?```|`[^`\n]*`", " ", text, flags=re.S)
+    text = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith(">"))
+    return re.sub(_QUOTED, " ", re.sub(_LINK, " ", text))
+
+
+def reply_language(text: str) -> str | None:
+    return language(own_words(text))
+
+
+def g_replies_in_language(ev: Evidence, lang: str) -> Result:
+    """Every reply is written in `lang`, counting only its own words: what it quotes
+    or links stays in the language it was written in."""
+    name = "replies_in_language"
+    texts = replies(ev)
+    for k, text in enumerate(texts, 1):
+        found = reply_language(text)
+        if found not in (lang, None):
+            return Result(name, False, f"reply {k} is in {found}, not {lang}")
+    return Result(name, True, f"{len(texts)} replies in {lang}")
+
+
+def g_quotes_stay_in_source_language(ev: Evidence, lang: str) -> Result:
+    """A reply written in `lang` quotes a note verbatim, in a [[wikilink]], in the
+    note's own language: the quote was not translated into the reply's."""
+    name = "quotes_stay_in_source_language"
+    written_in = [(k, text) for k, text in enumerate(replies(ev), 1)
+                  if reply_language(text) == lang]
+    if not written_in:
+        return Result(name, False, f"no reply is in {lang}")
+    for k, text in written_in:
+        kept = [(t, q) for t, q in verified(quotes(text), ev.vault) if language(q) != lang]
+        if kept:
+            t, q = kept[0]
+            return Result(name, True, f"reply {k} quotes [[{t}]] in {language(q)}: \"{q}\"")
+    return Result(name, False, f"no reply in {lang} quotes a note verbatim in its own language")
+
+
 GRADERS = {
     "orient_quotes_corpus": g_orient_quotes_corpus,
     "quotes_verbatim": g_quotes_verbatim,
@@ -816,6 +877,8 @@ GRADERS = {
     "quotes_human_beside_callout": g_quotes_human_beside_callout,
     "contradiction_surfaced": g_contradiction_surfaced,
     "reversal_annotated": g_reversal_annotated,
+    "replies_in_language": g_replies_in_language,
+    "quotes_stay_in_source_language": g_quotes_stay_in_source_language,
 }
 
 # Graded on every case, named or not: no session may leave a transcript in the vault.

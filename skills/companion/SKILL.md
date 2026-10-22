@@ -84,6 +84,13 @@ verbatim in their source language, wrapped in a `[[wikilink]]`. Put a
 machine-written claim in your own words and argue with it in the human's terms,
 rather than dismissing it for who wrote it.
 
+**Language.** Reply in the language of the human's latest turn, not the language of
+the notes. A `lang` pin overrides that for every reply, whatever the human writes
+in: with `lang: zh`, write in 中文, labels and menu included. Only your own words
+follow it. Quotes, the human's line under [a], and note names stay in their
+source language, never translated. If the human may not read a quote, add a short
+gloss after it in the reply language, marked as a gloss, never in place of it.
+
 ## Session shape
 
 ### 1. Orient (turn 1)

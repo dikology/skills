@@ -44,3 +44,14 @@ workaround and its evals pass.
   or domain mismatch, and a case where a confirmed reversal annotates the older
   note with its original text intact (the vault diff is additions only).
   Mutant `companion-no-contradiction-guard`.
+- Language: replies follow the human's language, not the notes'. A `lang` pin in the
+  Overlay sets the reply language whatever the human writes in. Quotes, the filed
+  line and note names stay in their source language; a gloss may follow a quote,
+  never replace it.
+- Evals for language: a Russian Fixture vault, `the-dacha`; graders
+  `replies_in_language` and `quotes_stay_in_source_language`; four cases (Russian
+  turns get Russian replies, English turns over Russian notes get English replies
+  with Russian quotes, a `lang: zh` pin over English turns, a Russian quote in a
+  中文 reply); mutants `companion-wrong-reply-language` and
+  `companion-translates-quotes`. Quotes may sit in 「」 marks, and a quote is no
+  longer credited to a wikilink in another sentence.

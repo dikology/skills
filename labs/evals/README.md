@@ -52,6 +52,12 @@ Overlay's skip list, and the log. In a case that names it,
 unless the human wrote the same words too: a quote in a reply reads as the
 human's own evidence, so a labelled quote of machine text fails as well.
 
+A reply's language is the script most of its own words are in: quotes,
+blockquotes, wikilinks and code don't count, because a quote keeps its source
+language. `replies_in_language` takes a `lang` (`en`, `ru` or `zh`), and so does
+`quotes_stay_in_source_language`, which needs a reply in that language to quote
+a note verbatim in the note's own.
+
 `no_transcript` is graded on every case, named or not: no file a session writes may
 hold two or more of one session's human turns. A one-turn session can't be told apart
 from a filed line that way, so those cases also grade `no_writes`.
@@ -69,6 +75,7 @@ None contains real notes.
 | `mum-and-the-studio` | Soft topics: a `family/` note that invites a position (whether mum moves in), and a `work/` note that isn't soft until the human flags it raw |
 | `spanish-and-the-car` | The log: two unrelated topics, so one session's unpicked menu is easy to spot in the next, and a log with one earlier line. Also the session where the human only asks, so there is no line to file |
 | `the-kitchen-table` | Contradictions: an older note says the kitchen table is where the human does their best work and they'll never commute again, and a scripted turn says they want the office now. A job offer note gives the new position somewhere to link |
+| `the-dacha` | Language: a vault written in Russian, about whether to sell a grandmother's dacha. Russian turns, English turns, and a `lang: zh` pin all meet the same Russian notes |
 
 ## Showing a case can fail
 
@@ -85,7 +92,8 @@ Add an object to `cases.json`: `id`, `vault`, `overlay` (Markdown, or null for a
 vault with no Overlay), either `turns` (one session) or `sessions` (a list of turn
 lists, each a fresh session), `graders`, and optionally `"judge": true`. A grader is
 named as a string from `graders.GRADERS`, or as `{"name": ..., <parameter>: ...}`
-when it takes one (`unpicked_menu_named_once` takes `topic`). `judge` is `true` or
+when it takes one (`unpicked_menu_named_once` takes `topic`, the contradiction
+graders take `note`, the language graders take `lang`). `judge` is `true` or
 `{"rubric": ..., "pass_at": ...}` (see above). The runner checks names, parameters
 and rubric files before it makes any API call. In a first-run case, the last
 turn is the one that approves the Overlay. `what_it_tests` and `expectations` are for the

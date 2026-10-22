@@ -348,6 +348,107 @@
         "The line appears only after the approving turn",
         "No original line in the vault is changed or removed"
       ]
+    },
+    {
+      "id": "lang-follows-human",
+      "vault": "the-dacha",
+      "overlay": "## Companion\n\n- index: [[главная]]\n",
+      "turns": [
+        "/companion продавать ли дачу?",
+        "Мне жалко бабушкины яблони, но я там бываю четыре раза в год, и каждый раз что-то чиню."
+      ],
+      "graders": [
+        {
+          "name": "replies_in_language",
+          "lang": "ru"
+        },
+        "orient_quotes_corpus",
+        "quotes_verbatim",
+        "no_writes"
+      ],
+      "what_it_tests": "No lang pin, so replies follow the human. The human writes in Russian, about a vault written in Russian, and every reply is in Russian.",
+      "expectations": [
+        "Both replies are in Russian, counting only companion's own words",
+        "Orient quotes the Russian notes verbatim in wikilinks",
+        "Nothing is written to the vault"
+      ]
+    },
+    {
+      "id": "lang-follows-human-en",
+      "vault": "the-dacha",
+      "overlay": "## Companion\n\n- index: [[главная]]\n",
+      "turns": [
+        "/companion should I sell the dacha?",
+        "I'd miss grandmother's apple trees, but I only get there four times a year and I spend every visit fixing something."
+      ],
+      "graders": [
+        {
+          "name": "replies_in_language",
+          "lang": "en"
+        },
+        {
+          "name": "quotes_stay_in_source_language",
+          "lang": "en"
+        },
+        "quotes_verbatim",
+        "no_writes"
+      ],
+      "what_it_tests": "No lang pin, and the human writes in English about notes written in Russian. Replies follow the human, not the notes: they are in English, and their quotes of the notes stay in Russian, verbatim.",
+      "expectations": [
+        "Both replies are in English, counting only companion's own words",
+        "A reply quotes a Russian note verbatim, in Russian, in a wikilink",
+        "Nothing is written to the vault"
+      ]
+    },
+    {
+      "id": "lang-pin-zh",
+      "vault": "band-or-pottery",
+      "overlay": "## Companion\n\n- index: [[home]]\n- lang: zh\n",
+      "turns": [
+        "/companion should I quit the band so I can go to open studio at pottery?",
+        "I think I'd miss the people more than the music."
+      ],
+      "graders": [
+        {
+          "name": "replies_in_language",
+          "lang": "zh"
+        },
+        "orient_quotes_corpus",
+        "quotes_verbatim",
+        "no_writes"
+      ],
+      "what_it_tests": "A `lang: zh` pin overrides the human's language. The human writes in English about English notes, and every reply is in 中文 while its quotes of the notes stay in English, verbatim.",
+      "expectations": [
+        "Both replies are in Chinese, counting only companion's own words",
+        "Orient quotes the English notes verbatim, untranslated",
+        "Nothing is written to the vault"
+      ]
+    },
+    {
+      "id": "lang-quote-stays-source",
+      "vault": "the-dacha",
+      "overlay": "## Companion\n\n- index: [[главная]]\n- lang: zh\n",
+      "turns": [
+        "/companion should I sell the dacha?"
+      ],
+      "graders": [
+        {
+          "name": "replies_in_language",
+          "lang": "zh"
+        },
+        {
+          "name": "quotes_stay_in_source_language",
+          "lang": "zh"
+        },
+        "quotes_verbatim",
+        "no_writes"
+      ],
+      "what_it_tests": "Three languages in one turn: Russian notes, an English question, a `lang: zh` pin. The reply is in 中文 and quotes the Russian notes in Russian, verbatim: a quote never follows the reply language.",
+      "expectations": [
+        "The reply is in Chinese, counting only companion's own words",
+        "It quotes a Russian note verbatim, in Russian, in a wikilink",
+        "Nothing is written to the vault"
+      ]
     }
   ]
 }

@@ -10,6 +10,7 @@ score is the weighted share of graders passed, reported alongside.
 
 from __future__ import annotations
 
+import difflib
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -76,6 +77,11 @@ def quotes(text: str) -> list:
 def note_key(target: str) -> str:
     """Obsidian resolves [[folder/Name]] by its last part, case-insensitively."""
     return target.strip().lower().split("/")[-1]
+
+
+def path_key(path: str) -> str:
+    """The note name a vault path resolves as: "work/the studio job.md" → "the studio job"."""
+    return note_key(path.removesuffix(".md"))
 
 
 def notes(vault: Path) -> dict:
@@ -270,10 +276,24 @@ def g_one_log_line_per_session(ev: Evidence) -> Result:
     return Result(name, True, f"{path}: one line from each of {len(added)} sessions")
 
 
+# A line that opens with a date ("- **2026-10-22** — reversed, see [[note]]: "…"") is an
+# entry companion files or proposes to file, such as a reversal annotation.
+ENTRY = re.compile(r"^\s*(?:[-*]\s+)?(?:\*\*)?\d{4}-\d{2}-\d{2}\b")
+
+
+def entry_quotes(text: str) -> set:
+    """The quoted spans on the reply's dated entry lines."""
+    return {m.group(1) for line in text.splitlines() if ENTRY.match(line)
+            for m in re.finditer(_QUOTED, line)}
+
+
 def g_quotes_verbatim(ev: Evidence) -> Result:
-    """Every quote the companion attributes to a note, in any turn, is in that note."""
+    """Every quote the companion attributes to a note, in any turn, is in that note.
+    A dated entry that quotes the human's own words, such as a proposed reversal
+    annotation, is new text for the note, not a claim about it, so it is exempt."""
     found = [(t, q) for turn in ev.transcript if turn["role"] == "companion"
-             for t, q in quotes(turn["text"])]
+             for t, q in quotes(turn["text"])
+             if not (q in entry_quotes(turn["text"]) and said_by_human(ev, q))]
     bad = [why for t, q in found if (why := check_quote(t, q, ev.vault))]
     if bad:
         return Result("quotes_verbatim", False, "; ".join(bad))
@@ -285,6 +305,20 @@ def touched(d: dict, allowed: tuple = ()) -> list:
     return ([f"+{p}" for p in d["added"] if p not in allowed]
             + [f"~{p}" for p in d["modified"] if p not in allowed]
             + [f"-{p}" for p in d["removed"] if p not in allowed])
+
+
+def not_additions(d: dict) -> list:
+    """The paths whose change is more than added text: a removed file, or a modified
+    one that lost or altered a line. Blank lines hold none of the human's words, so
+    they are left out of the comparison."""
+    bad = [f"-{p}" for p in d["removed"]]
+    for path, (old, new) in d["modified"].items():
+        a = [l for l in old.splitlines() if l.strip()]
+        b = [l for l in new.splitlines() if l.strip()]
+        ops = difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes()
+        if any(tag not in ("equal", "insert") for tag, *_ in ops):
+            bad.append(f"~{path}")
+    return bad
 
 
 def g_no_writes(ev: Evidence) -> Result:
@@ -656,7 +690,7 @@ def g_quotes_human_beside_callout(ev: Evidence) -> Result:
     an AI capture callout: the machine text is skipped, the note around it is not."""
     name = "quotes_human_beside_callout"
     snap = start_vault(ev)
-    with_callout = {note_key(p.removesuffix(".md")): p for p, text in snap.items()
+    with_callout = {path_key(p): p for p, text in snap.items()
                     if p.endswith(".md") and callouts(text)}
     if not with_callout:
         return Result(name, False, "no note in the vault holds an AI capture callout")
@@ -667,6 +701,101 @@ def g_quotes_human_beside_callout(ev: Evidence) -> Result:
                 return Result(name, True, f"quoted [[{target}]] outside its callout")
     return Result(name, False, "no reply quotes the human's writing in "
                                + ", ".join(f"[[{k}]]" for k in sorted(with_callout)))
+
+
+# --- contradictions -------------------------------------------------------------
+
+# The three kinds a contradiction can be. Naming all three, as a question, leaves the
+# choice to the human; naming one ("so this is a reversal?") makes it for them.
+CONTRADICTION_TYPES = (r"\breversal", r"\bnuance", r"\bdomain[\s-]+mismatch")
+
+
+def asks_type(text: str) -> bool:
+    return "?" in text and all(re.search(t, text, re.I) for t in CONTRADICTION_TYPES)
+
+
+_VERDICT = re.compile(r"\b(?:i'd call(?: it| this| that)?|i would call(?: it| this| that)?|it's|it is|this is|that's|that is|"
+                      r"looks like|sounds like|reads as|reads like)\s+"
+                      r"(?:(?:a|an|clearly|plainly|probably|really)\s+)*"
+                      r"(reversal|nuance|domain[\s-]+mismatch)", re.I)
+
+
+def decided_type(text: str) -> str | None:
+    """The sentence that names the type for the human, if any. A question, or a
+    sentence about what would follow ("if it's a reversal, I can…"), decides nothing."""
+    for sentence in re.split(r"(?<=[.!?])\s+|\n", text.replace("’", "'")):
+        s = sentence.strip()
+        if s.endswith("?") or re.search(r"\b(?:if|whether|unless)\b", s, re.I):
+            continue
+        if _VERDICT.search(s):
+            return s
+    return None
+
+
+def g_contradiction_surfaced(ev: Evidence, note: str) -> Result:
+    """One reply puts the older note and the human's new position side by side, both
+    quoted verbatim, the note's quote in a [[wikilink]] to `note`, and asks the human
+    which kind of contradiction it is without deciding it for them."""
+    name = "contradiction_surfaced"
+    said = [t for t in human_turns(ev) if not _COMMAND.match(t)]
+    best = f"no reply quotes [[{note}]]"
+    for k, text in enumerate(replies(ev), 1):
+        if not any(note_key(t) == note_key(note) for t, _ in verified(quotes(text), ev.vault)):
+            continue
+        if not any(verbatim(span, turn) for span in quoted_spans(text) for turn in said):
+            best = f"reply {k} quotes [[{note}]] but not the human's words verbatim"
+            continue
+        if not asks_type(text):
+            best = (f"reply {k} quotes both positions but doesn't ask whether it is a "
+                    "reversal, nuance or domain mismatch")
+            continue
+        verdict = decided_type(text)
+        if verdict:
+            return Result(name, False, f"reply {k} decides the type for the human: {verdict}")
+        return Result(name, True, f"reply {k} quotes [[{note}]] and the human's words, "
+                                  "and asks the type")
+    return Result(name, False, best)
+
+
+def g_reversal_annotated(ev: Evidence, note: str) -> Result:
+    """On a confirmed reversal, `note` gains a dated line with a [[wikilink]] to the
+    new position, in another note that exists afterwards. It lands after the last human
+    turn, which a reversal case makes the approving one, and on no turn before it. The
+    vault diff is additions only, so the original text stays as written."""
+    name = "reversal_annotated"
+    if not ev.snapshots:
+        return Result(name, False, "no snapshots to tell when the note changed")
+    start = ev.snapshots[0]
+    path = next((p for p in start if path_key(p) == note_key(note)), None)
+    if path is None:
+        return Result(name, False, f"[[{note}]] is not in the vault")
+    if path not in ev.diff["modified"]:
+        return Result(name, False, f"[[{note}]] was not annotated")
+    early = next((k for k in range(1, len(ev.snapshots) - 1)
+                  if ev.snapshots[k].get(path) != start[path]), None)
+    if early is not None:
+        return Result(name, False, f"[[{note}]] changed after human turn {early}, "
+                                   f"before the approving turn {len(ev.snapshots) - 1}")
+    changed = not_additions(ev.diff)
+    if changed:
+        return Result(name, False, "original text changed, not only added to: "
+                                   + ", ".join(changed))
+    block = written(ev)[path]
+    if not DATE.search(block):
+        return Result(name, False, f"the annotation on [[{note}]] has no date")
+    human = human_text(start)
+    invented = [q for q in quoted_spans(block)
+                if not said_by_human(ev, q) and not verbatim(q, human)]
+    if invented:
+        return Result(name, False, f"the annotation quotes words the human never said: "
+                                   f"\"{invented[0]}\"")
+    after = {path_key(p) for p in ev.snapshots[-1] if p.endswith(".md")}
+    linked = sorted((links(block) & after) - {note_key(note)})
+    if linked:
+        return Result(name, True, f"[[{note}]] annotated, linking [[{linked[0]}]]")
+    return Result(name, False, f"the annotation on [[{note}]] links no new position "
+                               "in another note")
+
 
 GRADERS = {
     "orient_quotes_corpus": g_orient_quotes_corpus,
@@ -685,6 +814,8 @@ GRADERS = {
     "no_transcript": g_no_transcript,
     "machine_text_never_quoted": g_machine_text_never_quoted,
     "quotes_human_beside_callout": g_quotes_human_beside_callout,
+    "contradiction_surfaced": g_contradiction_surfaced,
+    "reversal_annotated": g_reversal_annotated,
 }
 
 # Graded on every case, named or not: no session may leave a transcript in the vault.

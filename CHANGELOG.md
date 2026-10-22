@@ -39,3 +39,8 @@ workaround and its evals pass.
   judge rubric for soft posture that can decide a case with `pass_at`; Fixture
   vaults `the-sabbatical` and `mum-and-the-studio`; four cases for voice, soft
   topics and the raw flag; mutants `companion-no-voice-guard` and `companion-no-soft-mode`.
+- Evals for contradictions: a Fixture vault with a planted contradiction, a case
+  where both positions are quoted verbatim and the human is asked reversal, nuance
+  or domain mismatch, and a case where a confirmed reversal annotates the older
+  note with its original text intact (the vault diff is additions only).
+  Mutant `companion-no-contradiction-guard`.

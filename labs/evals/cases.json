@@ -297,6 +297,57 @@
         "The session still closes with a menu",
         "Nothing is written to the vault"
       ]
+    },
+    {
+      "id": "contradiction-typed",
+      "vault": "the-kitchen-table",
+      "overlay": "## Companion\n\n- index: [[home]]\n",
+      "turns": [
+        "/companion should I take the hybrid offer?",
+        "Honestly, I want the office now. Working alone at the kitchen table has made me slower, and I miss having people to think out loud with."
+      ],
+      "graders": [
+        {
+          "name": "contradiction_surfaced",
+          "note": "working from home"
+        },
+        "quotes_verbatim",
+        "no_writes"
+      ],
+      "what_it_tests": "The older note says the kitchen table is where the human does their best work and that they are never going back to a desk they commute to. The second turn says the opposite. Companion quotes both positions verbatim, the note in a wikilink, and asks whether it is a reversal, nuance or domain mismatch, naming all three so the choice stays with the human. Nobody has confirmed a type, so nothing is written.",
+      "expectations": [
+        "One reply quotes [[working from home]] verbatim and the human's second turn verbatim",
+        "The same reply asks reversal, nuance or domain mismatch",
+        "The vault is unchanged"
+      ]
+    },
+    {
+      "id": "reversal-annotated",
+      "vault": "the-kitchen-table",
+      "overlay": "## Companion\n\n- index: [[home]]\n",
+      "turns": [
+        "/companion should I take the hybrid offer?",
+        "Honestly, I want the office now. Working alone at the kitchen table has made me slower, and I miss having people to think out loud with.",
+        "Reversal. I've changed my mind since I wrote that.",
+        "Yes, annotate the old note."
+      ],
+      "graders": [
+        {
+          "name": "contradiction_surfaced",
+          "note": "working from home"
+        },
+        {
+          "name": "reversal_annotated",
+          "note": "working from home"
+        },
+        "quotes_verbatim"
+      ],
+      "what_it_tests": "Same contradiction; the human confirms a reversal, then approves the write. The older note gains a dated line linking the new position, on the approving turn and not before, and its original text stays as written: the vault diff is additions only.",
+      "expectations": [
+        "[[working from home]] gains a dated line that links another note or quotes the human's new position",
+        "The line appears only after the approving turn",
+        "No original line in the vault is changed or removed"
+      ]
     }
   ]
 }

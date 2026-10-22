@@ -68,6 +68,7 @@ None contains real notes.
 | `the-sabbatical` | Voice: the note about a sabbatical holds the human's reason and, beside it, a folded `AI capture` callout arguing the opposite. The index also links a generated digest, in a folder the skip-list case names |
 | `mum-and-the-studio` | Soft topics: a `family/` note that invites a position (whether mum moves in), and a `work/` note that isn't soft until the human flags it raw |
 | `spanish-and-the-car` | The log: two unrelated topics, so one session's unpicked menu is easy to spot in the next, and a log with one earlier line. Also the session where the human only asks, so there is no line to file |
+| `the-kitchen-table` | Contradictions: an older note says the kitchen table is where the human does their best work and they'll never commute again, and a scripted turn says they want the office now. A job offer note gives the new position somewhere to link |
 
 ## Showing a case can fail
 

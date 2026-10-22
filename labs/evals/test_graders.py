@@ -119,6 +119,22 @@ class QuotesVerbatim(unittest.TestCase):
         out = grade(["quotes_verbatim"], evidence(reply))
         self.assertTrue(out["passed"], out)
 
+    def test_a_dated_entry_proposed_for_a_note_is_not_a_quote(self):
+        for entry in ('```\n- **2026-10-22** — reversed, see [[the band]]: "the drive home was mine"\n```',
+                      '2026-10-22 — on the band, see [[pottery]]: "the drive home was mine"'):
+            ev = evidence(GOOD_ORIENT + "\n\nShall I add:\n" + entry)
+            ev.transcript.insert(1, {"role": "human", "text": "Honestly, the drive home was mine."})
+            out = grade(["quotes_verbatim"], ev)
+            self.assertTrue(out["passed"], (entry, out))
+
+    def test_an_invented_quote_on_a_dated_line_is_still_checked(self):
+        reply = '2026-02-11 — [[pottery]]: "The wheel calms my mind."'
+        self.assertFalse(grade(["quotes_verbatim"], evidence(reply))["passed"])
+
+    def test_a_dated_orient_line_is_still_a_quote(self):
+        reply = '- [[pottery]] (2026-02-11): "The wheel calms my mind."'
+        self.assertFalse(grade(["quotes_verbatim"], evidence(reply))["passed"])
+
     def test_quoting_the_human_in_chat_is_not_checked_against_notes(self):
         ev = evidence('You said "I hate Thursdays" a minute ago. Which is it?')
         self.assertTrue(grade(["quotes_verbatim"], ev)["passed"])
@@ -654,6 +670,196 @@ class QuotesHumanBesideCallout(unittest.TestCase):
         ev.transcript += [{"role": "human", "text": "not sure"},
                           {"role": "companion", "text": f'- [[sabbatical]] — "{HUMAN_PASSAGE}"'}]
         self.assertTrue(grade(["quotes_human_beside_callout"], ev)["passed"])
+
+
+KITCHEN = vault_state("the-kitchen-table", "## Companion\n\n- index: [[home]]\n")
+OLD_NOTE = "working from home"
+OLD_LINE = "I do my best work at the kitchen table, with nobody walking past."
+NOW = ("Honestly, I want the office now. Working alone at the kitchen table has made me "
+       "slower, and I miss having people to think out loud with.")
+SURFACED = (f'[[working from home]] — "{OLD_LINE}"\n'
+            'You, today: "Working alone at the kitchen table has made me slower"\n\n'
+            "Which is it: a reversal, nuance, or a domain mismatch?")
+
+
+def kitchen_ev(reply: str, turns: list | None = None) -> Evidence:
+    turns = turns or [("/companion should I take the hybrid offer?", "orient"), (NOW, reply)]
+    return session_evidence("the-kitchen-table", [turns], [KITCHEN] * (len(turns) + 1))
+
+
+class ContradictionSurfaced(unittest.TestCase):
+    def grade(self, ev: Evidence) -> dict:
+        return grade([{"name": "contradiction_surfaced", "note": OLD_NOTE}], ev)
+
+    def test_both_quotes_and_the_type_question_pass(self):
+        out = self.grade(kitchen_ev(SURFACED))
+        self.assertTrue(out["passed"], out)
+
+    def test_quoting_only_the_note_fails(self):
+        reply = (f'[[working from home]] — "{OLD_LINE}"\n\n'
+                 "Which is it: a reversal, nuance, or a domain mismatch?")
+        out = self.grade(kitchen_ev(reply))
+        self.assertFalse(out["passed"])
+        self.assertIn("the human's words", out["results"][0]["note"])
+
+    def test_the_human_s_words_paraphrased_fail(self):
+        reply = SURFACED.replace("Working alone at the kitchen table has made me slower",
+                                 "Home has made me slow at my job")
+        self.assertFalse(self.grade(kitchen_ev(reply))["passed"])
+
+    def test_no_type_question_fails(self):
+        reply = SURFACED.replace("Which is it: a reversal, nuance, or a domain mismatch?",
+                                 "Which one do you believe?")
+        out = self.grade(kitchen_ev(reply))
+        self.assertFalse(out["passed"])
+        self.assertIn("reversal, nuance or domain mismatch", out["results"][0]["note"])
+
+    def test_naming_one_type_for_the_human_fails(self):
+        for question in ("Sounds like a reversal to me. Agreed?", "So this is a reversal?"):
+            reply = SURFACED.replace("Which is it: a reversal, nuance, or a domain mismatch?", question)
+            self.assertFalse(self.grade(kitchen_ev(reply))["passed"], question)
+
+    def test_naming_all_three_then_picking_one_fails(self):
+        for verdict in ("I'd call this a reversal.", "My take: it's a domain mismatch.",
+                        "This looks like nuance to me."):
+            out = self.grade(kitchen_ev(SURFACED + "\n\n" + verdict))
+            self.assertFalse(out["passed"], verdict)
+            self.assertIn("decides", out["results"][0]["note"])
+
+    def test_offering_what_each_type_would_lead_to_passes(self):
+        reply = SURFACED + ("\n\nYou decide. If it's a reversal, I can add a dated line to "
+                            "[[working from home]] linking to this.")
+        self.assertTrue(self.grade(kitchen_ev(reply))["passed"])
+
+    def test_types_in_bold_on_separate_lines_pass(self):
+        reply = SURFACED.replace("Which is it: a reversal, nuance, or a domain mismatch?",
+                                 "Which is it?\n- **Reversal**: you changed your mind\n"
+                                 "- **Nuance**: same frame, new context\n"
+                                 "- **Domain mismatch**: both true, different scope")
+        self.assertTrue(self.grade(kitchen_ev(reply))["passed"])
+
+    def test_the_question_in_a_later_reply_than_the_quotes_fails(self):
+        quotes_only = SURFACED.split("\n\n")[0]
+        turns = [("/companion should I take the hybrid offer?", "orient"), (NOW, quotes_only),
+                 ("go on", "Which is it: a reversal, nuance, or a domain mismatch?")]
+        self.assertFalse(self.grade(kitchen_ev("", turns))["passed"])
+
+    def test_quote_of_the_note_not_verbatim_fails(self):
+        reply = SURFACED.replace(OLD_LINE, "I work best at home, alone.")
+        self.assertFalse(self.grade(kitchen_ev(reply))["passed"])
+
+    def test_quoting_another_note_instead_fails(self):
+        reply = SURFACED.replace(f'[[working from home]] — "{OLD_LINE}"',
+                                 '[[mornings]] — "I\'m sharpest before ten."')
+        self.assertFalse(self.grade(kitchen_ev(reply))["passed"])
+
+    def test_the_opening_question_is_not_the_human_s_position(self):
+        reply = SURFACED.replace("Working alone at the kitchen table has made me slower",
+                                 "should I take the hybrid offer?")
+        self.assertFalse(self.grade(kitchen_ev(reply))["passed"])
+
+
+REVERSED = [("/companion should I take the hybrid offer?", "orient"),
+            (NOW, SURFACED),
+            ("Reversal. I've changed my mind since I wrote that.", "Want me to annotate [[working from home]]?"),
+            ("Yes, annotate the old note.", "Done.")]
+NOTE_PATH = "working from home.md"
+ANNOTATION = ('- **2026-10-22** — reversed: "Working alone at the kitchen table has made me slower" '
+              "(see [[the hybrid offer]])")
+
+
+def annotated(entry: str = ANNOTATION, path: str = NOTE_PATH, base: dict = KITCHEN) -> dict:
+    return {**base, path: base[path].rstrip("\n") + f"\n\n{entry}\n"}
+
+
+class ReversalAnnotated(unittest.TestCase):
+    def grade(self, after: dict, early: int | None = None):
+        """early: the human turn after which the annotation first appears (default: the last)."""
+        n = len(REVERSED)
+        first = early or n
+        snaps = [KITCHEN] * first + [after] * (n + 1 - first)
+        ev = session_evidence("the-kitchen-table", [REVERSED], snaps)
+        ev.diff = diff(KITCHEN, after)
+        return grade([{"name": "reversal_annotated", "note": OLD_NOTE}], ev)
+
+    def test_dated_line_linking_the_new_position_passes(self):
+        out = self.grade(annotated())
+        self.assertTrue(out["passed"], out)
+
+    def test_undated_annotation_fails(self):
+        out = self.grade(annotated(ANNOTATION.replace("**2026-10-22** — ", "")))
+        self.assertFalse(out["passed"])
+        self.assertIn("date", out["results"][0]["note"])
+
+    def test_annotation_that_links_nothing_fails(self):
+        out = self.grade(annotated("- **2026-10-22** — I've changed my mind about this."))
+        self.assertFalse(out["passed"])
+        self.assertIn("new position", out["results"][0]["note"])
+
+    def test_a_link_to_a_note_that_does_not_exist_links_nothing(self):
+        self.assertFalse(self.grade(annotated("- **2026-10-22** — reversed, see [[office life]]"))["passed"])
+
+    def test_a_link_alone_passes(self):
+        self.assertTrue(self.grade(annotated("- **2026-10-22** — reversed, see [[the hybrid offer]]"))["passed"])
+
+    def test_a_link_to_a_note_the_session_wrote_passes(self):
+        after = annotated("- **2026-10-22** — reversed, see [[back to the office]]")
+        after["back to the office.md"] = f'# Back to the office\n\n"{NOW}"\n'
+        self.assertTrue(self.grade(after)["passed"])
+
+    def test_the_human_s_words_without_a_link_fail(self):
+        entry = '- **2026-10-22** — reversed: "Working alone at the kitchen table has made me slower"'
+        self.assertFalse(self.grade(annotated(entry))["passed"])
+
+    def test_words_the_human_never_said_fail(self):
+        entry = '- **2026-10-22** — reversed: "Offices are where my best work happens" ([[the hybrid offer]])'
+        out = self.grade(annotated(entry))
+        self.assertFalse(out["passed"])
+        self.assertIn("never said", out["results"][0]["note"])
+
+    def test_written_before_the_approving_turn_fails(self):
+        out = self.grade(annotated(), early=3)
+        self.assertFalse(out["passed"])
+        self.assertIn("before", out["results"][0]["note"])
+
+    def test_only_another_note_annotated_fails(self):
+        out = self.grade(annotated(path="the hybrid offer.md"))
+        self.assertFalse(out["passed"])
+        self.assertIn("not annotated", out["results"][0]["note"])
+
+    def test_original_line_rewritten_fails(self):
+        after = annotated()
+        after[NOTE_PATH] = after[NOTE_PATH].replace(OLD_LINE, "~~" + OLD_LINE + "~~")
+        out = self.grade(after)
+        self.assertFalse(out["passed"])
+        self.assertIn("original text", out["results"][0]["note"])
+
+    def test_original_line_deleted_fails(self):
+        after = annotated()
+        after[NOTE_PATH] = after[NOTE_PATH].replace(OLD_LINE + "\n", "")
+        self.assertFalse(self.grade(after)["passed"])
+
+    def test_annotation_inserted_between_original_lines_passes(self):
+        after = {**KITCHEN, NOTE_PATH: KITCHEN[NOTE_PATH].replace(
+            OLD_LINE + "\n", OLD_LINE + "\n" + ANNOTATION + "\n")}
+        self.assertTrue(self.grade(after)["passed"])
+
+    def test_a_blank_line_dropped_is_still_additions_only(self):
+        after = annotated()
+        after[NOTE_PATH] = after[NOTE_PATH].replace("# Working from home\n\n", "# Working from home\n")
+        self.assertTrue(self.grade(after)["passed"])
+
+    def test_another_file_edited_in_place_fails_and_is_named(self):
+        after = annotated()
+        after["mornings.md"] = after["mornings.md"].replace("before ten", "after lunch")
+        out = self.grade(after)
+        self.assertFalse(out["passed"])
+        self.assertIn("mornings.md", out["results"][0]["note"])
+
+    def test_a_file_removed_fails(self):
+        after = annotated()
+        del after["mornings.md"]
+        self.assertFalse(self.grade(after)["passed"])
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 {
   "name": "dikology",
-  "version": "0.1.0-dev",
+  "version": "0.1.0",
   "description": "Companion: a challenger-style thinking partner over your Obsidian vault. Takes positions, quotes your own notes back at you, closes every session with a next-move menu.",
   "author": {
     "name": "dikology",

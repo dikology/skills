@@ -4,7 +4,10 @@ All notable changes to this Library. Versions follow [semver](https://semver.org
 the Library stays on 0.x until companion has run about ten real sessions with no
 workaround and its evals pass.
 
-## [0.1.0-dev] — unreleased
+## [0.1.0] — 2026-10-23
+
+First release. This is 0.x: it stays 0.x until about ten real-vault sessions
+need no workaround. Expect the Overlay contract to change before 1.0.0.
 
 ### Added
 
@@ -60,3 +63,16 @@ workaround and its evals pass.
   difference. `--promote` copies the candidate over stable on the evidence of a
   saved two-arm run, and refuses when the candidate lost any case, the run was
   partial, or either arm changed since.
+- README: the Overlay fields with their fallbacks, a pinned install, and a 中文
+  README (`README.zh.md`).
+
+### Changed
+
+- Evals: a quote from a note may change the case of its first letter to fit its sentence;
+  every other character must still match the note. A filed line stays exact.
+- Evals: the soft-posture cases pass at judge score 3, not 4. A score of 3 is
+  gentle in tone with one reply that still steers (a verdict, an argued opposite
+  side, or a pointed "but your notes say"). Companion lands there about half the
+  time; a session that challenges as usual still fails.
+
+[0.1.0]: https://github.com/dikology/skills/releases/tag/v0.1.0

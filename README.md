@@ -7,7 +7,10 @@ and installable as a Claude Code plugin marketplace.
 |---|---|
 | [`companion`](skills/companion/SKILL.md) | A challenger-style thinking partner. It reads your notes before it speaks, takes a position, quotes your own past writing where it contradicts you, and ends every session with a next-move menu. |
 
-Status: **0.1.0-dev**. See [CHANGELOG](CHANGELOG.md).
+Status: **0.1.0**. This stays 0.x until about ten real-vault sessions need no
+workaround, so the Overlay contract may still change. See [CHANGELOG](CHANGELOG.md).
+
+[中文版 README](README.zh.md)
 
 ## Install
 
@@ -15,6 +18,14 @@ Status: **0.1.0-dev**. See [CHANGELOG](CHANGELOG.md).
 
 ```
 /plugin marketplace add dikology/skills
+/plugin install dikology@dikology-skills
+```
+
+To pin a version, add the marketplace at a release tag instead, so the skill
+doesn't change under you until you move the tag:
+
+```
+/plugin marketplace add https://github.com/dikology/skills.git#v0.1.0
 /plugin install dikology@dikology-skills
 ```
 
@@ -56,6 +67,23 @@ Also: when I mention a book, check `reading/` first.
 Here `lang: zh` pins replies to 中文, which turns thinking sessions into language
 practice. Leave it out and companion replies in whatever language you write in.
 Quotes from your notes always stay in their original language.
+
+Every field is optional. When one is missing, companion names it once at the start
+of the session with the fallback it uses:
+
+| Field | What it tells companion | Fallback when absent |
+|---|---|---|
+| `index` | The page orient starts from | Search the vault for the topic |
+| `log` | A file that takes one line per session; an unpicked Close menu is logged as `menu unpicked` and named once next session | Write nothing |
+| `filing target` | The heading under which `[a]` files your own line, verbatim and dated, on the note the session was about | Hand the line back in chat for you to place |
+| `skip list` | Notes, folders or callouts that are never your voice, so never quoted | Only folded `> [!quote]- AI capture` callouts and the log, which are skipped in every vault |
+| `soft topics` | Folders or tags where the challenger posture is off: no positions, no devil's advocate | Only saying "this is raw" mid-session softens it |
+| `lang` | A reply-language pin | Reply in the language you write in |
+
+With no Overlay at all, the first session says so, asks for every field in one
+message, shows the section it would write, and writes it only after you approve.
+Decline and the session runs anyway on the fallbacks. A vault with no notes gets a
+chat-only session: no quotes, no contradictions.
 
 Anything after the fields is your own instruction. The skill follows it but never
 depends on it, so the same skill works in a vault that has none.

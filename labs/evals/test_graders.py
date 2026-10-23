@@ -135,6 +135,24 @@ class QuotesVerbatim(unittest.TestCase):
         reply = '- [[pottery]] (2026-02-11): "The wheel calms my mind."'
         self.assertFalse(grade(["quotes_verbatim"], evidence(reply))["passed"])
 
+    def test_a_quote_lowercased_to_fit_its_sentence_passes(self):
+        reply = 'In [[pottery]] you wrote that "the wheel is the only place my hands stop asking what time it is."'
+        out = grade(["quotes_verbatim"], evidence(reply))
+        self.assertTrue(out["passed"], out)
+
+    def test_a_russian_quote_lowercased_to_fit_its_sentence_passes(self):
+        reply = "По [[деньги на крышу]], «крыша течёт третий год»."
+        out = grade(["quotes_verbatim"], lang_evidence(reply))
+        self.assertTrue(out["passed"], out)
+
+    def test_case_changed_after_the_first_letter_fails(self):
+        reply = '[[pottery]] — "The Wheel is the only place my hands stop asking what time it is."'
+        self.assertFalse(grade(["quotes_verbatim"], evidence(reply))["passed"])
+
+    def test_russian_case_changed_after_the_first_letter_fails(self):
+        reply = "[[деньги на крышу]] — «Крыша Течёт третий год»."
+        self.assertFalse(grade(["quotes_verbatim"], lang_evidence(reply))["passed"])
+
     def test_quoting_the_human_in_chat_is_not_checked_against_notes(self):
         ev = evidence('You said "I hate Thursdays" a minute ago. Which is it?')
         self.assertTrue(grade(["quotes_verbatim"], ev)["passed"])
@@ -431,6 +449,11 @@ class LineFiledUnderTarget(unittest.TestCase):
     def test_quote_as_a_blockquote_under_a_dated_line_passes(self):
         entry = f"- **2026-10-19** — on quitting the band:\n  > {LINE}"
         self.assertTrue(self.grade(filed(entry=entry))["passed"])
+
+    def test_filed_line_with_its_first_letter_recased_fails(self):
+        recased = "i" + LINE[1:]
+        out = self.grade(filed(entry=f'- **2026-10-19** — on quitting the band: "{recased}"'))
+        self.assertFalse(out["passed"], out)
 
     def test_filed_under_another_heading_fails(self):
         out = self.grade(filed("## Notes"))

@@ -104,12 +104,19 @@ def verbatim(quote: str, note_text: str) -> bool:
     return bool(frags) and all(f in body for f in frags)
 
 
+def quoted_from_note(quote: str, note_text: str) -> bool:
+    """verbatim, except the quote's first letter may differ in case: a quote set
+    inside a sentence is often lowercased or capitalised to fit it."""
+    return any(verbatim(q, note_text) for q in (quote, quote[:1].lower() + quote[1:],
+                                                quote[:1].upper() + quote[1:]))
+
+
 def check_quote(target: str, quote: str, vault: Path) -> str | None:
     """None if the quote is verbatim in the note the link resolves to; else why not."""
     path = notes(vault).get(note_key(target))
     if path is None:
         return f"[[{target}]] does not resolve"
-    if not verbatim(quote, path.read_text()):
+    if not quoted_from_note(quote, path.read_text()):
         return f"not verbatim in [[{target}]]: \"{quote}\""
     return None
 

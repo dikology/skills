@@ -68,7 +68,7 @@ The LLM judge scores only what a regex can't decide, such as whether the reply
 takes a position. A case turns it on with `"judge": true`, which uses
 `judge-rubric.md` and only reports: the score is printed next to the verdict and
 never changes it. Or the case names a rubric and a pass mark,
-`"judge": {"rubric": "soft-posture", "pass_at": 4}`, which reads
+`"judge": {"rubric": "soft-posture", "pass_at": 3}`, which reads
 `judge-soft-posture.md`. Then a lower score, or a judge that fails to answer, fails
 the case. Use a pass mark only where posture is the behaviour under test and no
 regex can see it. `--no-judge` skips the judge, pass marks included; such a case prints

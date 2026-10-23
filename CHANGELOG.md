@@ -55,3 +55,8 @@ workaround and its evals pass.
   中文 reply); mutants `companion-wrong-reply-language` and
   `companion-translates-quotes`. Quotes may sit in 「」 marks, and a quote is no
   longer credited to a wikilink in another sentence.
+- Stable and Candidate: `labs/companion/` is a working copy of companion. The eval
+  runner scores `--arm stable`, `candidate` or `both`, and prints a per-case
+  difference. `--promote` copies the candidate over stable on the evidence of a
+  saved two-arm run, and refuses when the candidate lost any case, the run was
+  partial, or either arm changed since.

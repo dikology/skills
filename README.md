@@ -67,6 +67,8 @@ fallback for each item, and let each vault say the rest.
 ## Repo map
 
 - `skills/` holds the stable skills, the ones the plugin ships.
+- `labs/companion/` is the Candidate: the working copy of companion, scored against the
+  stable one before it may replace it.
 - `labs/evals/` is the eval harness: synthetic Fixture vaults, scripted sessions, graders.
 - `.claude-plugin/` holds the marketplace and plugin manifests.
 - `CONTEXT.md` is the glossary: Overlay, Corpus, Consuming vault, Fixture vault, Stable/Candidate.

@@ -26,5 +26,5 @@ A small, hand-written, synthetic vault in the Library, built to provoke one beha
 _Avoid_: test vault, sample data
 
 **Stable / Candidate**:
-Stable is the published copy of a skill under `skills/`; it changes only by promotion. Candidate is the working copy under `labs/`, scored against Stable on the same Fixture vaults before it may replace it.
+Stable is the published copy of a skill under `skills/`; it changes only by promotion. Candidate is the working copy under `labs/`, scored against Stable on the same Fixture vaults before it may replace it. The two are the eval runner's arms.
 _Avoid_: prod/dev, v1/v2

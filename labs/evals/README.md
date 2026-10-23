@@ -5,11 +5,37 @@ seams inside the skill. The agent reads the Overlay, so the only way to test tha
 is to run a session and look at what came out.
 
 ```
-python3 labs/evals/run_evals.py                 # every case, stable skill
+python3 labs/evals/run_evals.py                 # every case, stable arm
+python3 labs/evals/run_evals.py --arm both      # stable and candidate, compared case by case
+python3 labs/evals/run_evals.py --promote       # candidate -> stable, if it lost nothing
 python3 -m unittest discover -s labs/evals -v   # graders' and runner's own tests (no API calls)
 ```
 
 Requires `claude` on PATH. Python 3.9+, standard library only.
+
+## The loop: edit the candidate, compare, promote
+
+There are two copies of companion. **Stable**, `skills/companion/`, is what the
+plugin ships; it changes only by promotion. **Candidate**, `labs/companion/`, is the
+one you edit; nobody installs it. A cycle starts with the two byte-identical.
+
+1. **Edit** `labs/companion/SKILL.md`. Iterate on the cases it touches with
+   `--arm candidate --case <id>`; that run is cheap and proves nothing on its own.
+2. **Compare.** `--arm both` scores both arms on every case and prints one line per
+   case: each arm's verdict and score, and the difference, candidate minus stable.
+   A case is **LOST** when the candidate fails where stable passes, scores lower, or
+   didn't run. Sessions are probabilistic, so a single loss can be noise: run again
+   before you decide the edit is wrong.
+3. **Promote.** `--promote` reads the newest saved run of both arms (or
+   `--promote <results dir>`) and copies the candidate over stable. It refuses, and
+   changes nothing, when that run scored one arm only, used `--case` or `--no-judge`, skipped a case in
+   `cases.json`, or the candidate lost any case; or when either arm has been edited
+   since the run (each arm's files are hashed into `summary.json`). After a promote
+   the two copies are identical again, so the next cycle starts clean.
+
+Promotion is justified by the run, not by reading the diff. Commit `skills/` and
+`labs/` together, with the run's comparison table in the message. Following
+ae-daily-driver's ADR-0003.
 
 ## What a run does
 
@@ -25,10 +51,12 @@ For each case in `cases.json`:
 4. Snapshot the vault before the first turn and after every turn, then grade the
    **transcript**, the **vault diff** and, where order matters (first-run setup,
    one log line per session), the snapshots between turns.
-5. Print one `PASS`/`FAIL` line per case and keep, under `results/<timestamp>/<case>/`:
-   `transcript.md`, `transcript.json`, `vault.diff`, `grade.json`.
+5. Print one `PASS`/`FAIL` line per case and keep, under `results/<timestamp>/<arm>/<case>/`:
+   `transcript.md`, `transcript.json`, `vault.diff`, `grade.json`. `summary.json`
+   holds every arm's rows and the hash of the skill folder it scored.
 
-The runner exits 1 when any case fails.
+With `--arm both` the steps run once per arm, stable first, and a comparison table
+follows. The runner exits 1 when any case fails in any arm.
 
 ## Graders and the judge
 

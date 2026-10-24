@@ -10,7 +10,7 @@ This repository. Generic skills, their eval harness, and the records explaining 
 _Avoid_: vault, wiki
 
 **Overlay**:
-A `## Companion` section in a Consuming vault's `CLAUDE.md` or `AGENTS.md` that tells the generic skill where things are: index, log, filing target, skip list, soft topics, and an optional `lang` pin. Read by the agent as prose; there is no parser. Every field has a stated fallback. Free-form instructions may follow the fields.
+A section named after one skill (`## Companion`, `## Improve`) in a Consuming vault's `CLAUDE.md` or `AGENTS.md` that tells that skill where things are. Each skill lists its own fields in its `Requires from the consuming vault` section. Read by the agent as prose; there is no parser, so one section may point at another ("as in `## Companion`"). Every field has a stated fallback. Free-form instructions may follow the fields.
 _Avoid_: config, settings, profile
 
 **Corpus**:

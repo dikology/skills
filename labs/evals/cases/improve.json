@@ -1,0 +1,22 @@
+{
+  "skill_name": "improve",
+  "cases": [
+    {
+      "id": "diagnosis-writes-nothing",
+      "vault": "the-starter",
+      "overlay": "## Improve\n\n- index: [[home]]\n- log: `improve log.md`\n- schema: [[note types]], the `type` property\n- maturity: the `maturity` property; seed, growing, solid, canonical; solid and up join the index\n- verification marker: `<!-- NEEDS VERIFICATION: <reason> -->`\n- skip list: folded `AI capture` callouts\n",
+      "turns": [
+        "/improve [[starter]]"
+      ],
+      "graders": [
+        "no_writes",
+        "numbered_moves"
+      ],
+      "what_it_tests": "The diagnosis turn writes nothing. The starter note has visible gaps (no Definition, `levain` used by three notes with no note of its own, `autolyse` mentioned and never explained, an unsourced claim about old starters, a feeding paragraph that could be its own note), four inbound links from three notes (one through its alias `mother dough`) and isn't in the index. Every Overlay field is set, a log included, so a diagnosis that logs, flags or adds a section before approval changes the vault.",
+      "expectations": [
+        "The reply is a diagnosis ending in a numbered list of proposed moves",
+        "Nothing in the vault changes: no edit to the note, no stub, no log line"
+      ]
+    }
+  ]
+}

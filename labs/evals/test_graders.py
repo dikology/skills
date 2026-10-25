@@ -1024,5 +1024,50 @@ class QuotesStayInTheirSentence(unittest.TestCase):
         self.assertFalse(grade(["quotes_verbatim"], evidence(reply))["passed"])
 
 
+DIAGNOSIS = """PAGE: starter.md
+
+PROPOSED MOVES (ranked)
+1. Add a one-sentence Definition up top.
+2. **Flag** the claim about old starters as unverified.
+3. NOT YET: split the feeding schedule into its own note.
+
+QUESTIONS
+- Is the starter a baking note or a routine note?"""
+
+
+class NumberedMoves(unittest.TestCase):
+    def test_a_diagnosis_with_moves_numbered_from_one_passes(self):
+        out = grade(["numbered_moves"], evidence(DIAGNOSIS))
+        self.assertTrue(out["passed"], out)
+        self.assertIn("3", result(out, "numbered_moves")["note"])
+
+    def test_moves_as_plain_bullets_fail(self):
+        reply = DIAGNOSIS.replace("1. ", "- ").replace("2. ", "- ").replace("3. ", "- ")
+        self.assertFalse(grade(["numbered_moves"], evidence(reply))["passed"])
+
+    def test_a_single_numbered_line_is_not_a_list_of_moves(self):
+        reply = "PROPOSED MOVES\n1. Add a Definition.\n\nWhich?"
+        self.assertFalse(grade(["numbered_moves"], evidence(reply))["passed"])
+
+    def test_numbers_that_do_not_start_at_one_fail(self):
+        reply = DIAGNOSIS.replace("1. ", "4. ").replace("2. ", "5. ").replace("3. ", "6. ")
+        self.assertFalse(grade(["numbered_moves"], evidence(reply))["passed"])
+
+    def test_a_later_list_restarting_at_one_keeps_the_moves(self):
+        reply = DIAGNOSIS + "\n\nApprove as:\n1. a list of numbers"
+        out = grade(["numbered_moves"], evidence(reply))
+        self.assertIn("3", result(out, "numbered_moves")["note"])
+
+    def test_a_number_out_of_sequence_breaks_the_list(self):
+        reply = "1. Add a Definition.\n2. Add Related.\n9. Flag a claim.\n3. Promote."
+        self.assertIn("2 numbered", result(grade(["numbered_moves"], evidence(reply)), "numbered_moves")["note"])
+
+    def test_moves_only_in_a_later_turn_do_not_count(self):
+        ev = evidence("Let me read the note first.")
+        ev.transcript += [{"role": "human", "text": "go on"},
+                          {"role": "companion", "text": DIAGNOSIS}]
+        self.assertFalse(grade(["numbered_moves"], ev)["passed"])
+
+
 if __name__ == "__main__":
     unittest.main()

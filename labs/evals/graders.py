@@ -1,4 +1,4 @@
-"""Graders for companion eval cases.
+"""Graders for the Library's eval cases.
 
 A grader sees what a user would see or find: the session transcript and the
 vault diff, plus the Fixture vault to check quotes against. It never reads the
@@ -336,6 +336,24 @@ def g_no_writes(ev: Evidence) -> Result:
     if changed:
         return Result("no_writes", False, "vault changed: " + ", ".join(changed))
     return Result("no_writes", True, "vault unchanged")
+
+
+# A numbered list item: "1. Add a Definition", "2) …", "**3.** …".
+NUMBERED = re.compile(r"^\s*(?:\*\*)?(\d+)[.)](?:\*\*)?\s+\S", re.M)
+
+
+def g_numbered_moves(ev: Evidence) -> Result:
+    """The first reply ends a diagnosis in moves the human can approve by number:
+    a list numbered 1, 2, … with at least two items."""
+    found = [int(n) for n in NUMBERED.findall(first_reply(ev))]
+    run = best = 0
+    for n in found:
+        run = n if n == run + 1 else (1 if n == 1 else 0)
+        best = max(best, run)
+    if best < 2:
+        return Result("numbered_moves", False,
+                      f"no list numbered from 1 with two or more items (numbers seen: {found})")
+    return Result("numbered_moves", True, f"{best} numbered moves")
 
 
 def g_writes_only_log(ev: Evidence) -> Result:
@@ -869,6 +887,7 @@ GRADERS = {
     "orient_quotes_corpus": g_orient_quotes_corpus,
     "quotes_verbatim": g_quotes_verbatim,
     "no_writes": g_no_writes,
+    "numbered_moves": g_numbered_moves,
     "orient_quotes_from_index": g_orient_quotes_from_index,
     "overlay_written_after_approval": g_overlay_written_after_approval,
     "session_quotes_corpus": g_session_quotes_corpus,

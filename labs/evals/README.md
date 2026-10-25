@@ -125,6 +125,7 @@ None contains real notes.
 | `spanish-and-the-car` | The log: two unrelated topics, so one session's unpicked menu is easy to spot in the next, and a log with one earlier line. Also the session where the human only asks, so there is no line to file |
 | `the-kitchen-table` | Contradictions: an older note says the kitchen table is where the human does their best work and they'll never commute again, and a scripted turn says they want the office now. A job offer note gives the new position somewhere to link |
 | `the-dacha` | Language: a vault written in Russian, about whether to sell a grandmother's dacha. Russian turns, English turns, and a `lang: zh` pin all meet the same Russian notes |
+| `the-starter` | Improve: a sourdough `starter` note with visible gaps (no Definition, a term with no note of its own, a term never explained, an unsourced claim, a paragraph that wants to be its own note), four inbound links from three notes, one through its alias, and no index entry. A schema file and a log with one earlier line, so a diagnosis that writes anything shows up in the diff |
 
 ## Showing a case can fail
 
@@ -133,6 +134,7 @@ it targets should print `FAIL`:
 
 ```
 python3 labs/evals/run_evals.py --skill labs/evals/mutants/companion-paraphrase
+python3 labs/evals/run_evals.py improve --skill labs/evals/mutants/improve-writes-before-approval
 ```
 
 ## Adding a case

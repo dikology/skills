@@ -1,22 +1,26 @@
 #!/usr/bin/env python3
-"""Run companion eval cases and print one pass/fail line per case.
+"""Run a Library skill's eval cases and print one pass/fail line per case.
 
-A case is a Fixture vault, an optional Overlay and scripted human turns, in one
-session (`turns`) or several (`sessions`). For each case the runner copies the
-vault to a temp directory, appends the Overlay to its CLAUDE.md, installs the skill
-under .claude/skills/companion unmodified (as a Consuming vault would), and plays
-each session in headless `claude -p`, resuming it for each later turn and starting
-fresh for the next session. It snapshots the vault after every turn, grades the
-transcript and the vault diff, and keeps both under results/.
+The skill is named on the command line (default: companion). Its cases are
+cases/<skill>.json. A case is a Fixture vault, an optional Overlay and scripted
+human turns, in one session (`turns`) or several (`sessions`). For each case the
+runner copies the vault to a temp directory, appends the Overlay to its CLAUDE.md,
+installs the skill under .claude/skills/<skill> unmodified (as a Consuming vault
+would), and plays each session in headless `claude -p`, resuming it for each later
+turn and starting fresh for the next session. It snapshots the vault after every
+turn, grades the transcript and the vault diff, and keeps both under results/.
 
-There are two arms: stable (skills/companion, what the plugin ships) and candidate
-(labs/companion, what you edit). Scoring both on the same cases prints a per-case
-difference; --promote then copies the candidate over stable, unless it lost a case.
+Each skill has two arms: stable (skills/<skill>, what the plugin ships) and
+candidate (labs/<skill>, what you edit). Scoring both on the same cases prints a
+per-case difference; --promote then copies that skill's candidate over its stable,
+unless it lost a case.
 
-    python3 labs/evals/run_evals.py                          # all cases, stable arm
+    python3 labs/evals/run_evals.py                          # companion, all cases, stable arm
+    python3 labs/evals/run_evals.py improve                  # another skill, by name
     python3 labs/evals/run_evals.py --arm candidate          # iterate on the candidate
     python3 labs/evals/run_evals.py --arm both               # compare, case by case
     python3 labs/evals/run_evals.py --promote                # candidate -> stable, gated
+    python3 labs/evals/run_evals.py improve --promote        # the same, for improve
     python3 labs/evals/run_evals.py --case orient            # cases whose id contains "orient"
     python3 labs/evals/run_evals.py --skill labs/evals/mutants/companion-paraphrase
     python3 labs/evals/run_evals.py --no-judge               # deterministic graders only
@@ -46,11 +50,9 @@ import vaultdiff  # noqa: E402
 
 HERE = Path(__file__).parent
 REPO = HERE.parent.parent
-# Stable is what the plugin ships and changes only by promotion; Candidate is the
-# working copy you edit. Both start byte-identical.
-ARMS = {"stable": REPO / "skills" / "companion",
-        "candidate": REPO / "labs" / "companion"}
+DEFAULT_SKILL = "companion"
 VAULTS = HERE / "fixtures" / "vaults"
+CASES = HERE / "cases"
 RESULTS = HERE / "results"
 
 # Settings come from the temp vault only (no user hooks or plugins), and no MCP
@@ -59,16 +61,38 @@ ISOLATION = ["--strict-mcp-config", "--setting-sources", "project,local"]
 SESSION_FLAGS = ["--permission-mode", "bypassPermissions", *ISOLATION]
 
 
+# --- a skill by name ----------------------------------------------------------
+
+def arms_for(name: str) -> dict:
+    """Both copies of a Library skill. Stable is what the plugin ships and changes
+    only by promotion; Candidate is the working copy you edit."""
+    return {"stable": REPO / "skills" / name, "candidate": REPO / "labs" / name}
+
+
+def load_cases(name: str, folder: Path = CASES) -> list:
+    """The skill's own case set, cases/<name>.json. Raises ValueError when there is
+    none, or when the file says it belongs to another skill."""
+    path = folder / f"{name}.json"
+    if not path.exists():
+        raise ValueError(f"no case set for skill {name!r} at {path}")
+    data = json.loads(path.read_text())
+    if data.get("skill_name", name) != name:
+        raise ValueError(f"{path.name} holds cases for {data['skill_name']!r}, not {name!r}")
+    return data["cases"]
+
+
 # --- the temp Consuming vault -------------------------------------------------
 
-def build_vault(root: Path, case: dict, skill: Path) -> Path:
+def build_vault(root: Path, case: dict, skill: Path, name: str) -> Path:
+    """A temp Consuming vault: the case's Fixture vault, its Overlay, and the skill
+    folder installed unmodified as .claude/skills/<name>, whatever the folder is called."""
     ws = root / case["id"]
     shutil.copytree(VAULTS / case["vault"], ws)
     if case.get("overlay"):
         md = ws / "CLAUDE.md"
         existing = md.read_text() if md.exists() else ""
         md.write_text(existing.rstrip() + "\n\n" + case["overlay"].strip() + "\n")
-    shutil.copytree(skill, ws / ".claude" / "skills" / "companion")
+    shutil.copytree(skill, ws / ".claude" / "skills" / name)
     return ws
 
 
@@ -189,7 +213,7 @@ def keep(outdir: Path, case: dict, session: dict, d: dict, scored: dict) -> None
 
 
 def run_case(case: dict, skill: Path, args, tmp: Path, outdir: Path) -> dict:
-    ws = build_vault(tmp, case, skill)
+    ws = build_vault(tmp, case, skill, args.name)
     session = play(ws, case_sessions(case), args.model, args.timeout)
     snaps = session["snapshots"]
     d = vaultdiff.diff(snaps[0], snaps[-1])
@@ -259,10 +283,20 @@ def tree_hash(folder: Path) -> str:
     return h.hexdigest()
 
 
-def promote(summary: dict, stable: Path, candidate: Path, case_ids: list) -> str | None:
-    """Copy the candidate over stable, on the evidence of a saved two-arm run.
-    Returns why it refused, or None once stable has been replaced."""
+def scored_skill(summary: dict) -> str:
+    """The skill a saved run scored. Runs saved before the harness took a name
+    scored companion."""
+    return summary.get("skill", DEFAULT_SKILL)
+
+
+def promote(summary: dict, stable: Path, candidate: Path, case_ids: list,
+            skill_name: str) -> str | None:
+    """Copy the named skill's candidate over its stable, on the evidence of a saved
+    two-arm run of that skill. Returns why it refused, or None once stable has been
+    replaced."""
     arms = summary.get("arms") or {}
+    if scored_skill(summary) != skill_name:
+        return f"this run scored {scored_skill(summary)!r}, not {skill_name!r}"
     if set(arms) != {"stable", "candidate"}:
         return "this run didn't score both arms; run with --arm both"
     if summary.get("case_filter"):
@@ -329,43 +363,49 @@ def comparison_table(rows: list) -> str:
     return "\n".join(lines)
 
 
-def latest_run() -> Path | None:
-    """The newest saved run that scored both arms, so a quick one-arm run made
-    after it doesn't hide it."""
+def latest_run(skill_name: str, results: Path = RESULTS) -> Path | None:
+    """The newest saved run that scored both arms of the named skill, so a quick
+    one-arm run, or a run of another skill, made after it doesn't hide it."""
     runs = []
-    for summary in RESULTS.glob("*/summary.json"):
+    for summary in results.glob("*/summary.json"):
         try:
-            arms = json.loads(summary.read_text()).get("arms") or {}
+            saved = json.loads(summary.read_text())
         except (OSError, json.JSONDecodeError):
             continue
-        if set(arms) == {"stable", "candidate"}:
+        if scored_skill(saved) == skill_name and set(saved.get("arms") or {}) == {"stable", "candidate"}:
             runs.append(summary)
     return max(runs, key=lambda s: s.stat().st_mtime).parent if runs else None
 
 
-def run_promote(run: Path | None, cases: list) -> int:
-    run = run or latest_run()
+def run_promote(skill_name: str, run: Path | None, cases: list) -> int:
+    run = run or latest_run(skill_name)
     if not run or not (run / "summary.json").exists():
-        print("error: no saved two-arm run to promote from; run --arm both",
-              file=sys.stderr)
+        print(f"error: no saved two-arm run of {skill_name} to promote from; "
+              f"run {skill_name} --arm both", file=sys.stderr)
         return 2
     summary = json.loads((run / "summary.json").read_text())
-    problem = promote(summary, ARMS["stable"], ARMS["candidate"], [c["id"] for c in cases])
+    arms = arms_for(skill_name)
+    problem = promote(summary, arms["stable"], arms["candidate"],
+                      [c["id"] for c in cases], skill_name)
     if problem:
         print(f"not promoted ({run.name}): {problem}", file=sys.stderr)
         return 1
-    print(f"promoted {ARMS['candidate'].relative_to(REPO)} -> "
-          f"{ARMS['stable'].relative_to(REPO)} on the evidence of {run.name}")
+    print(f"promoted {arms['candidate'].relative_to(REPO)} -> "
+          f"{arms['stable'].relative_to(REPO)} on the evidence of {run.name}")
     return 0
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("name", nargs="?", default=DEFAULT_SKILL, metavar="SKILL",
+                    help="the Library skill to score: its arms are skills/SKILL and "
+                         "labs/SKILL, its cases cases/SKILL.json (default: companion)")
     ap.add_argument("--case", help="run only cases whose id contains this")
     ap.add_argument("--arm", choices=["stable", "candidate", "both"],
-                    help="which copy of companion to score (default: stable)")
-    ap.add_argument("--skill", help="score this skill folder instead of an arm, e.g. a mutant")
+                    help="which copy of the skill to score (default: stable)")
+    ap.add_argument("--skill", help="score this folder instead of an arm, e.g. a "
+                                    "mutant; it is installed under SKILL's name")
     ap.add_argument("--promote", nargs="?", const="", metavar="RUN",
                     help="copy the candidate over stable on the evidence of a saved "
                          "two-arm run (default: the latest under results/), then exit")
@@ -376,9 +416,14 @@ def main() -> int:
     ap.add_argument("--output-dir", help="default: labs/evals/results/<timestamp>")
     args = ap.parse_args()
 
-    all_cases = json.loads((HERE / "cases.json").read_text())["cases"]
+    try:
+        all_cases = load_cases(args.name)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
     if args.promote is not None:
-        return run_promote(Path(args.promote) if args.promote else None, all_cases)
+        return run_promote(args.name, Path(args.promote) if args.promote else None,
+                           all_cases)
 
     if args.skill and args.arm:
         print("error: --skill and --arm are alternatives", file=sys.stderr)
@@ -388,7 +433,8 @@ def main() -> int:
         arms = {skill.name: skill}
     else:
         names = ["stable", "candidate"] if args.arm == "both" else [args.arm or "stable"]
-        arms = {n: ARMS[n] for n in names}
+        both = arms_for(args.name)
+        arms = {n: both[n] for n in names}
     for name, skill in arms.items():
         if not (skill / "SKILL.md").exists():
             print(f"error: no SKILL.md for {name} in {skill}", file=sys.stderr)
@@ -411,8 +457,9 @@ def main() -> int:
               else RESULTS / datetime.now().strftime("%Y-%m-%d_%H%M%S"))
     outdir.mkdir(parents=True, exist_ok=True)
 
-    summary = {"arms": {}, "case_filter": args.case, "judge": args.judge}
-    with tempfile.TemporaryDirectory(prefix="companion-evals-") as tmpdir:
+    summary = {"skill": args.name, "arms": {}, "case_filter": args.case,
+               "judge": args.judge}
+    with tempfile.TemporaryDirectory(prefix=f"{args.name}-evals-") as tmpdir:
         for name, skill in arms.items():
             where = skill.relative_to(REPO) if skill.is_relative_to(REPO) else skill
             print(f"\n{name}: {where}")

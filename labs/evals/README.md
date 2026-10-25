@@ -1,35 +1,56 @@
-# labs/evals — the companion eval harness
+# labs/evals — the Library's eval harness
 
-One seam: a companion session run against a Fixture vault. There are no unit
-seams inside the skill. The agent reads the Overlay, so the only way to test that
+One seam: a skill session run against a Fixture vault. There are no unit
+seams inside a skill. The agent reads the Overlay, so the only way to test that
 is to run a session and look at what came out.
 
 ```
-python3 labs/evals/run_evals.py                 # every case, stable arm
-python3 labs/evals/run_evals.py --arm both      # stable and candidate, compared case by case
-python3 labs/evals/run_evals.py --promote       # candidate -> stable, if it lost nothing
-python3 -m unittest discover -s labs/evals -v   # graders' and runner's own tests (no API calls)
+python3 labs/evals/run_evals.py                         # companion, every case, stable arm
+python3 labs/evals/run_evals.py <skill>                 # any Library skill, by name
+python3 labs/evals/run_evals.py <skill> --arm both      # stable and candidate, compared case by case
+python3 labs/evals/run_evals.py <skill> --promote       # candidate -> stable, if it lost nothing
+python3 -m unittest discover -s labs/evals -v           # graders' and runner's own tests (no API calls)
 ```
+
+## Running a skill by name
+
+The skill's name is the first argument; with none, it is `companion`, so every
+command below without a name runs companion. The name decides three things:
+
+- **The arms**: Stable is `skills/<skill>/`, Candidate is `labs/<skill>/`.
+- **The cases**: `cases/<skill>.json`, the skill's own case set. A name with no
+  case set is a setup error.
+- **The install path**: the skill is copied into each temp vault as
+  `.claude/skills/<skill>/`, so `/<skill>` invokes it. That holds for `--skill`
+  too: a mutant folder is installed under the skill's name, not its own.
+
+A run saved before the harness took a name counts as a companion run.
+
+Put the name before `--promote`: `--promote <dir>` takes a results directory,
+so `--promote improve` would read `improve` as one.
+
+Fixture vaults, graders and judge rubrics are shared; a case names the ones it uses.
 
 Requires `claude` on PATH. Python 3.9+, standard library only.
 
 ## The loop: edit the candidate, compare, promote
 
-There are two copies of companion. **Stable**, `skills/companion/`, is what the
-plugin ships; it changes only by promotion. **Candidate**, `labs/companion/`, is the
+Every skill has two copies. **Stable**, `skills/<skill>/`, is what the
+plugin ships; it changes only by promotion. **Candidate**, `labs/<skill>/`, is the
 one you edit; nobody installs it. A cycle starts with the two byte-identical.
 
-1. **Edit** `labs/companion/SKILL.md`. Iterate on the cases it touches with
+1. **Edit** `labs/<skill>/SKILL.md`. Iterate on the cases it touches with
    `--arm candidate --case <id>`; that run is cheap and proves nothing on its own.
 2. **Compare.** `--arm both` scores both arms on every case and prints one line per
    case: each arm's verdict and score, and the difference, candidate minus stable.
    A case is **LOST** when the candidate fails where stable passes, scores lower, or
    didn't run. Sessions are probabilistic, so a single loss can be noise: run again
    before you decide the edit is wrong.
-3. **Promote.** `--promote` reads the newest saved run of both arms (or
-   `--promote <results dir>`) and copies the candidate over stable. It refuses, and
-   changes nothing, when that run scored one arm only, used `--case` or `--no-judge`, skipped a case in
-   `cases.json`, or the candidate lost any case; or when either arm has been edited
+3. **Promote.** `<skill> --promote` reads the newest saved run of both arms of that
+   skill (or `--promote <results dir>`) and copies its candidate over its stable;
+   no other skill is touched. It refuses, and
+   changes nothing, when that run scored another skill or one arm only, used `--case` or `--no-judge`, skipped a case in
+   `cases/<skill>.json`, or the candidate lost any case; or when either arm has been edited
    since the run (each arm's files are hashed into `summary.json`). After a promote
    the two copies are identical again, so the next cycle starts clean.
 
@@ -39,11 +60,11 @@ ae-daily-driver's ADR-0003.
 
 ## What a run does
 
-For each case in `cases.json`:
+For each case in `cases/<skill>.json`:
 
 1. Copy `fixtures/vaults/<vault>/` to a temp directory and append the case's
    Overlay to its `CLAUDE.md`.
-2. Install the skill under `.claude/skills/companion/`, unmodified, the way a
+2. Install the skill under `.claude/skills/<skill>/`, unmodified, the way a
    Consuming vault installs it.
 3. Play each session's human turns in headless `claude -p`, resuming the session
    for each turn after the first and starting fresh for the next session. User
@@ -53,7 +74,7 @@ For each case in `cases.json`:
    one log line per session), the snapshots between turns.
 5. Print one `PASS`/`FAIL` line per case and keep, under `results/<timestamp>/<arm>/<case>/`:
    `transcript.md`, `transcript.json`, `vault.diff`, `grade.json`. `summary.json`
-   holds every arm's rows and the hash of the skill folder it scored.
+   holds the skill's name, every arm's rows and the hash of the skill folder it scored.
 
 With `--arm both` the steps run once per arm, stable first, and a comparison table
 follows. The runner exits 1 when any case fails in any arm.
@@ -116,7 +137,9 @@ python3 labs/evals/run_evals.py --skill labs/evals/mutants/companion-paraphrase
 
 ## Adding a case
 
-Add an object to `cases.json`: `id`, `vault`, `overlay` (Markdown, or null for a
+Add an object to the skill's `cases/<skill>.json` (a new skill starts a new file,
+`{"skill_name": "<skill>", "cases": [...]}`; `skill_name` may be left out, but when
+present it must match the file name): `id`, `vault`, `overlay` (Markdown, or null for a
 vault with no Overlay), either `turns` (one session) or `sessions` (a list of turn
 lists, each a fresh session), `graders`, and optionally `"judge": true`. A grader is
 named as a string from `graders.GRADERS`, or as `{"name": ..., <parameter>: ...}`

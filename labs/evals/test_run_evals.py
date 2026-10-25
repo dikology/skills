@@ -6,6 +6,8 @@ judge's score decides the case. No API calls.
 
 from __future__ import annotations
 
+import json
+import os
 import shutil
 import sys
 import tempfile
@@ -64,6 +66,51 @@ class JudgeVerdict(unittest.TestCase):
         self.assertEqual(out["judge"], {"score": 1})
 
 
+class SkillByName(unittest.TestCase):
+    """A skill name picks the arms, the case set, and where the skill is installed."""
+
+    def test_the_arms_resolve_from_the_name(self):
+        self.assertEqual(run_evals.arms_for("improve"),
+                         {"stable": run_evals.REPO / "skills" / "improve",
+                          "candidate": run_evals.REPO / "labs" / "improve"})
+
+    def test_each_skill_reads_only_its_own_case_set(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            for name in ("companion", "improve"):
+                (folder / f"{name}.json").write_text(json.dumps(
+                    {"skill_name": name, "cases": [{"id": f"{name}-case"}]}))
+            self.assertEqual(run_evals.load_cases("improve", folder), [{"id": "improve-case"}])
+
+    def test_a_skill_with_no_case_set_is_a_setup_error(self):
+        with self.assertRaisesRegex(ValueError, "no-such-skill"):
+            run_evals.load_cases("no-such-skill")
+
+    def test_a_case_set_naming_another_skill_is_a_setup_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "improve.json").write_text(
+                json.dumps({"skill_name": "companion", "cases": []}))
+            with self.assertRaisesRegex(ValueError, "companion"):
+                run_evals.load_cases("improve", Path(tmp))
+
+    def test_companions_cases_are_its_own_set(self):
+        ids = [c["id"] for c in run_evals.load_cases("companion")]
+        self.assertIn("orient-quotes-corpus", ids)
+        self.assertEqual(len(ids), len(set(ids)))
+
+    def test_the_skill_is_installed_under_its_own_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            mutant = root / "improve-writes-before-approval"
+            mutant.mkdir()
+            (mutant / "SKILL.md").write_text("mutant\n")
+            case = {"id": "x", "vault": "band-or-pottery", "overlay": None}
+            ws = run_evals.build_vault(root / "ws", case, mutant, "improve")
+            installed = ws / ".claude" / "skills"
+            self.assertEqual([p.name for p in installed.iterdir()], ["improve"])
+            self.assertEqual((installed / "improve" / "SKILL.md").read_text(), "mutant\n")
+
+
 def row(case: str, passed: bool, score: float) -> dict:
     return {"case": case, "passed": passed, "score": score}
 
@@ -112,12 +159,13 @@ class Promote(unittest.TestCase):
                                  "cases": stable_rows},
                       "candidate": {"hash": run_evals.tree_hash(self.candidate),
                                     "cases": candidate_rows}},
-             "case_filter": None, "judge": True}
+             "skill": "companion", "case_filter": None, "judge": True}
         s.update(over)
         return s
 
     def promote(self, summary, case_ids=("orient", "voice")):
-        return run_evals.promote(summary, self.stable, self.candidate, list(case_ids))
+        return run_evals.promote(summary, self.stable, self.candidate, list(case_ids),
+                                 "companion")
 
     def winning(self) -> dict:
         return self.summary([row("orient", True, 0.5), row("voice", True, 1.0)],
@@ -170,10 +218,54 @@ class Promote(unittest.TestCase):
         shutil.copytree(self.stable, self.candidate)
         self.assertRefused(self.promote(self.winning()), "identical")
 
+    def test_refuses_a_run_of_another_skill(self):
+        self.assertRefused(self.promote({**self.winning(), "skill": "improve"}), "improve")
+
+    def test_a_run_saved_before_skill_names_counts_as_companion(self):
+        s = self.winning()
+        del s["skill"]
+        self.assertIsNone(self.promote(s))
+
     def test_refuses_a_run_where_stable_skipped_a_case(self):
         s = self.summary([row("orient", True, 0.5)],
                          [row("orient", True, 1.0), row("voice", True, 1.0)])
         self.assertRefused(self.promote(s), "voice")
+
+
+class LatestRun(unittest.TestCase):
+    """--promote with no run named reads the newest two-arm run of the named skill."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.results = Path(tmp.name)
+        self.mtime = 1_000_000
+
+    def saved(self, run: str, skill: str, arms=("stable", "candidate")) -> Path:
+        folder = self.results / run
+        folder.mkdir()
+        summary = folder / "summary.json"
+        summary.write_text(json.dumps({"skill": skill, "arms": {a: {} for a in arms}}))
+        self.mtime += 60
+        os.utime(summary, (self.mtime, self.mtime))
+        return folder
+
+    def test_the_newest_two_arm_run_of_that_skill(self):
+        self.saved("old", "companion")
+        mine = self.saved("mine", "companion")
+        self.saved("one-arm", "companion", arms=("candidate",))
+        self.saved("other-skill", "improve")
+        self.assertEqual(run_evals.latest_run("companion", self.results), mine)
+
+    def test_a_run_saved_before_skill_names_counts_as_companion(self):
+        old = self.saved("old", "companion")
+        (old / "summary.json").write_text(json.dumps({"arms": {"stable": {}, "candidate": {}}}))
+        self.assertEqual(run_evals.latest_run("companion", self.results), old)
+        self.assertIsNone(run_evals.latest_run("improve", self.results))
+
+    def test_none_when_the_skill_has_no_two_arm_run(self):
+        self.saved("other-skill", "companion")
+        self.assertIsNone(run_evals.latest_run("improve", self.results))
 
 
 if __name__ == "__main__":

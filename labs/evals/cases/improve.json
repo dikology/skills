@@ -17,6 +17,28 @@
         "The reply is a diagnosis ending in a numbered list of proposed moves",
         "Nothing in the vault changes: no edit to the note, no stub, no log line"
       ]
+    },
+    {
+      "id": "only-approved-moves-apply",
+      "vault": "the-starter",
+      "overlay": "## Improve\n\n- index: [[home]]\n- log: `improve log.md`\n- schema: [[note types]], the `type` property\n- maturity: the `maturity` property; seed, growing, solid, canonical; solid and up join the index\n- verification marker: `<!-- NEEDS VERIFICATION: <reason> -->`\n- skip list: folded `AI capture` callouts\n",
+      "turns": [
+        "/improve [[starter]]",
+        "1, 2, 3"
+      ],
+      "graders": [
+        "numbered_moves",
+        "only_approved_moves_applied",
+        "prose_verbatim",
+        "one_improve_log_line"
+      ],
+      "what_it_tests": "Diagnose, then approve the top three moves by number. The diagnosis turn writes nothing. After the approval, only files an approved move names change: the note, the log, a note an approved move links, and the index only if an approved move names it. A stub or promotion further down the list is declined because it wasn't named. Every line of the human's prose survives verbatim (headings, a Definition, a [[link]] around a word or a verification marker may be added), the folded AI capture callout, which holds an unsourced claim, isn't touched at all, and the log gains exactly one `improve` line linking [[starter]].",
+      "expectations": [
+        "The first reply is a diagnosis with numbered moves, and the vault is unchanged after it",
+        "After \"1, 2, 3\", only starter.md, improve log.md and notes those three moves name have changed",
+        "Every prose line of starter.md is still there word for word; the AI capture callout is byte-identical",
+        "improve log.md has one new line: op improve, linking [[starter]]"
+      ]
     }
   ]
 }

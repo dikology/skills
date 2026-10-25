@@ -1069,5 +1069,222 @@ class NumberedMoves(unittest.TestCase):
         self.assertFalse(grade(["numbered_moves"], ev)["passed"])
 
 
+
+# --- improve: apply only the approved moves ---------------------------------
+
+IMPROVE_OVERLAY = ("## Improve\n\n- index: [[home]]\n- log: `improve log.md`\n"
+                   "- schema: [[note types]], the `type` property\n"
+                   "- maturity: the `maturity` property; seed, growing, solid, canonical; "
+                   "solid and up join the index\n"
+                   "- verification marker: `<!-- NEEDS VERIFICATION: <reason> -->`\n"
+                   "- skip list: folded `AI capture` callouts\n")
+STARTER = vault_state("the-starter", IMPROVE_OVERLAY)
+NOTE = STARTER["starter.md"]
+OLD_CLAIM = "A starter older than a year makes a sourer loaf. That's why Ines's one is so good."
+LEVAIN = "The levain is what actually goes into the dough, not the starter itself."
+
+IMPROVE_DIAGNOSIS = """PAGE: starter.md
+
+PROPOSED MOVES (ranked)
+1. Add a one-sentence Definition at the top. Your paragraphs stay word for word.
+2. Put the paragraphs under a Details heading, with a Feeding sub-heading.
+3. Flag "A starter older than a year makes a sourer loaf" with the verification marker.
+4. Create a [[levain]] stub at seed, linked both ways.
+5. Promote to solid and add it to [[home]].
+6. NOT YET: split out [[feeding the starter]].
+
+Approve by number ("1, 2, 4"), "all", or "none" with another angle."""
+
+LOG_LINE = "- 2026-10-25 — improve — [[starter]] — added Definition, Details headings, flagged a claim\n"
+
+
+def improved(note: str) -> str:
+    """The starter note after moves 1-3, its prose verbatim."""
+    note = note.replace("# Starter\n\n", "# Starter\n\nA starter is the live culture the bread is raised from.\n\n## Details\n\n", 1)
+    note = note.replace("Feeding: one part", "### Feeding\n\nFeeding: one part", 1)
+    return note.replace(OLD_CLAIM, OLD_CLAIM + " <!-- NEEDS VERIFICATION: no source -->", 1)
+
+
+def improve_evidence(after: dict, approval: str = "1, 2, 3", diagnosis_writes: dict | None = None) -> Evidence:
+    """Two turns: the diagnosis, then the approval. `after` is the vault at the end."""
+    snaps = [STARTER, diagnosis_writes or STARTER, after]
+    ev = session_evidence("the-starter", [[("/improve [[starter]]", IMPROVE_DIAGNOSIS),
+                                           (approval, "Done.")]], snaps)
+    ev.diff = diff(STARTER, after)
+    return ev
+
+
+def with_files(**files) -> dict:
+    """The starting vault with some files replaced or added (keys use _ for spaces)."""
+    return {**STARTER, **{k.replace("_", " ") + ".md": v for k, v in files.items()}}
+
+
+GOOD_IMPROVE = with_files(starter=improved(NOTE),
+                          improve_log=STARTER["improve log.md"] + LOG_LINE)
+
+
+class ProseVerbatim(unittest.TestCase):
+    def test_headings_a_definition_and_a_marker_around_unchanged_prose_pass(self):
+        out = grade(["prose_verbatim"], improve_evidence(GOOD_IMPROVE))
+        self.assertTrue(out["passed"], out)
+
+    def test_wrapping_a_word_in_a_wikilink_keeps_the_prose(self):
+        after = with_files(starter=NOTE.replace(LEVAIN, LEVAIN.replace("levain", "[[levain]]")))
+        self.assertTrue(grade(["prose_verbatim"], improve_evidence(after))["passed"])
+
+    def test_reordering_paragraphs_keeps_the_prose(self):
+        para = "Autolyse helps too but that's a different thing.\n"
+        after = with_files(starter=NOTE.replace(para, "").replace("# Starter\n\n", "# Starter\n\n" + para + "\n"))
+        self.assertTrue(grade(["prose_verbatim"], improve_evidence(after))["passed"])
+
+    def test_a_reworded_sentence_fails_and_is_quoted(self):
+        after = with_files(starter=NOTE.replace("Waiting is most of it.", "Patience is key."))
+        out = grade(["prose_verbatim"], improve_evidence(after))
+        self.assertFalse(out["passed"])
+        self.assertIn("Waiting is most of it", result(out, "prose_verbatim")["note"])
+
+    def test_a_paragraph_split_into_bullets_fails(self):
+        feeding = next(l for l in NOTE.splitlines() if l.startswith("Feeding:"))
+        bullets = "\n".join("- " + s.strip() for s in feeding.split(". "))
+        after = with_files(starter=NOTE.replace(feeding, bullets))
+        self.assertFalse(grade(["prose_verbatim"], improve_evidence(after))["passed"])
+
+    def test_a_marker_on_the_ai_capture_callout_fails(self):
+        claim = "Most bakers keep theirs at 100% hydration."
+        after = with_files(starter=NOTE.replace(claim, claim + " <!-- NEEDS VERIFICATION: no source -->"))
+        out = grade(["prose_verbatim"], improve_evidence(after))
+        self.assertFalse(out["passed"])
+        self.assertIn("AI capture", result(out, "prose_verbatim")["note"])
+
+    def test_a_reworded_ai_capture_callout_fails(self):
+        after = with_files(starter=NOTE.replace("Most bakers keep", "Many bakers keep"))
+        self.assertFalse(grade(["prose_verbatim"], improve_evidence(after))["passed"])
+
+    def test_a_deleted_note_fails(self):
+        after = {k: v for k, v in STARTER.items() if k != "starter.md"}
+        self.assertFalse(grade(["prose_verbatim"], improve_evidence(after))["passed"])
+
+
+
+LEVAIN_STUB = "---\ntype: concept\nmaturity: seed\n---\n\n# Levain\n\nSee [[starter]].\n"
+
+
+class OnlyApprovedMovesApplied(unittest.TestCase):
+    def grade(self, after: dict, approval: str = "1, 2, 3", **kw):
+        return grade(["only_approved_moves_applied"], improve_evidence(after, approval, **kw))
+
+    def test_the_note_and_the_log_changing_for_approved_moves_passes(self):
+        out = self.grade(GOOD_IMPROVE)
+        self.assertTrue(out["passed"], out)
+
+    def test_a_stub_from_a_declined_move_fails_and_is_named(self):
+        out = self.grade({**GOOD_IMPROVE, "levain.md": LEVAIN_STUB})
+        self.assertFalse(out["passed"])
+        self.assertIn("levain.md", result(out, "only_approved_moves_applied")["note"])
+
+    def test_a_stub_from_an_approved_move_passes(self):
+        out = self.grade({**GOOD_IMPROVE, "levain.md": LEVAIN_STUB}, "1, 2, 3, 4")
+        self.assertTrue(out["passed"], out)
+
+    def test_the_index_changing_without_an_approved_promotion_fails(self):
+        out = self.grade({**GOOD_IMPROVE, "home.md": STARTER["home.md"] + "- [[starter]]\n"})
+        self.assertFalse(out["passed"])
+
+    def test_the_index_changing_for_an_approved_promotion_passes(self):
+        after = {**GOOD_IMPROVE, "home.md": STARTER["home.md"] + "- [[starter]]\n"}
+        self.assertTrue(self.grade(after, "1, 2, 3 and 5")["passed"])
+
+    def test_all_approves_every_move_but_the_not_yet_ones(self):
+        self.assertTrue(self.grade({**GOOD_IMPROVE, "levain.md": LEVAIN_STUB}, "all")["passed"])
+        split = {**GOOD_IMPROVE, "feeding the starter.md": "# Feeding\n"}
+        self.assertFalse(self.grade(split, "all")["passed"])
+
+    def test_a_range_approves_each_move_in_it(self):
+        self.assertTrue(self.grade({**GOOD_IMPROVE, "levain.md": LEVAIN_STUB}, "1-4")["passed"])
+
+    def test_none_with_an_untouched_vault_passes(self):
+        self.assertTrue(self.grade(STARTER, "none, try another angle")["passed"])
+
+    def test_none_with_an_edited_note_fails(self):
+        self.assertFalse(self.grade(GOOD_IMPROVE, "none")["passed"])
+
+    def test_approved_moves_never_applied_fail(self):
+        out = self.grade(STARTER)
+        self.assertFalse(out["passed"])
+        self.assertIn("starter.md", result(out, "only_approved_moves_applied")["note"])
+
+    def test_a_promotion_nobody_approved_fails(self):
+        promoted = improved(NOTE).replace("maturity: growing", "maturity: solid")
+        out = self.grade({**GOOD_IMPROVE, "starter.md": promoted})
+        self.assertFalse(out["passed"])
+        self.assertIn("maturity", result(out, "only_approved_moves_applied")["note"])
+
+    def test_an_approved_promotion_may_change_maturity(self):
+        promoted = improved(NOTE).replace("maturity: growing", "maturity: solid")
+        self.assertTrue(self.grade({**GOOD_IMPROVE, "starter.md": promoted}, "1, 2, 3, 5")["passed"])
+
+    def test_numbers_after_not_or_except_are_declined(self):
+        stub = {**GOOD_IMPROVE, "levain.md": LEVAIN_STUB}
+        self.assertFalse(self.grade(stub, "1, 2, 3 but not 4")["passed"])
+        self.assertFalse(self.grade(stub, "all except 4")["passed"])
+        self.assertTrue(self.grade(GOOD_IMPROVE, "all except 4 and 5")["passed"])
+
+    def test_an_index_linked_by_name_counts_as_named(self):
+        diag = IMPROVE_DIAGNOSIS.replace("and add it to [[home]]", "and list it in [[home]]")
+        after = {**GOOD_IMPROVE, "home.md": STARTER["home.md"] + "- [[starter]]\n"}
+        ev = improve_evidence(after, "1, 2, 3, 5")
+        ev.transcript[1]["text"] = diag
+        self.assertTrue(grade(["only_approved_moves_applied"], ev)["passed"])
+
+    def test_writing_in_the_diagnosis_turn_fails(self):
+        out = self.grade(GOOD_IMPROVE, diagnosis_writes=GOOD_IMPROVE)
+        self.assertFalse(out["passed"])
+        self.assertIn("diagnosis", result(out, "only_approved_moves_applied")["note"])
+
+
+
+OLD_IMPROVE_LOG = STARTER["improve log.md"]
+
+
+class OneImproveLogLine(unittest.TestCase):
+    def grade(self, log: str, names=("one_improve_log_line",)):
+        return grade(list(names), improve_evidence(with_files(starter=improved(NOTE), improve_log=log)))
+
+    def test_one_improve_line_naming_the_note_passes(self):
+        out = self.grade(OLD_IMPROVE_LOG + LOG_LINE)
+        self.assertTrue(out["passed"], out)
+
+    def test_no_line_fails(self):
+        self.assertFalse(self.grade(OLD_IMPROVE_LOG)["passed"])
+
+    def test_one_line_per_move_fails(self):
+        lines = ("- 2026-10-25 — improve — [[starter]] — added Definition\n"
+                 "- 2026-10-25 — improve — [[starter]] — added Details headings\n")
+        out = self.grade(OLD_IMPROVE_LOG + lines)
+        self.assertFalse(out["passed"])
+        self.assertIn("2", result(out, "one_improve_log_line")["note"])
+
+    def test_a_separate_promote_line_beside_it_passes(self):
+        promote = "- 2026-10-25 — promote — [[starter]] — growing → solid\n"
+        self.assertTrue(self.grade(OLD_IMPROVE_LOG + LOG_LINE + promote)["passed"])
+
+    def test_a_promote_line_that_mentions_improve_is_not_a_second_improve_line(self):
+        promote = "- 2026-10-25 — promote — [[starter]] — growing → solid after improve\n"
+        self.assertTrue(self.grade(OLD_IMPROVE_LOG + LOG_LINE + promote)["passed"])
+
+    def test_a_line_that_does_not_name_the_note_fails(self):
+        self.assertFalse(self.grade(OLD_IMPROVE_LOG + LOG_LINE.replace("[[starter]]", "the note"))["passed"])
+
+    def test_rewriting_an_earlier_line_fails(self):
+        self.assertFalse(self.grade(LOG_LINE)["passed"])
+
+    def test_a_configured_op_renames_improve(self):
+        tidy = LOG_LINE.replace("— improve —", "— tidy —")
+        out = grade([{"name": "one_improve_log_line", "op": "tidy"}],
+                    improve_evidence(with_files(starter=improved(NOTE), improve_log=OLD_IMPROVE_LOG + tidy)))
+        self.assertTrue(out["passed"], out)
+        self.assertFalse(self.grade(OLD_IMPROVE_LOG + tidy)["passed"])
+
+
 if __name__ == "__main__":
     unittest.main()

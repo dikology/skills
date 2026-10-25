@@ -126,15 +126,69 @@ Then stop and wait. Do not edit, create a stub, or log in this turn.
 | Two concerns in one note | Propose a split, NOT YET until other notes use the second |
 | One topic plus a long aside | Propose extracting the aside |
 
-## 5. Apply what was approved
+## 5. Read the approval
 
-Only after the human names moves. A move they didn't name is declined; silence is
-never approval. If their answers to the QUESTIONS change the moves, show the
-revised list and wait again before writing.
+The human's next turn decides what happens:
+
+- **Numbers** ("1, 2, 4", "1-3", "2 and 5"): those moves, and only those.
+- **"all"**: every listed move except the `NOT YET` ones.
+- **"none"**, optionally with another angle ("none, look at it as a routine"):
+  write nothing. With an angle, diagnose again from it, and wait again.
+
+A move they didn't name is declined. Silence is never approval, and neither is
+"looks good" without numbers: ask which moves.
+
+Answers to the QUESTIONS may re-rank moves, rewrite them, drop them or add new
+ones. When they do, show the revised numbered list, mark what changed, and wait
+for approval of that list. Write nothing in the turn that shows it.
+
+## 6. Apply exactly the approved moves
+
+Apply them in this turn, without asking again. Touch only the files an approved
+move names: the note, a stub or split note it names, a note it links back from,
+the index for an approved promotion, and the log.
+
+- **Structure edits keep the human's prose verbatim.** Add headings, a Definition
+  or a section around the existing lines; move whole lines or paragraphs. Never
+  reword, shorten, merge, split into bullets or "tidy" a line the human wrote.
+  Wrapping an existing word in `[[…]]` is allowed; changing the word is not.
+  Rewrite prose only when the human asks for it in so many words ("rewrite the
+  feeding paragraph").
+- **New text you draft** (a Definition, a Related list) is the only new prose, and
+  it says only what the note already says.
+- **Skip-listed text** stays byte-for-byte as it is: never reword it, flag it, link
+  inside it, or draft from it as if it were the human's claim.
+- **Unsourced claims** get the verification marker right after the claim, from the
+  Overlay or the fallback. The claim itself stays as written. Never delete a claim
+  or "fix" it.
+- **Stubs**: at most three per run, whatever was approved; past three, say which
+  ones wait. A stub gets the note's frontmatter shape, a heading, one line saying
+  where it came from, and a link back to the note; the note links to it. With a
+  maturity ladder it gets the lowest rung; without one, no maturity property.
+- **Split**: move the approved section, verbatim, into the new note, and leave a
+  one-line pointer and link in its place. Links go both ways.
+- **Promotion**: set the maturity property to the approved level. If that level
+  joins the index, add the note to the index in the index's own format. Never
+  promote without the move being approved, even when the other moves make the note
+  ready.
+
+Then reply with what changed, per file, and the moves declined. Quote nothing
+from the note you didn't change.
+
+## 7. Log
+
+With a log configured, append one line per note per session, in the log's
+existing format, op `improve`, listing the moves applied. A promotion and a split
+each get their own line, op `promote` and op `split`. If the Overlay names other
+ops for these, use those. Lines already in the log stay as they are; a later
+approval in the same session updates this session's line instead of adding
+another. No log configured: write nothing, and say so once. With "none", log
+nothing.
 
 ## Rules
 
 - **The diagnosis never writes.** Not a section, not a stub, not a log line.
+- **Only approved moves apply.** Unnamed means declined.
 - **Keep the human's prose verbatim.** Structure edits move and frame existing
   lines; they never reword them. Rewrite prose only when the human asks for it.
 - **Skip-listed text is never the human's voice.** Never reword it or treat it as

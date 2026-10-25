@@ -15,6 +15,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import vaultdiff
+
 
 @dataclass
 class Evidence:
@@ -133,22 +135,23 @@ def first_reply(ev: Evidence) -> str:
 # --- the Overlay, read the way a user reads their own CLAUDE.md ---------------
 
 OVERLAY_FILES = ("CLAUDE.md", "AGENTS.md")
-_SECTION = re.compile(r"^## Companion[ \t]*\n(.*?)(?=^## |\Z)", re.M | re.S)
 
 
-def overlay(snap: dict) -> str | None:
-    """The body of the `## Companion` section, or None when the vault has none."""
+def overlay(snap: dict, section: str = "Companion") -> str | None:
+    """The body of the skill's Overlay section (`## Companion`, `## Improve`), or
+    None when the vault has none."""
+    pattern = re.compile(rf"^## {re.escape(section)}[ \t]*\n(.*?)(?=^## |\Z)", re.M | re.S)
     for name in OVERLAY_FILES:
-        m = _SECTION.search(snap.get(name, ""))
+        m = pattern.search(snap.get(name, ""))
         if m:
             return m.group(1)
     return None
 
 
-def overlay_field(snap: dict, name: str) -> str | None:
+def overlay_field(snap: dict, name: str, section: str = "Companion") -> str | None:
     """A field's value with its [[link]] or `code` wrapper removed, or None."""
     m = re.search(rf"^\s*[-*]?\s*(\*\*|__)?{re.escape(name)}(\*\*|__)?\s*:\s*(.+?)\s*$",
-                  overlay(snap) or "", re.M | re.I)
+                  overlay(snap, section) or "", re.M | re.I)
     if not m:
         return None
     value = m.group(3)
@@ -167,9 +170,9 @@ def at_start(ev: "Evidence", fn):
     return fn(ev.snapshots[0]) if ev.snapshots else None
 
 
-def log_path(snap: dict) -> str | None:
+def log_path(snap: dict, section: str = "Companion") -> str | None:
     """The vault path of the configured log, whether given as a path or a [[link]]."""
-    value = overlay_field(snap, "log")
+    value = overlay_field(snap, "log", section)
     if not value:
         return None
     value = value.strip("/")
@@ -192,10 +195,10 @@ def sessions(ev: Evidence) -> list:
     return [spans[sid] for sid in sorted(spans)]
 
 
-def session_log_lines(ev: Evidence) -> tuple:
+def session_log_lines(ev: Evidence, section: str = "Companion") -> tuple:
     """(log path, [lines each session added]) or (None, why) when it can't be read.
     Lines written before a session must survive it unchanged."""
-    path = at_start(ev, log_path)
+    path = at_start(ev, lambda snap: log_path(snap, section))
     if not path:
         return None, "no log configured in the Overlay"
     added = []
@@ -354,6 +357,177 @@ def g_numbered_moves(ev: Evidence) -> Result:
         return Result("numbered_moves", False,
                       f"no list numbered from 1 with two or more items (numbers seen: {found})")
     return Result("numbered_moves", True, f"{best} numbered moves")
+
+
+# --- improve: apply only the approved moves -----------------------------------
+
+IMPROVE = "Improve"
+
+
+def improved_note(ev: Evidence) -> str | None:
+    """The vault path of the note the session improves: the [[link]] in the first
+    human turn, resolved against the vault as the session first saw it."""
+    m = re.search(_LINK, (human_turns(ev) or [""])[0])
+    if not m:
+        return None
+    key = note_key(m.group(1))
+    return next((p for p in start_vault(ev) if p.endswith(".md") and path_key(p) == key), None)
+
+
+def body(text: str) -> str:
+    """A note without its frontmatter."""
+    m = re.match(r"---\n.*?\n---\n", text, re.S)
+    return text[m.end():] if m else text
+
+
+def unframed(line: str) -> str:
+    """A prose line with what a structure edit may add around its words taken off:
+    [[wikilink]] brackets (an alias keeps its shown text) and HTML comments, such as
+    a verification marker."""
+    line = re.sub(r"\[\[(?:[^\]|]*\|)?([^\]]*)\]\]", r"\1", line)
+    line = re.sub(r"<!--.*?-->", "", line)
+    return re.sub(r"\s+", " ", line).strip()
+
+
+def g_prose_verbatim(ev: Evidence) -> Result:
+    """Every line the improved note held is still in it, word for word. Headings and
+    new lines may go around it, lines may move, a word may gain [[ ]] and a line a
+    marker. An AI capture callout may not change at all, marker included: it isn't
+    the human's claim."""
+    path = improved_note(ev)
+    if not path:
+        return Result("prose_verbatim", False, "no [[note]] named in the first turn")
+    before = start_vault(ev)[path]
+    after = ev.snapshots[-1].get(path) if ev.snapshots else None
+    if after is None:
+        return Result("prose_verbatim", False, f"{path} is gone")
+    machine, prose = _split_callouts(body(before))
+    kept = callouts(after)
+    lost = [f"AI capture callout changed: \"{c[:60]}\"" for c in machine if c not in kept]
+    lines = [unframed(l) for l in body(after).splitlines()]
+    now, flat = set(lines), "\n".join(lines)
+    for line in (unframed(l) for l in prose.splitlines() if l.strip()):
+        if line not in now:
+            # Quote the first sentence that went, so a long paragraph points at its change.
+            gone = [s for s in re.split(r"(?<=[.!?])\s+", line) if s not in flat]
+            lost.append(f"\"{(gone or [line])[0][:100]}\"")
+    if lost:
+        return Result("prose_verbatim", False, "not verbatim: " + "; ".join(lost))
+    return Result("prose_verbatim", True, f"every line of {path} kept")
+
+
+def moves(reply: str) -> dict:
+    """{number: text} for the reply's list of moves: the longest run numbered 1, 2, …
+    A later list that restarts at 1 (how to approve, say) doesn't replace it."""
+    items, best, run = list(re.finditer(rf"{NUMBERED.pattern}.*$", reply, re.M)), {}, {}
+    for m in items:
+        n = int(m.group(1))
+        run = {n: m.group(0)} if n == 1 else ({**run, n: m.group(0)} if n == len(run) + 1 else {})
+        if len(run) > len(best):
+            best = run
+    return best
+
+
+def numbers(text: str) -> set:
+    """Every number and range ("1, 2, 4", "1-3") in the text."""
+    named = set()
+    for a, b in re.findall(r"(\d+)(?:\s*[-–]\s*(\d+))?", text):
+        named.update(range(int(a), int(b or a) + 1))
+    return named
+
+
+def approved(turn: str, listed: dict) -> set:
+    """The move numbers an approval names: numbers and ranges ("1, 2, 4", "1-3"),
+    "all" (every move not deferred as NOT YET), or "none". Numbers after "not",
+    "except" or "without" are declined, and so is anything unnamed."""
+    if re.match(r"\s*none\b", turn, re.I):
+        return set()
+    yes, *rest = re.split(r"\b(?:but not|not|except|without)\b", turn, maxsplit=1, flags=re.I)
+    no = rest[0] if rest else ""
+    if re.match(r"\s*all\b", yes, re.I):
+        named = {n for n, text in listed.items() if "NOT YET" not in text}
+    else:
+        named = numbers(yes)
+    return (named - numbers(no)) & set(listed)
+
+
+def maturity_property(snap: dict) -> str | None:
+    """The frontmatter property the `## Improve` Overlay names for maturity: the first
+    `code` span in its maturity field, else `maturity` when the field is set."""
+    value = overlay_field(snap, "maturity", IMPROVE)
+    if not value:
+        return None
+    m = re.search(r"`([^`]+)`", value)
+    return m.group(1) if m else (value if re.fullmatch(r"[\w-]+", value) else "maturity")
+
+
+def frontmatter_value(text: str, prop: str | None) -> str | None:
+    if not prop:
+        return None
+    m = re.match(r"---\n(.*?)\n---\n", text, re.S)
+    v = re.search(rf"^{re.escape(prop)}\s*:\s*(.*?)\s*$", m.group(1), re.M) if m else None
+    return v.group(1) if v else None
+
+
+def g_only_approved_moves_applied(ev: Evidence) -> Result:
+    """The diagnosis turn writes nothing; after the approving turn the only files that
+    changed are the improved note, the log, the notes an approved move links to, and
+    the index if an approved move names it. An approval that names moves changes the
+    note; "none" changes nothing."""
+    name = "only_approved_moves_applied"
+    path, snaps = improved_note(ev), ev.snapshots
+    if not path or len(snaps) < 3:
+        return Result(name, False, "no improved note, or the session stopped before approval")
+    early = touched(vaultdiff.diff(snaps[0], snaps[1]))
+    if early:
+        return Result(name, False, "the diagnosis turn wrote: " + ", ".join(early))
+    listed = moves(first_reply(ev))
+    chosen = approved(human_turns(ev)[1], listed)
+    shown = f"approved {sorted(chosen) or 'none'}"
+    allowed = set()
+    if chosen:
+        text = "\n".join(listed[n] for n in chosen)
+        named = links(text)
+        index = overlay_field(snaps[0], "index", IMPROVE)
+        if index and re.search(r"\bindex\b", text, re.I):
+            named.add(note_key(index.removesuffix(".md")))
+        allowed = {path, log_path(snaps[0], IMPROVE)}
+        allowed |= {p for p in snaps[-1] if p.endswith(".md") and path_key(p) in named}
+    stray = touched(ev.diff, tuple(a for a in allowed if a))
+    if stray:
+        return Result(name, False, f"{shown}, but changed: " + ", ".join(stray))
+    if chosen and path not in ev.diff["modified"]:
+        return Result(name, False, f"{shown}, but {path} is unchanged")
+    prop = maturity_property(snaps[0])
+    was, now = (frontmatter_value(snap.get(path, ""), prop) for snap in (snaps[0], snaps[-1]))
+    if prop and was != now and not any(re.search(r"promot", listed[n], re.I) for n in chosen):
+        return Result(name, False, f"{shown}, none a promotion, but {prop} went {was} → {now}")
+    return Result(name, True, f"approved {sorted(chosen) or 'none'} of {len(listed)}; "
+                              "only their files changed")
+
+
+def g_one_improve_log_line(ev: Evidence, op: str = "improve",
+                           promote: str = "promote", split: str = "split") -> Result:
+    """Each session leaves one `improve` line in the configured log that links the
+    note, plus at most a separate `promote` and `split` line. A vault whose Overlay
+    renames the ops passes them as parameters."""
+    name = "one_improve_log_line"
+    path, added = session_log_lines(ev, IMPROVE)
+    if not path:
+        return Result(name, False, added)
+    key = path_key(improved_note(ev) or "")
+
+    def has(line, word):
+        return re.search(rf"(?<!\w){re.escape(word)}(?!\w)", line, re.I) is not None
+
+    for n, lines in enumerate(added, 1):
+        other_op = [l for l in lines if has(l, promote) or has(l, split)]
+        main = [l for l in lines if l not in other_op and has(l, op) and key in links(l)]
+        extra = [l for l in lines if l not in main and l not in other_op]
+        if len(main) != 1 or extra:
+            return Result(name, False, f"session {n}: {len(main)} `{op}` line(s) linking "
+                                       f"[[{key}]], {len(extra)} other line(s) in {path}")
+    return Result(name, True, f"one `{op}` line per session in {path}")
 
 
 def g_writes_only_log(ev: Evidence) -> Result:
@@ -888,6 +1062,9 @@ GRADERS = {
     "quotes_verbatim": g_quotes_verbatim,
     "no_writes": g_no_writes,
     "numbered_moves": g_numbered_moves,
+    "prose_verbatim": g_prose_verbatim,
+    "only_approved_moves_applied": g_only_approved_moves_applied,
+    "one_improve_log_line": g_one_improve_log_line,
     "orient_quotes_from_index": g_orient_quotes_from_index,
     "overlay_written_after_approval": g_overlay_written_after_approval,
     "session_quotes_corpus": g_session_quotes_corpus,

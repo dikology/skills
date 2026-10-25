@@ -107,6 +107,16 @@ language. `replies_in_language` takes a `lang` (`en`, `ru` or `zh`), and so does
 `quotes_stay_in_source_language`, which needs a reply in that language to quote
 a note verbatim in the note's own.
 
+Improve's graders read the `## Improve` Overlay. The improved note is the
+`[[link]]` in the first human turn, and the approval is the second.
+`only_approved_moves_applied` reads the numbered moves from the diagnosis and
+the numbers, range, `all` or `none` from the approval. It fails a diagnosis turn
+that writes, and a change to any file other than the note, the log, a note an
+approved move links, or the index when an approved move names it.
+`prose_verbatim` fails when a line of the note is missing afterwards. Headings and
+new lines may go around a line, `[[ ]]` around a word and an HTML-comment marker
+after a claim, but an `AI capture` callout must stay byte-identical.
+
 `no_transcript` is graded on every case, named or not: no file a session writes may
 hold two or more of one session's human turns. A one-turn session can't be told apart
 from a filed line that way, so those cases also grade `no_writes`.
@@ -125,7 +135,7 @@ None contains real notes.
 | `spanish-and-the-car` | The log: two unrelated topics, so one session's unpicked menu is easy to spot in the next, and a log with one earlier line. Also the session where the human only asks, so there is no line to file |
 | `the-kitchen-table` | Contradictions: an older note says the kitchen table is where the human does their best work and they'll never commute again, and a scripted turn says they want the office now. A job offer note gives the new position somewhere to link |
 | `the-dacha` | Language: a vault written in Russian, about whether to sell a grandmother's dacha. Russian turns, English turns, and a `lang: zh` pin all meet the same Russian notes |
-| `the-starter` | Improve: a sourdough `starter` note with visible gaps (no Definition, a term with no note of its own, a term never explained, an unsourced claim, a paragraph that wants to be its own note), four inbound links from three notes, one through its alias, and no index entry. A schema file and a log with one earlier line, so a diagnosis that writes anything shows up in the diff |
+| `the-starter` | Improve: a sourdough `starter` note with visible gaps (no Definition, a term with no note of its own, a term never explained, an unsourced claim, a paragraph that wants to be its own note), four inbound links from three notes, one through its alias, and no index entry. A folded `AI capture` callout holds an unsourced claim that is not the human's. A schema file and a log with one earlier line, so a diagnosis that writes anything shows up in the diff, and an approval shows exactly which files its moves touched |
 
 ## Showing a case can fail
 
@@ -135,6 +145,7 @@ it targets should print `FAIL`:
 ```
 python3 labs/evals/run_evals.py --skill labs/evals/mutants/companion-paraphrase
 python3 labs/evals/run_evals.py improve --skill labs/evals/mutants/improve-writes-before-approval
+python3 labs/evals/run_evals.py improve --skill labs/evals/mutants/improve-rewrites-prose
 ```
 
 ## Adding a case
@@ -146,7 +157,7 @@ vault with no Overlay), either `turns` (one session) or `sessions` (a list of tu
 lists, each a fresh session), `graders`, and optionally `"judge": true`. A grader is
 named as a string from `graders.GRADERS`, or as `{"name": ..., <parameter>: ...}`
 when it takes one (`unpicked_menu_named_once` takes `topic`, the contradiction
-graders take `note`, the language graders take `lang`). `judge` is `true` or
+graders take `note`, the language graders take `lang`, `one_improve_log_line` takes `op`, `promote` and `split` for a vault that renames them). `judge` is `true` or
 `{"rubric": ..., "pass_at": ...}` (see above). The runner checks names, parameters
 and rubric files before it makes any API call. In a first-run case, the last
 turn is the one that approves the Overlay. `what_it_tests` and `expectations` are for the

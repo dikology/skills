@@ -10,8 +10,8 @@
     {
       "name": "dikology",
       "description": "Companion: a challenger-style thinking partner over your Obsidian vault.",
-      "source": "./",
-      "version": "0.1.0",
+      "source": "./skills",
+      "version": "0.1.1",
       "category": "productivity"
     }
   ]

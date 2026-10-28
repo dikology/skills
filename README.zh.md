@@ -31,7 +31,7 @@
 在 Claude Code 里打开你的笔记库，运行 `/companion`，或者直接说
 "challenge me on <话题>"。
 
-**Cursor、Codex 或任何能读 Agent Skills 的智能体。** `skills/` 下的每个文件夹都是
+**Cursor、Codex 或任何能读 Agent Skills 的智能体。** `skills/` 下的每个技能文件夹都是
 一个普通的技能。把 `skills/companion/` 复制到你的智能体的技能目录即可。
 
 ## 做法：通用技能 + Overlay
@@ -92,11 +92,12 @@ Also: when I mention a book, check `reading/` first.
 
 ## 目录
 
-- `skills/`：稳定版技能，插件发布的就是这些。
+- `skills/`：稳定版技能，插件发布的就是这些。它就是插件根目录：安装时只复制这个文件夹，
+  其余都不带。插件清单在它里面的 `.claude-plugin/`。
 - `labs/companion/`：Candidate，companion 的工作副本。必须先和稳定版对比打分，
   才能替换它。
 - `labs/evals/`：评测工具：合成的 Fixture 笔记库、写好剧本的会话、评分器。
-- `.claude-plugin/`：插件市场和插件的清单文件。
+- 仓库根目录的 `.claude-plugin/`：插件市场的清单文件。
 - `CONTEXT.md`：术语表（英文）：Overlay、Corpus、Consuming vault、Fixture vault、Stable/Candidate。
 - `docs/adr/`：设计决定和背后的理由（英文）。
 

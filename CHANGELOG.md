@@ -4,6 +4,16 @@ All notable changes to this Library. Versions follow [semver](https://semver.org
 the Library stays on 0.x until companion has run about ten real sessions with no
 workaround and its evals pass.
 
+## [0.1.1] — 2026-10-28
+
+### Changed
+
+- The plugin root is now `skills/`, not the repo root. An install copies only the
+  stable skills folder and its manifest; it no longer carries `labs/`, `docs/` or the
+  repo files (READMEs, glossary, changelog). The plugin manifest moved to
+  `skills/.claude-plugin/plugin.json`; the marketplace manifest stays in the repo-root
+  `.claude-plugin/`. Installs pinned at `#v0.1.0` keep the old layout.
+
 ## [0.1.0] — 2026-10-23
 
 First release. This is 0.x: it stays 0.x until about ten real-vault sessions
@@ -75,4 +85,5 @@ need no workaround. Expect the Overlay contract to change before 1.0.0.
   side, or a pointed "but your notes say"). Companion lands there about half the
   time; a session that challenges as usual still fails.
 
+[0.1.1]: https://github.com/dikology/skills/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/dikology/skills/releases/tag/v0.1.0

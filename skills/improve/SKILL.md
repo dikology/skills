@@ -16,7 +16,8 @@ read as prose. Every field is optional, and a field may point at another section
 ("index, log, skip list: as in `## Companion`").
 
 - **index** — the catalogue a promoted note joins. Absent: skip the index step,
-  and drop the INDEX line from the diagnosis.
+  and drop the INDEX line from the diagnosis. Skipping it includes not proposing
+  to add the note to a page that only looks like an index.
 - **log** — a file that takes one line per note per session, and optionally its op
   vocabulary (default ops `improve`, `promote`, `split`). Absent: write nothing.
 - **schema** — where the expected sections for each note type live, and the
@@ -35,16 +36,35 @@ need them.
 
 ## 1. Find the Overlay
 
-Look for `## Improve` in the vault root's `CLAUDE.md` or `AGENTS.md`. Name each
-missing field once, with its fallback, in the diagnosis header, then go on. With
-no Overlay at all, say "No `## Improve` Overlay found", name every fallback once,
-and go on. Never write an Overlay.
+Look for `## Improve` in the vault root's `CLAUDE.md` or `AGENTS.md`. A field that
+points at another section ("index, log, skip list: as in `## Companion`") is read
+from that section as if it were written here; if that section doesn't have it,
+the field is missing.
+
+Name each missing field once, with its fallback, in the diagnosis header, then go
+on. With no Overlay at all, say "No `## Improve` Overlay found" and name all six:
+
+```
+FALLBACKS:  No `## Improve` Overlay found.
+            index: none, skipping the index step
+            log: none, nothing will be logged
+            schema: none, inferring structure from this note and its siblings
+            maturity: none, so no promotion moves
+            verification marker: none, using <!-- NEEDS VERIFICATION: <reason> -->
+            skip list: none, treating folded AI capture callouts as not yours
+```
+
+That is the only time they are named. Don't list them again after the approval,
+and don't stop to ask for an Overlay: the fallbacks are enough to go on. Never
+write an Overlay.
 
 ## 2. Pick one note
 
 One note per run. `/improve [[note]]` names it; "improve this" means the note the
-human is in. A folder, or several notes, gets a short list of candidates and the
-question "which one first?", and nothing else.
+human is in. A folder, or several notes, gets a short list of candidates, one line
+each (the note and why it might want work), and the question "which one first?".
+Nothing else: no diagnosis of any of them, no moves, no writes. The diagnosis
+starts once the human picks one.
 
 ## 3. Read the neighbourhood
 
@@ -65,7 +85,9 @@ don't flag it, don't propose rewording it.
 
 Reply in the language the human writes in. Quotes from the note stay verbatim in
 their source language. Use this shape; drop a line or section whose Overlay field
-is missing instead of filling it with a guess.
+is missing instead of filling it with a guess: no index, no INDEX line; no
+maturity, TYPE alone, no MATURITY section and no promotion move, not even a
+`NOT YET` one.
 
 ```
 PAGE:       garden/compost.md
@@ -182,8 +204,8 @@ existing format, op `improve`, listing the moves applied. A promotion and a spli
 each get their own line, op `promote` and op `split`. If the Overlay names other
 ops for these, use those. Lines already in the log stay as they are; a later
 approval in the same session updates this session's line instead of adding
-another. No log configured: write nothing, and say so once. With "none", log
-nothing.
+another. No log configured: write nothing; the FALLBACKS line already said so.
+With "none", log nothing.
 
 ## Rules
 

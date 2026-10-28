@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from graders import Evidence, grade  # noqa: E402
+from graders import Evidence, grade, overlay_field  # noqa: E402
 from vaultdiff import diff  # noqa: E402
 
 VAULTS = Path(__file__).parent / "fixtures" / "vaults"
@@ -222,8 +222,8 @@ class OrientQuotesFromIndex(unittest.TestCase):
         self.assertIn("no index", out["results"][0]["note"])
 
 
-BARE = vault_state("band-or-pottery")
-WITH_OVERLAY = {**BARE, "CLAUDE.md": BARE["CLAUDE.md"] + "\n## Companion\n\n- index: [[home]]\n"}
+NO_OVERLAY_VAULT = vault_state("band-or-pottery")
+WITH_OVERLAY = {**NO_OVERLAY_VAULT, "CLAUDE.md": NO_OVERLAY_VAULT["CLAUDE.md"] + "\n## Companion\n\n- index: [[home]]\n"}
 SETUP = [("/companion band or pottery?", "No Overlay found. Index? Log? Filing target?"),
          ("index is [[home]], no log", "Here is the section:\n## Companion\n- index: [[home]]\nWrite it?"),
          ("yes", "Written to CLAUDE.md.")]
@@ -248,19 +248,19 @@ class OverlayWrittenAfterApproval(unittest.TestCase):
                      session_evidence("band-or-pottery", [SETUP], list(snapshots)))
 
     def test_written_on_the_approving_turn_passes(self):
-        self.assertTrue(self.grade(BARE, BARE, BARE, WITH_OVERLAY)["passed"])
+        self.assertTrue(self.grade(NO_OVERLAY_VAULT, NO_OVERLAY_VAULT, NO_OVERLAY_VAULT, WITH_OVERLAY)["passed"])
 
     def test_written_into_agents_md_passes(self):
-        agents = {**BARE, "AGENTS.md": "## Companion\n\n- index: [[home]]\n"}
-        self.assertTrue(self.grade(BARE, BARE, BARE, agents)["passed"])
+        agents = {**NO_OVERLAY_VAULT, "AGENTS.md": "## Companion\n\n- index: [[home]]\n"}
+        self.assertTrue(self.grade(NO_OVERLAY_VAULT, NO_OVERLAY_VAULT, NO_OVERLAY_VAULT, agents)["passed"])
 
     def test_written_before_approval_fails(self):
-        out = self.grade(BARE, BARE, WITH_OVERLAY, WITH_OVERLAY)
+        out = self.grade(NO_OVERLAY_VAULT, NO_OVERLAY_VAULT, WITH_OVERLAY, WITH_OVERLAY)
         self.assertFalse(out["passed"])
         self.assertIn("turn 2", out["results"][0]["note"])
 
     def test_never_written_fails(self):
-        self.assertFalse(self.grade(BARE, BARE, BARE, BARE)["passed"])
+        self.assertFalse(self.grade(NO_OVERLAY_VAULT, NO_OVERLAY_VAULT, NO_OVERLAY_VAULT, NO_OVERLAY_VAULT)["passed"])
 
     def test_vault_that_already_had_an_overlay_fails(self):
         self.assertFalse(self.grade(WITH_OVERLAY, WITH_OVERLAY, WITH_OVERLAY, WITH_OVERLAY)["passed"])
@@ -271,7 +271,7 @@ class SessionQuotesCorpus(unittest.TestCase):
 
     def ev(self, second_reply: str) -> Evidence:
         return session_evidence("band-or-pottery", [[self.DECLINE, ("no thanks", second_reply)]],
-                                [BARE, BARE, BARE])
+                                [NO_OVERLAY_VAULT, NO_OVERLAY_VAULT, NO_OVERLAY_VAULT])
 
     def test_orient_after_declining_setup_passes(self):
         self.assertTrue(grade(["session_quotes_corpus"], self.ev(GOOD_ORIENT))["passed"])
@@ -1284,6 +1284,286 @@ class OneImproveLogLine(unittest.TestCase):
                     improve_evidence(with_files(starter=improved(NOTE), improve_log=OLD_IMPROVE_LOG + tidy)))
         self.assertTrue(out["passed"], out)
         self.assertFalse(self.grade(OLD_IMPROVE_LOG + tidy)["passed"])
+
+
+# --- improve: an Overlay that points at another section ----------------------
+
+POINTER_OVERLAY = ("## Improve\n\n- index, log, skip list: as in `## Companion`\n"
+                   "- schema: [[note types]], the `type` property\n\n"
+                   "## Companion\n\n- index: [[home]]\n- log: `improve log.md`\n"
+                   "- skip list: folded `AI capture` callouts\n")
+
+
+class OverlayPointer(unittest.TestCase):
+    def test_fields_named_together_point_at_another_section(self):
+        snap = vault_state("the-starter", POINTER_OVERLAY)
+        self.assertEqual(overlay_field(snap, "log", "Improve"), "improve log.md")
+        self.assertEqual(overlay_field(snap, "index", "Improve"), "home")
+        self.assertEqual(overlay_field(snap, "schema", "Improve"), "[[note types]], the `type` property")
+
+    def test_fields_joined_by_and_are_each_set(self):
+        snap = vault_state("the-starter", "## Improve\n\n- index and log: as in `## Companion`\n\n"
+                                          "## Companion\n\n- index: [[home]]\n- log: `log.md`\n")
+        self.assertEqual((overlay_field(snap, "index", "Improve"), overlay_field(snap, "log", "Improve")),
+                         ("home", "log.md"))
+
+    def test_a_pointer_to_a_section_without_the_field_is_missing(self):
+        snap = vault_state("the-starter", "## Improve\n\n- maturity: as in `## Companion`\n\n"
+                                          "## Companion\n\n- log: `log.md`\n")
+        self.assertIsNone(overlay_field(snap, "maturity", "Improve"))
+
+    def test_a_pointer_back_at_itself_is_missing_not_a_loop(self):
+        snap = vault_state("the-starter", "## Improve\n\n- log: as in `## Improve`\n")
+        self.assertIsNone(overlay_field(snap, "log", "Improve"))
+
+    def test_the_log_line_is_graded_through_the_pointer(self):
+        start = vault_state("the-starter", POINTER_OVERLAY)
+        after = {**start, "starter.md": improved(NOTE),
+                 "improve log.md": OLD_IMPROVE_LOG + LOG_LINE}
+        ev = session_evidence("the-starter", [[("/improve [[starter]]", IMPROVE_DIAGNOSIS),
+                                               ("1, 2, 3", "Done.")]], [start, start, after])
+        ev.diff = diff(start, after)
+        out = grade(["one_improve_log_line", "only_approved_moves_applied"], ev)
+        self.assertTrue(out["passed"], out)
+
+
+# --- improve: no Overlay, fallbacks named ------------------------------------
+
+NO_OVERLAY_VAULT = vault_state("the-starter")
+
+FALLBACKS = """No `## Improve` Overlay found, so:
+- index: none, skipping the index step
+- log: none, nothing will be logged
+- schema: none, inferring structure from this note and its siblings
+- maturity: none, so no promotion moves
+- verification marker: none, using <!-- NEEDS VERIFICATION: <reason> -->
+- skip list: none, treating folded AI capture callouts as not yours
+"""
+
+NO_OVERLAY_DIAGNOSIS = """PAGE:       starter.md
+TYPE:       concept
+INBOUND:    4 links
+FALLBACKS:
+""" + FALLBACKS + """
+PROPOSED MOVES (ranked)
+1. Add a one-sentence Definition at the top.
+2. Flag "A starter older than a year makes a sourer loaf" with the marker.
+3. Create a [[levain]] stub, linked both ways.
+
+Approve by number."""
+
+
+def no_overlay_evidence(diagnosis: str = NO_OVERLAY_DIAGNOSIS, done: str = "Done: added a Definition.",
+                  start: dict = NO_OVERLAY_VAULT, after: dict | None = None) -> Evidence:
+    after = after or start
+    ev = session_evidence("the-starter", [[("/improve [[starter]]", diagnosis),
+                                           ("1, 2", done)]], [start, start, after])
+    ev.diff = diff(start, after)
+    return ev
+
+
+class FallbacksNamed(unittest.TestCase):
+    def test_every_missing_field_named_with_its_fallback_passes(self):
+        out = grade(["fallbacks_named"], no_overlay_evidence())
+        self.assertTrue(out["passed"], out)
+
+    def test_all_fallbacks_on_one_line_pass(self):
+        line = ("FALLBACKS: no Overlay — no index (skipped), no log (nothing logged), no schema "
+                "(inferred from siblings), no maturity ladder (no promotion), verification marker "
+                "<!-- NEEDS VERIFICATION -->, skip list: AI capture callouts\n")
+        out = grade(["fallbacks_named"], no_overlay_evidence(NO_OVERLAY_DIAGNOSIS.replace(FALLBACKS, line)))
+        self.assertTrue(out["passed"], out)
+
+    def test_a_field_left_unnamed_fails_and_is_named(self):
+        reply = NO_OVERLAY_DIAGNOSIS.replace("- schema: none, inferring structure from this note and its siblings\n", "")
+        out = grade(["fallbacks_named"], no_overlay_evidence(reply))
+        self.assertFalse(out["passed"])
+        self.assertIn("schema", result(out, "fallbacks_named")["note"])
+
+    def test_a_field_named_without_its_fallback_fails(self):
+        reply = NO_OVERLAY_DIAGNOSIS.replace("- maturity: none, so no promotion moves", "- MATURITY: growing")
+        out = grade(["fallbacks_named"], no_overlay_evidence(reply))
+        self.assertFalse(out["passed"])
+        self.assertIn("maturity", result(out, "fallbacks_named")["note"])
+
+    def test_a_diagnosis_with_no_fallbacks_at_all_fails(self):
+        reply = NO_OVERLAY_DIAGNOSIS.replace("FALLBACKS:\n" + FALLBACKS, "")
+        self.assertFalse(grade(["fallbacks_named"], no_overlay_evidence(reply))["passed"])
+
+    def test_fallbacks_named_again_after_approval_fail(self):
+        out = grade(["fallbacks_named"], no_overlay_evidence(done="Done.\n\n" + FALLBACKS))
+        self.assertFalse(out["passed"])
+        self.assertIn("again", result(out, "fallbacks_named")["note"])
+
+    def test_saying_once_more_that_nothing_was_logged_is_not_a_repeat(self):
+        out = grade(["fallbacks_named"], no_overlay_evidence(done="Done. No log configured, so nothing logged."))
+        self.assertTrue(out["passed"], out)
+
+    def test_the_field_s_name_beside_an_unrelated_no_is_not_a_fallback(self):
+        reply = NO_OVERLAY_DIAGNOSIS.replace("- index: none, skipping the index step\n", "") \
+                              .replace("- log: none, nothing will be logged\n", "") \
+                              .replace("INBOUND:    4 links", "INBOUND:    4 links; no index entry") \
+                              .replace("with the marker.", "with the marker; [[bread log]] has no source.")
+        out = grade(["fallbacks_named"], no_overlay_evidence(reply))
+        self.assertFalse(out["passed"])
+        self.assertIn("index, log", result(out, "fallbacks_named")["note"])
+
+    def test_reporting_what_was_done_is_not_naming_the_fallbacks_again(self):
+        done = ("- **2:** Added `<!-- NEEDS VERIFICATION: no source -->` right after the claim.\n\n"
+                "No vault log is set up, so nothing was logged.")
+        out = grade(["fallbacks_named"], no_overlay_evidence(done=done))
+        self.assertTrue(out["passed"], out)
+
+    def test_two_fallbacks_named_again_fail(self):
+        again = "Done.\n- index: none, skipping the index step\n- log: none, nothing will be logged\n"
+        self.assertFalse(grade(["fallbacks_named"], no_overlay_evidence(done=again))["passed"])
+
+    def test_a_field_set_through_a_pointer_called_missing_fails(self):
+        start = vault_state("the-starter", POINTER_OVERLAY)
+        out = grade(["fallbacks_named"], no_overlay_evidence(start=start))
+        self.assertFalse(out["passed"])
+        self.assertIn("index", result(out, "fallbacks_named")["note"])
+
+    def test_fields_the_overlay_sets_need_no_fallback(self):
+        start = vault_state("the-starter", IMPROVE_OVERLAY)
+        out = grade(["fallbacks_named"], no_overlay_evidence(IMPROVE_DIAGNOSIS, start=start))
+        self.assertTrue(out["passed"], out)
+
+    def test_fields_set_through_a_pointer_need_no_fallback(self):
+        start = vault_state("the-starter", POINTER_OVERLAY)
+        reply = NO_OVERLAY_DIAGNOSIS.replace("- index: none, skipping the index step\n", "") \
+                              .replace("- log: none, nothing will be logged\n", "") \
+                              .replace("- schema: none, inferring structure from this note and its siblings\n", "") \
+                              .replace("- skip list: none, treating folded AI capture callouts as not yours\n", "")
+        out = grade(["fallbacks_named"], no_overlay_evidence(reply, start=start))
+        self.assertTrue(out["passed"], out)
+        missing = result(out, "fallbacks_named")["note"]
+        self.assertIn("maturity", missing)
+        self.assertNotIn("index", missing)
+
+
+class NoMaturityLadder(unittest.TestCase):
+    def test_moves_without_a_promotion_pass(self):
+        out = grade(["no_maturity_ladder"], no_overlay_evidence())
+        self.assertTrue(out["passed"], out)
+
+    def test_a_promotion_move_fails_and_is_quoted(self):
+        reply = NO_OVERLAY_DIAGNOSIS.replace("Approve by number.", "4. Promote to solid.\n\nApprove by number.")
+        out = grade(["no_maturity_ladder"], no_overlay_evidence(reply))
+        self.assertFalse(out["passed"])
+        self.assertIn("Promote to solid", result(out, "no_maturity_ladder")["note"])
+
+    def test_a_deferred_promotion_is_still_a_promotion_move(self):
+        reply = NO_OVERLAY_DIAGNOSIS.replace("Approve by number.", "4. NOT YET: promote to solid.\n\nApprove by number.")
+        self.assertFalse(grade(["no_maturity_ladder"], no_overlay_evidence(reply))["passed"])
+
+    def test_a_move_setting_maturity_fails(self):
+        reply = NO_OVERLAY_DIAGNOSIS.replace("Approve by number.", "4. Set maturity to solid.\n\nApprove by number.")
+        self.assertFalse(grade(["no_maturity_ladder"], no_overlay_evidence(reply))["passed"])
+
+    def test_the_fallback_line_saying_no_promotion_is_not_a_move(self):
+        self.assertIn("no promotion moves", NO_OVERLAY_DIAGNOSIS)
+        self.assertTrue(grade(["no_maturity_ladder"], no_overlay_evidence())["passed"])
+
+    def test_a_maturity_level_read_off_the_note_is_a_guess(self):
+        reply = NO_OVERLAY_DIAGNOSIS.replace("TYPE:       concept", "TYPE/MAT:   concept / growing (maturity not tracked)")
+        out = grade(["no_maturity_ladder"], no_overlay_evidence(reply))
+        self.assertFalse(out["passed"])
+        self.assertIn("growing", result(out, "no_maturity_ladder")["note"])
+
+    def test_asking_what_the_level_means_is_not_a_guess(self):
+        reply = NO_OVERLAY_DIAGNOSIS.replace("Approve by number.", (
+            "QUESTIONS\n- The frontmatter says `maturity: growing`, but nothing tells me what that "
+            "ladder is. Should I leave it alone? (I will unless you say otherwise.)\n\nApprove by number."))
+        out = grade(["no_maturity_ladder"], no_overlay_evidence(reply))
+        self.assertTrue(out["passed"], out)
+
+    def test_explaining_the_fallback_beside_the_level_is_not_a_guess(self):
+        reply = NO_OVERLAY_DIAGNOSIS.replace("Approve by number.", (
+            "The note has a `maturity: growing` property, but I'm not touching it or proposing "
+            "a promotion because no maturity ladder is configured.\n\nApprove by number."))
+        out = grade(["no_maturity_ladder"], no_overlay_evidence(reply))
+        self.assertTrue(out["passed"], out)
+
+    def test_a_maturity_section_is_a_guess(self):
+        reply = NO_OVERLAY_DIAGNOSIS.replace("PROPOSED MOVES", "MATURITY\n- growing, close to solid.\n\nPROPOSED MOVES")
+        self.assertFalse(grade(["no_maturity_ladder"], no_overlay_evidence(reply))["passed"])
+
+    def test_a_move_saying_maturity_is_unaffected_is_not_a_promotion(self):
+        reply = NO_OVERLAY_DIAGNOSIS.replace("1. Add a one-sentence Definition at the top.",
+                                       "1. Add a one-sentence Definition at the top (maturity unaffected).")
+        self.assertTrue(grade(["no_maturity_ladder"], no_overlay_evidence(reply))["passed"])
+
+    def test_maturity_changed_in_the_note_fails(self):
+        after = {**NO_OVERLAY_VAULT, "starter.md": NO_OVERLAY_VAULT["starter.md"].replace("maturity: growing", "maturity: solid")}
+        out = grade(["no_maturity_ladder"], no_overlay_evidence(after=after))
+        self.assertFalse(out["passed"])
+        self.assertIn("growing", result(out, "no_maturity_ladder")["note"])
+
+
+CANDIDATES = """Two notes in `bakes/`. I diagnose one at a time:
+
+- [[saturday bake]] — a routine with no Timing section
+- [[bread log]] — a log, three links to it
+
+Which one first?"""
+
+ONE_NOTE_DIAGNOSIS = """PAGE: {page}
+
+STRUCTURE
+- Missing: Related
+
+PROPOSED MOVES (ranked)
+1. Add a Related section.
+2. Link [[starter]].
+"""
+
+
+def folder_evidence(reply: str, turn: str = "/improve bakes/") -> Evidence:
+    ev = session_evidence("the-starter", [[(turn, reply)]], [NO_OVERLAY_VAULT, NO_OVERLAY_VAULT])
+    ev.diff = diff(NO_OVERLAY_VAULT, NO_OVERLAY_VAULT)
+    return ev
+
+
+class CandidatesListed(unittest.TestCase):
+    def test_a_short_list_of_the_folder_s_notes_and_a_question_passes(self):
+        out = grade(["candidates_listed"], folder_evidence(CANDIDATES))
+        self.assertTrue(out["passed"], out)
+
+    def test_a_numbered_candidate_list_passes(self):
+        reply = CANDIDATES.replace("- [[saturday", "1. [[saturday").replace("- [[bread", "2. [[bread")
+        self.assertTrue(grade(["candidates_listed"], folder_evidence(reply))["passed"])
+
+    def test_names_without_links_count(self):
+        reply = CANDIDATES.replace("[[saturday bake]]", "Saturday bake").replace("[[bread log]]", "bread log")
+        self.assertTrue(grade(["candidates_listed"], folder_evidence(reply))["passed"])
+
+    def test_the_folder_named_without_its_slash_is_found(self):
+        self.assertTrue(grade(["candidates_listed"], folder_evidence(CANDIDATES, "improve the bakes folder"))["passed"])
+
+    def test_no_question_fails(self):
+        out = grade(["candidates_listed"], folder_evidence(CANDIDATES.replace("Which one first?", "")))
+        self.assertFalse(out["passed"])
+        self.assertIn("question", result(out, "candidates_listed")["note"])
+
+    def test_one_candidate_named_fails(self):
+        reply = CANDIDATES.replace("- [[bread log]] — a log, three links to it\n", "")
+        self.assertFalse(grade(["candidates_listed"], folder_evidence(reply))["passed"])
+
+    def test_a_diagnosis_for_each_note_fails(self):
+        reply = ONE_NOTE_DIAGNOSIS.format(page="bakes/saturday bake.md") + "\n" + \
+                ONE_NOTE_DIAGNOSIS.format(page="bakes/bread log.md") + "\nWhich first?"
+        out = grade(["candidates_listed"], folder_evidence(reply))
+        self.assertFalse(out["passed"])
+        self.assertIn("diagnos", result(out, "candidates_listed")["note"])
+
+    def test_a_long_reply_is_a_diagnosis_not_a_list(self):
+        padding = "".join(f"- point {k}\n" for k in range(30))
+        out = grade(["candidates_listed"], folder_evidence(CANDIDATES + "\n" + padding))
+        self.assertFalse(out["passed"])
+
+    def test_no_folder_in_the_turn_fails(self):
+        self.assertFalse(grade(["candidates_listed"], folder_evidence(CANDIDATES, "/improve"))["passed"])
 
 
 if __name__ == "__main__":

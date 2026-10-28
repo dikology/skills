@@ -117,6 +117,19 @@ approved move links, or the index when an approved move names it.
 new lines may go around a line, `[[ ]]` around a word and an HTML-comment marker
 after a claim, but an `AI capture` callout must stay byte-identical.
 
+An Overlay field is read the way a user writes it: one line may set several
+fields (`index, log, skip list: …`), and a value of "as in `## Companion`" is read
+from that section. `fallbacks_named` fails a first reply that leaves an unset
+`## Improve` field without its fallback (a clause that labels the field unset,
+`log: none`, or names the field and its fallback together), one that calls a
+field the Overlay sets unset, and a later reply that lists two or more of them
+again. `no_maturity_ladder`, for a vault with no maturity field, fails a listed
+move that promotes or sets maturity, deferred or not, a MATURITY section or a
+line reading the note's level, and a change to its maturity. For "improve
+<folder>", `candidates_listed` wants the first reply to name two or more of the
+folder's notes and ask a question, with no more than one numbered list and at
+most 25 lines: a list, not a diagnosis of each.
+
 `no_transcript` is graded on every case, named or not: no file a session writes may
 hold two or more of one session's human turns. A one-turn session can't be told apart
 from a filed line that way, so those cases also grade `no_writes`.
@@ -135,7 +148,7 @@ None contains real notes.
 | `spanish-and-the-car` | The log: two unrelated topics, so one session's unpicked menu is easy to spot in the next, and a log with one earlier line. Also the session where the human only asks, so there is no line to file |
 | `the-kitchen-table` | Contradictions: an older note says the kitchen table is where the human does their best work and they'll never commute again, and a scripted turn says they want the office now. A job offer note gives the new position somewhere to link |
 | `the-dacha` | Language: a vault written in Russian, about whether to sell a grandmother's dacha. Russian turns, English turns, and a `lang: zh` pin all meet the same Russian notes |
-| `the-starter` | Improve: a sourdough `starter` note with visible gaps (no Definition, a term with no note of its own, a term never explained, an unsourced claim, a paragraph that wants to be its own note), four inbound links from three notes, one through its alias, and no index entry. A folded `AI capture` callout holds an unsourced claim that is not the human's. A schema file and a log with one earlier line, so a diagnosis that writes anything shows up in the diff, and an approval shows exactly which files its moves touched |
+| `the-starter` | Improve: a sourdough `starter` note with visible gaps (no Definition, a term with no note of its own, a term never explained, an unsourced claim, a paragraph that wants to be its own note), four inbound links from three notes, one through its alias, and no index entry. A folded `AI capture` callout holds an unsourced claim that is not the human's. A schema file and a log with one earlier line, so a diagnosis that writes anything shows up in the diff, and an approval shows exactly which files its moves touched. Run with no Overlay, the same log and schema sit there unconfigured, as decoys. Two notes live in `bakes/`, for a folder request |
 
 ## Showing a case can fail
 

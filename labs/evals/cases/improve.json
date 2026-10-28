@@ -39,6 +39,66 @@
         "Every prose line of starter.md is still there word for word; the AI capture callout is byte-identical",
         "improve log.md has one new line: op improve, linking [[starter]]"
       ]
+    },
+    {
+      "id": "no-overlay",
+      "vault": "the-starter",
+      "overlay": null,
+      "turns": [
+        "/improve [[starter]]",
+        "1, 2"
+      ],
+      "graders": [
+        "numbered_moves",
+        "fallbacks_named",
+        "no_maturity_ladder",
+        "only_approved_moves_applied",
+        "prose_verbatim"
+      ],
+      "what_it_tests": "The vault has no `## Improve` Overlay. The first reply names each of the six fields once with its fallback and still diagnoses the note with numbered moves; with no maturity ladder no move promotes, deferred or not, and no line reads a maturity level off the note. After \"1, 2\" only the files those moves name change. `improve log.md` and `note types.md` sit in the vault unconfigured, so a skill that logs anyway changes a file no approved move names. Prose stays verbatim.",
+      "expectations": [
+        "The diagnosis names index, log, schema, maturity, verification marker and skip list, each with its fallback, and doesn't list them again after the approval",
+        "No move promotes the note or touches its maturity, and the diagnosis doesn't judge its maturity",
+        "After \"1, 2\" the note changes, improve log.md does not, and every prose line survives"
+      ]
+    },
+    {
+      "id": "overlay-points-at-companion",
+      "vault": "the-starter",
+      "overlay": "## Improve\n\n- index, log, skip list: as in `## Companion`\n- schema: [[note types]], the `type` property\n- maturity: the `maturity` property; seed, growing, solid, canonical; solid and up join the index\n\n## Companion\n\n- index: [[home]]\n- log: `improve log.md`\n- skip list: folded `AI capture` callouts\n",
+      "turns": [
+        "/improve [[starter]]",
+        "1, 2, 3"
+      ],
+      "graders": [
+        "numbered_moves",
+        "fallbacks_named",
+        "only_approved_moves_applied",
+        "prose_verbatim",
+        "one_improve_log_line"
+      ],
+      "what_it_tests": "The `## Improve` Overlay reads \"index, log, skip list: as in `## Companion`\", and only `## Companion` names the log. A skill that follows the pointer logs one `improve` line; one that doesn't logs nothing. The verification marker is unset, so its fallback is named.",
+      "expectations": [
+        "The verification marker's fallback is named; index, log and skip list are not called missing",
+        "After \"1, 2, 3\" improve log.md gains one improve line linking [[starter]]"
+      ]
+    },
+    {
+      "id": "folder-lists-candidates",
+      "vault": "the-starter",
+      "overlay": "## Improve\n\n- index: [[home]]\n- log: `improve log.md`\n- schema: [[note types]], the `type` property\n- maturity: the `maturity` property; seed, growing, solid, canonical; solid and up join the index\n- verification marker: `<!-- NEEDS VERIFICATION: <reason> -->`\n- skip list: folded `AI capture` callouts\n",
+      "turns": [
+        "/improve bakes/"
+      ],
+      "graders": [
+        "no_writes",
+        "candidates_listed"
+      ],
+      "what_it_tests": "A folder request. `bakes/` holds two notes. The reply lists them as candidates and asks which one to start with; it diagnoses neither and writes nothing.",
+      "expectations": [
+        "The reply names [[saturday bake]] and [[bread log]] and asks which first",
+        "No diagnosis for either note; the vault is unchanged"
+      ]
     }
   ]
 }

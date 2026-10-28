@@ -148,15 +148,29 @@ def overlay(snap: dict, section: str = "Companion") -> str | None:
     return None
 
 
-def overlay_field(snap: dict, name: str, section: str = "Companion") -> str | None:
-    """A field's value with its [[link]] or `code` wrapper removed, or None."""
-    m = re.search(rf"^\s*[-*]?\s*(\*\*|__)?{re.escape(name)}(\*\*|__)?\s*:\s*(.+?)\s*$",
-                  overlay(snap, section) or "", re.M | re.I)
-    if not m:
+# "as in `## Companion`": a field read from another section, as a user would.
+POINTER = re.compile(r"^as\s+in\s+`?##\s*([^`]+?)`?\s*\.?$", re.I)
+FIELD_LINE = re.compile(r"^\s*[-*]?\s*(?:\*\*|__)?([^:\n]+?)(?:\*\*|__)?\s*:\s*(.+?)\s*$", re.M)
+
+
+def overlay_field(snap: dict, name: str, section: str = "Companion",
+                  _seen: frozenset = frozenset()) -> str | None:
+    """A field's value with its [[link]] or `code` wrapper removed, or None. One line
+    may set several fields ("index, log: …"), and a value may point at another
+    section ("as in `## Companion`"), where the field is then read."""
+    value = None
+    for m in FIELD_LINE.finditer(overlay(snap, section) or ""):
+        keys = re.split(r"\s*(?:,|\band\b)\s*", m.group(1).strip(), flags=re.I)
+        if name.lower() in (k.strip().lower() for k in keys):
+            value = m.group(2)
+            break
+    if value is None or re.match(r"(none|no|n/a|-|—)(\W|$)", value, re.I):
         return None
-    value = m.group(3)
-    if re.match(r"(none|no|n/a|-|—)(\W|$)", value, re.I):
-        return None
+    pointer = POINTER.match(value)
+    if pointer:
+        target = pointer.group(1).strip()
+        seen = _seen | {section.lower()}
+        return None if target.lower() in seen else overlay_field(snap, name, target, seen)
     inner = re.fullmatch(r"\[\[([^\]|#]+)[^\]]*\]\]|`([^`]+)`", value)
     return (inner.group(1) or inner.group(2)).strip() if inner else value
 
@@ -528,6 +542,144 @@ def g_one_improve_log_line(ev: Evidence, op: str = "improve",
             return Result(name, False, f"session {n}: {len(main)} `{op}` line(s) linking "
                                        f"[[{key}]], {len(extra)} other line(s) in {path}")
     return Result(name, True, f"one `{op}` line per session in {path}")
+
+
+# --- improve: no Overlay, fallbacks named ------------------------------------
+
+# Each `## Improve` field: how a reply names it, and how it names that field's
+# fallback. A clause (a line, cut at , ; |) names the fallback when it labels the
+# field unset ("log: none") or names the field and its fallback together ("no
+# schema, inferred from siblings"). A bare "no" beside the field's name doesn't
+# count: "no index entry" says nothing about the Overlay.
+IMPROVE_FIELDS = {
+    "index": (r"\bindex\b", r"skip(?![\s-]*list)"),
+    "log": (r"\blog(?:ged|ging)?\b", r"nothing|not\s+(?:be\s+)?logged|won't log"),
+    "schema": (r"\bschema\b", r"infer|sibling"),
+    "maturity": (r"\bmaturity\b|\bladder\b", r"promot"),
+    "verification marker": (r"verification", r"NEEDS VERIFICATION|HTML comment"),
+    "skip list": (r"skip[\s-]*list", r"AI capture"),
+}
+UNSET = r"(?:none|not (?:set|configured|found)|missing|absent|unset)\b"
+
+
+def clauses(reply: str) -> list:
+    return [c for line in reply.splitlines() for c in re.split(r"[,;|]", line)]
+
+
+def labelled_unset(field: str, clause: str) -> bool:
+    """The clause labels the field unset: "log: none", "**index** — not set"."""
+    return re.search(rf"(?:{field})\W{{0,6}}{UNSET}", clause, re.I) is not None
+
+
+def fallbacks_in(reply: str, fields: list) -> list:
+    """The fields some clause of the reply names together with their fallback."""
+    named = []
+    for f in fields:
+        field, fallback = IMPROVE_FIELDS[f]
+        if any(labelled_unset(field, c) or (re.search(field, c, re.I) and re.search(fallback, c, re.I))
+               for c in clauses(reply)):
+            named.append(f)
+    return named
+
+
+def g_fallbacks_named(ev: Evidence) -> Result:
+    """Every `## Improve` field the Overlay leaves unset is named with its fallback in
+    the first reply, once: a later reply naming two or more again fails. A field the
+    Overlay sets, through a pointer to another section or not, is never called unset."""
+    name = "fallbacks_named"
+    snap = ev.snapshots[0] if ev.snapshots else {}
+    missing = [f for f in IMPROVE_FIELDS if overlay_field(snap, f, IMPROVE) is None]
+    first = first_reply(ev)
+    wrong = [f for f in IMPROVE_FIELDS if f not in missing
+             and any(labelled_unset(IMPROVE_FIELDS[f][0], c) for c in clauses(first))]
+    if wrong:
+        return Result(name, False, "calls a field the Overlay sets unset: " + ", ".join(wrong))
+    if not missing:
+        return Result(name, True, "the Overlay sets every field")
+    unnamed = [f for f in missing if f not in fallbacks_in(first, missing)]
+    if unnamed:
+        return Result(name, False, "first reply names no fallback for: " + ", ".join(unnamed))
+    # Again means listed again ("log: none"), not a report of what was done
+    # ("nothing was logged", "added <!-- NEEDS VERIFICATION -->").
+    for k, text in enumerate(replies(ev)[1:], 2):
+        again = [f for f in missing if any(labelled_unset(IMPROVE_FIELDS[f][0], c) for c in clauses(text))]
+        if len(again) >= 2:
+            return Result(name, False, f"reply {k} names the fallbacks again: " + ", ".join(again))
+    return Result(name, True, "fallbacks named once for: " + ", ".join(missing))
+
+
+PROMOTING = re.compile(r"promot|(?:set|change|raise|move|bump)\w*\s+(?:the\s+|its\s+)?maturity"
+                       r"|maturity\s*(?:to|→|->)\s*\w", re.I)
+
+
+def g_no_maturity_ladder(ev: Evidence) -> Result:
+    """With no maturity field in the Overlay, the diagnosis has no maturity: no move
+    promotes the note or sets its maturity, deferred or not; no line (other than a
+    question) reads its level off the note and no MATURITY section judges it; and its `maturity` property
+    doesn't change."""
+    name = "no_maturity_ladder"
+    start = ev.snapshots[0] if ev.snapshots else {}
+    if overlay_field(start, "maturity", IMPROVE):
+        return Result(name, True, "the Overlay sets a maturity ladder")
+    reply = first_reply(ev)
+    promoting = [text.strip() for text in moves(reply).values() if PROMOTING.search(text)]
+    if promoting:
+        return Result(name, False, "proposed: " + "; ".join(f"\"{t[:80]}\"" for t in promoting))
+    if re.search(r"^\W*(?:#+\s*)?maturity\W*$", reply, re.M | re.I):
+        return Result(name, False, "a MATURITY section with no ladder to judge by")
+    path = improved_note(ev)
+    level = frontmatter_value(start.get(path or "", ""), "maturity")
+    if level:
+        # Asking about the level, or naming the fallback beside it, isn't a guess.
+        guess = next((l.strip() for l in reply.splitlines()
+                      if "?" not in l and not fallbacks_in(l, ["maturity"])
+                      and re.search(r"\bmat(?:urity)?\b", l, re.I)
+                      and re.search(rf"\b{re.escape(level)}\b", l, re.I)), None)
+        if guess:
+            return Result(name, False, f"reads a level with no ladder: \"{guess[:80]}\"")
+    if path and ev.snapshots:
+        was, now = (frontmatter_value(snap.get(path, ""), "maturity") for snap in (start, ev.snapshots[-1]))
+        if was != now:
+            return Result(name, False, f"maturity went {was} → {now}")
+    return Result(name, True, "no maturity proposed, read or changed")
+
+
+def numbered_lists(reply: str) -> int:
+    """How many lists numbered 1, 2, … the reply holds."""
+    count = run = 0
+    for n in (int(n) for n in NUMBERED.findall(reply)):
+        run = n if n in (1, run + 1) else 0
+        count += run == 2
+    return count
+
+
+# A candidate list is a line per note and a question; a diagnosis runs longer.
+CANDIDATE_LIST_LINES = 25
+
+
+def g_candidates_listed(ev: Evidence) -> Result:
+    """For "improve <folder>": the first reply names two or more notes in the folder and
+    asks a question, and diagnoses none of them: no more than one numbered list,
+    and short."""
+    name = "candidates_listed"
+    turn = (human_turns(ev) or [""])[0]
+    vault = start_vault(ev)
+    folders = {p.rsplit("/", 1)[0] for p in vault if "/" in p}
+    folder = next((f for f in sorted(folders, key=len, reverse=True)
+                   if re.search(rf"(?<!\w){re.escape(f)}(?!\w)", turn, re.I)), None)
+    if not folder:
+        return Result(name, False, "no folder of the vault named in the first turn")
+    reply = first_reply(ev)
+    inside = sorted({path_key(p) for p in vault if p.startswith(folder + "/") and p.endswith(".md")})
+    named = [n for n in inside if n in reply.lower()]
+    if len(named) < 2:
+        return Result(name, False, f"names {len(named)} of {len(inside)} notes in {folder}/")
+    if "?" not in reply and "？" not in reply:
+        return Result(name, False, "lists candidates but asks no question")
+    lists, lines = numbered_lists(reply), len([l for l in reply.splitlines() if l.strip()])
+    if lists > 1 or lines > CANDIDATE_LIST_LINES:
+        return Result(name, False, f"diagnoses instead of listing: {lists} numbered lists, {lines} lines")
+    return Result(name, True, f"lists {len(named)} notes in {folder}/ and asks which first")
 
 
 def g_writes_only_log(ev: Evidence) -> Result:
@@ -1065,6 +1217,9 @@ GRADERS = {
     "prose_verbatim": g_prose_verbatim,
     "only_approved_moves_applied": g_only_approved_moves_applied,
     "one_improve_log_line": g_one_improve_log_line,
+    "fallbacks_named": g_fallbacks_named,
+    "no_maturity_ladder": g_no_maturity_ladder,
+    "candidates_listed": g_candidates_listed,
     "orient_quotes_from_index": g_orient_quotes_from_index,
     "overlay_written_after_approval": g_overlay_written_after_approval,
     "session_quotes_corpus": g_session_quotes_corpus,

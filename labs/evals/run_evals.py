@@ -5,10 +5,15 @@ The skill is named on the command line (default: companion). Its cases are
 cases/<skill>.json. A case is a Fixture vault, an optional Overlay and scripted
 human turns, in one session (`turns`) or several (`sessions`). For each case the
 runner copies the vault to a temp directory, appends the Overlay to its CLAUDE.md,
-installs the skill under .claude/skills/<skill> unmodified (as a Consuming vault
-would), and plays each session in headless `claude -p`, resuming it for each later
+installs the skill under .qwen/skills/<skill> unmodified (as a Consuming vault
+would), and plays each session in headless `qwen`, resuming it for each later
 turn and starting fresh for the next session. It snapshots the vault after every
 turn, grades the transcript and the vault diff, and keeps both under results/.
+
+Every turn runs against a qwen home of the run's own, seeded with nothing but how
+to reach a model, so user settings, hooks, extensions, user skills and MCP servers
+stay out. A turn that loaded an MCP server, or never invoked the skill at all, is
+reported and fails: neither is a test of the skill, whatever the reply looks like.
 
 Each skill has two arms: stable (skills/<skill>, what the plugin ships) and
 candidate (labs/<skill>, what you edit). Scoring both on the same cases prints a
@@ -35,6 +40,7 @@ import argparse
 import hashlib
 import inspect
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -55,10 +61,153 @@ VAULTS = HERE / "fixtures" / "vaults"
 CASES = HERE / "cases"
 RESULTS = HERE / "results"
 
-# Settings come from the temp vault only (no user hooks or plugins), and no MCP
-# servers are loaded, so the session sees the vault and the skill and little else.
-ISOLATION = ["--strict-mcp-config", "--setting-sources", "project,local"]
-SESSION_FLAGS = ["--permission-mode", "bypassPermissions", *ISOLATION]
+# --- the process adapter -------------------------------------------------------
+# One place holds the agent binary and every flag this harness passes it. Moving the
+# harness to another CLI means changing this section, `read_turn` below, and
+# SKILL_FOLDER; nothing else in the file names an agent.
+BINARY = "qwen"
+
+# Where a Consuming vault installs a skill so the agent finds it. The folder the
+# plugin ships into is not the folder qwen discovers: install it in the wrong place
+# and every case runs with no skill, the model improvising from the prompt, which
+# reads as a green run that proves nothing. `check_run` is the guard.
+SKILL_FOLDER = ".qwen"
+
+OUTPUT = ["-o", "json"]
+
+# No MCP server is loaded, whatever the developer running the eval has configured.
+NO_MCP = ["--mcp-config", json.dumps({"mcpServers": {}})]
+
+# History has to be on disk: `-r` resumes the session recorded there, so without it
+# every turn after the first starts a stranger who has never seen the vault.
+RECORD = ["--chat-recording"]
+
+# The tools a judge must not hold. qwen has no `--disallowedTools`, so the denial is
+# these two flags together: the mode says the session is read-only, the exclusion takes
+# the tools out of its registry — writers, readers and shells alike, because the judge
+# decides from the transcript in its prompt. `agent`, `tool_call` and the worktree tools
+# go too: delegating a write, discovering a hidden tool or making a new checkout are all
+# still ways of not staying inside the transcript.
+DENIED_TOOLS = ",".join(["write_file", "edit", "notebook_edit", "run_shell_command",
+                         "read_file", "glob", "grep_search", "monitor",
+                         "enter_worktree", "exit_worktree",
+                         "artifact", "record_artifact", "agent", "tool_call"])
+
+
+def session_argv(prompt: str, resume: str | None = None,
+                 model: str | None = None) -> list:
+    """One human turn against a temp Consuming vault. yolo, because no one is
+    watching the process to answer a permission prompt, and a turn that cannot
+    write the vault cannot be graded on its diff."""
+    argv = [BINARY, prompt, *OUTPUT, *RECORD, "--approval-mode", "yolo", *NO_MCP]
+    if resume:
+        argv += ["-r", resume]
+    if model:
+        argv += ["-m", model]
+    return argv
+
+
+def judge_argv(prompt: str, model: str | None = None) -> list:
+    """The rubric and the transcript, in a directory that is nobody's vault, read-only:
+    a judge that can edit the thing it is grading grades its own work."""
+    argv = [BINARY, prompt, *OUTPUT, "--approval-mode", "plan",
+            "--exclude-tools", DENIED_TOOLS, *NO_MCP]
+    if model:
+        argv += ["-m", model]
+    return argv
+
+
+def agent_env(home: Path) -> dict:
+    """The child's environment: the global config dir moved to `home`, so user
+    settings, hooks, extensions, user skills and MCP servers stay out of every turn."""
+    return {**os.environ, "QWEN_HOME": str(home), "QWEN_CODE_SUPPRESS_YOLO_WARNING": "1"}
+
+# An isolated home still has to reach a model, which it does with the login the
+# developer already has. Everything else a qwen home holds — MCP servers, hooks,
+# extensions, the user's own skills, display settings — is what a case must not be
+# run against, because the case is testing a bare Consuming vault.
+SEED_KEYS = ("$version", "env", "security", "model", "modelProviders", "providerMetadata")
+
+# A login sometimes sits beside settings.json instead of inside it. These are qwen's own
+# credential files; an isolated home without them can reach no model at all.
+CREDENTIAL_FILES = ("oauth_creds.json", "credentials.json")
+
+
+def seed_settings(real: dict) -> dict:
+    """The settings.json a run's home is written with: how to reach a model, nothing else."""
+    return {k: real[k] for k in SEED_KEYS if k in real}
+
+
+def real_home() -> Path:
+    """The developer's own qwen home, where a login lives."""
+    return Path(os.environ.get("QWEN_HOME") or Path.home() / ".qwen")
+
+
+def make_isolated_home(root: Path, from_home: Path) -> Path:
+    """A qwen home for this one run, under `root`, seeded from `from_home`'s login.
+
+    One home for the whole run, not one per turn: sessions are recorded inside it, and
+    a resume on turn two reads the history turn one left there."""
+    home = root / "agent-home"
+    home.mkdir(parents=True, exist_ok=True)
+    settings = from_home / "settings.json"
+    seed = seed_settings(json.loads(settings.read_text())) if settings.exists() else {}
+    (home / "settings.json").write_text(json.dumps(seed))
+    for name in CREDENTIAL_FILES:
+        if (from_home / name).exists():
+            shutil.copyfile(from_home / name, home / name)
+    return home
+
+
+def login_found(from_home: Path, env: dict) -> bool:
+    """Whether there is anything to seed a run with: a settings block that says how to
+    authenticate, one of qwen's credential files, or a key in the environment. A run
+    without it would spend a turn on every case learning the same thing."""
+    if env.get("OPENAI_API_KEY"):
+        return True
+    if any((from_home / name).exists() for name in CREDENTIAL_FILES):
+        return True
+    settings = from_home / "settings.json"
+    if not settings.exists():
+        return False
+    seeded = seed_settings(json.loads(settings.read_text()))
+    return bool(seeded.get("security") or seeded.get("env"))
+
+
+def read_turn(stdout: str) -> dict:
+    """One headless run's output, read as the harness uses it.
+
+    `qwen -o json` prints an array of events, not one object: the last is the turn's
+    result (reply, session id, whether it failed, tokens — qwen reports no price), and
+    the init event says what the session was handed. Both are needed to tell a passing
+    case from a run that quietly did nothing, which is what a green eval most often is.
+
+    `init_reported` separates "the session loaded no MCP server" from "the run never
+    said what it loaded", which an empty list alone cannot tell apart."""
+    events = json.loads(stdout)
+    if not isinstance(events, list):
+        raise ValueError("qwen printed no event array")
+    result = next((e for e in reversed(events)
+                   if isinstance(e, dict) and e.get("type") == "result"), None)
+    if result is None:
+        raise ValueError("qwen printed no result event")
+    init = next((e for e in events
+                 if isinstance(e, dict) and e.get("type") == "system"), None)
+    usage = result.get("usage") or {}
+    by_name = ((result.get("stats") or {}).get("skills") or {}).get("byName") or {}
+    text = result.get("result") or ""
+    is_error = bool(result.get("is_error"))
+    reason = ""
+    if is_error:
+        err = result.get("error")
+        reason = ((err.get("message") if isinstance(err, dict) else str(err or ""))
+                  or text or "the run gave no reason")
+    return {"text": text, "session_id": result.get("session_id"), "is_error": is_error,
+            "error": reason,
+            "tokens": (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0),
+            "skills": sorted(by_name),
+            "init_reported": init is not None,
+            "mcp_servers": (init or {}).get("mcp_servers") or []}
 
 
 # --- a skill by name ----------------------------------------------------------
@@ -85,15 +234,39 @@ def load_cases(name: str, folder: Path = CASES) -> list:
 
 def build_vault(root: Path, case: dict, skill: Path, name: str) -> Path:
     """A temp Consuming vault: the case's Fixture vault, its Overlay, and the skill
-    folder installed unmodified as .claude/skills/<name>, whatever the folder is called."""
+    folder installed unmodified as SKILL_FOLDER/skills/<name>, whatever the folder is
+    called."""
     ws = root / case["id"]
     shutil.copytree(VAULTS / case["vault"], ws)
     if case.get("overlay"):
         md = ws / "CLAUDE.md"
         existing = md.read_text() if md.exists() else ""
         md.write_text(existing.rstrip() + "\n\n" + case["overlay"].strip() + "\n")
-    shutil.copytree(skill, ws / ".claude" / "skills" / name)
+    shutil.copytree(skill, ws / SKILL_FOLDER / "skills" / name)
     return ws
+
+
+def check_run(name: str, session: dict):
+    """Why a session that ran without error is still no evidence about the skill, or None.
+
+    All three ways this goes wrong are invisible in a transcript. A skill nothing looked
+    for leaves a model that improvises from the prompt and answers much like the skill; a
+    session that loaded the developer's MCP servers was never the bare Consuming vault the
+    case describes; and a run that reported no init event proved neither of those things,
+    so it cannot claim them. The skill is looked for across the whole run rather than turn
+    by turn: turn 1 invokes it, and "1, 2" or "yes, write it" are follow-ups in the same
+    session that need not invoke it again."""
+    if not session["init_reported"]:
+        return ("a turn printed no init event, so nothing shows what the session was "
+                "given — isolation not proven")
+    if session["mcp_servers"]:
+        return (f"a session loaded an MCP server ({session['mcp_servers']}) — this run is "
+                f"not the isolated vault the case describes")
+    if name not in session["skills_invoked"]:
+        return (f"skill {name!r} was never invoked (the session ran: "
+                f"{', '.join(session['skills_invoked']) or 'no skill'}) — its replies came "
+                f"from the prompt, not the skill")
+    return None
 
 
 def case_sessions(case: dict) -> list:
@@ -101,10 +274,16 @@ def case_sessions(case: dict) -> list:
     return case.get("sessions") or [case["turns"]]
 
 
-def play(ws: Path, sessions: list, model: str | None, timeout: int) -> dict:
+def play(ws: Path, sessions: list, model: str | None, timeout: int, env: dict) -> dict:
     """Play each session's human turns, snapshotting the vault before the first turn
-    and after each one. Stops at the first failed turn."""
-    transcript, cost, error, ids = [], 0.0, None, []
+    and after each one. Stops at the first failed turn.
+
+    The first turn of a session starts fresh, every later one resumes the session id the
+    agent reported. A resume that quietly did not happen is a failure, not a smaller
+    success: the turn would be answering with no memory of the one before, and a case
+    that grades only replies and files would never notice."""
+    transcript, error, ids = [], None, []
+    tokens, skills, mcp, no_init = 0, [], [], False
     snapshots = [vaultdiff.snapshot(ws)]
     started = time.time()
     turns = [(n, text) for n, texts in enumerate(sessions) for text in texts]
@@ -113,35 +292,39 @@ def play(ws: Path, sessions: list, model: str | None, timeout: int) -> dict:
         if n != current:
             session, current = None, n
         transcript.append({"role": "human", "text": text, "session": n})
-        cmd = ["claude", "-p", text, "--output-format", "json", *SESSION_FLAGS]
-        if session:
-            cmd += ["--resume", session]
-        if model:
-            cmd += ["--model", model]
+        resumed = session
         try:
-            proc = subprocess.run(cmd, cwd=ws, capture_output=True, text=True,
-                                  timeout=timeout)
+            proc = subprocess.run(session_argv(text, resume=resumed, model=model),
+                                  cwd=ws, capture_output=True, text=True,
+                                  timeout=timeout, env=env)
         except subprocess.TimeoutExpired:
             error = f"turn {len(snapshots)} timed out after {timeout}s"
             break
         try:
-            payload = json.loads(proc.stdout)
-        except json.JSONDecodeError:
+            turn = read_turn(proc.stdout)
+        except ValueError:
             error = (proc.stderr or proc.stdout)[-2000:] or "no output"
             break
-        if proc.returncode != 0 or payload.get("is_error"):
-            error = payload.get("result") or proc.stderr[-2000:] or "non-zero exit"
+        if proc.returncode != 0 or turn["is_error"]:
+            error = turn["error"] or (proc.stderr or "")[-2000:] or "non-zero exit"
             break
-        session = payload.get("session_id", session)
+        if resumed and turn["session_id"] != resumed:
+            error = (f"turn {len(snapshots)} did not resume {resumed}: qwen answered as "
+                     f"{turn['session_id']}")
+            break
+        no_init = no_init or not turn["init_reported"]
+        session = turn["session_id"] or session
         if not ids or ids[-1] != session:
             ids.append(session)
-        cost += payload.get("total_cost_usd") or 0.0
-        transcript.append({"role": "companion", "text": payload.get("result", ""),
-                           "session": n})
+        tokens += turn["tokens"]
+        skills += turn["skills"]
+        mcp = mcp or turn["mcp_servers"]
+        transcript.append({"role": "companion", "text": turn["text"], "session": n})
         snapshots.append(vaultdiff.snapshot(ws))
     return {"transcript": transcript, "session_ids": ids, "error": error,
-            "snapshots": snapshots, "cost_usd": round(cost, 4),
-            "seconds": round(time.time() - started, 1)}
+            "snapshots": snapshots, "tokens": tokens, "seconds": round(time.time() - started, 1),
+            "skills_invoked": sorted(set(skills)), "mcp_servers": mcp,
+            "init_reported": not no_init}
 
 
 # --- LLM judge ----------------------------------------------------------------
@@ -168,22 +351,26 @@ def apply_judge(scored: dict, verdict: dict, pass_at) -> dict:
     return scored
 
 
-def judge(transcript: list, rubric: Path, model: str, timeout: int) -> dict:
+def judge(transcript: list, rubric: Path, model: str | None, timeout: int, env: dict) -> dict:
     """The part a regex can't decide, such as whether a reply takes a position. On
-    failure returns {"error": ...} so a broken judge shows up in the report."""
+    failure returns {"error": ...} so a broken judge shows up in the report.
+
+    The transcript arrives in the prompt, so the judge needs no tools: `judge_argv`
+    runs it read-only, and a judge that could edit the vault would grade its own work."""
     prompt = (f"{rubric.read_text()}\n\n---\n\nThe transcript under review:\n\n"
               f"{render_transcript(transcript)}\n\nReturn ONLY a JSON object.")
     try:
-        proc = subprocess.run(
-            ["claude", "-p", prompt, "--output-format", "json", "--model", model,
-             *ISOLATION, "--disallowedTools", "Bash", "Read", "Write", "Edit", "Glob", "Grep"],
-            capture_output=True, text=True, timeout=timeout, cwd=tempfile.gettempdir())
-        text = json.loads(proc.stdout).get("result", "")
+        proc = subprocess.run(judge_argv(prompt, model), capture_output=True, text=True,
+                              timeout=timeout, cwd=tempfile.gettempdir(), env=env)
+        turn = read_turn(proc.stdout)
+        if proc.returncode != 0 or turn["is_error"]:
+            return {"error": turn["error"] or "non-zero exit"}
+        text = turn["text"]
         m = re.search(r"\{.*\}", text, re.S)
         return json.loads(m.group(0)) if m else {"error": f"no JSON in reply: {text[:200]}"}
     except subprocess.TimeoutExpired:
         return {"error": f"timed out after {timeout}s"}
-    except json.JSONDecodeError:
+    except ValueError:
         return {"error": (proc.stderr or proc.stdout)[-200:] or "no output"}
 
 
@@ -208,13 +395,14 @@ def keep(outdir: Path, case: dict, session: dict, d: dict, scored: dict) -> None
     (out / "vault.diff").write_text(vaultdiff.render(d))
     (out / "grade.json").write_text(json.dumps(
         {**scored, "error": session["error"], "session_ids": session["session_ids"],
-         "cost_usd": session["cost_usd"], "seconds": session["seconds"]},
+         "tokens": session["tokens"], "seconds": session["seconds"],
+         "skills_invoked": session["skills_invoked"], "mcp_servers": session["mcp_servers"]},
         indent=2, ensure_ascii=False))
 
 
-def run_case(case: dict, skill: Path, args, tmp: Path, outdir: Path) -> dict:
+def run_case(case: dict, skill: Path, args, tmp: Path, outdir: Path, env: dict) -> dict:
     ws = build_vault(tmp, case, skill, args.name)
-    session = play(ws, case_sessions(case), args.model, args.timeout)
+    session = play(ws, case_sessions(case), args.model, args.timeout, env)
     snaps = session["snapshots"]
     d = vaultdiff.diff(snaps[0], snaps[-1])
     ev = graders.Evidence(transcript=session["transcript"], diff=d,
@@ -223,6 +411,14 @@ def run_case(case: dict, skill: Path, args, tmp: Path, outdir: Path) -> dict:
     if session["error"]:
         scored["passed"] = False
         scored["hard_fail"].insert(0, "session")
+    else:
+        # A session can satisfy every grader while having tested the prompt rather than
+        # the skill. Nothing in the transcript tells you, so the run says what it ran.
+        problem = check_run(args.name, session)
+        if problem:
+            session["error"] = problem
+            scored["passed"] = False
+            scored["hard_fail"].insert(0, "integrity")
     spec = judge_spec(case)
     if spec and not args.judge and spec[1] is not None:
         # Reported, not failed: --no-judge is a choice to leave posture ungraded.
@@ -230,10 +426,10 @@ def run_case(case: dict, skill: Path, args, tmp: Path, outdir: Path) -> dict:
     elif args.judge and spec and not session["error"]:
         rubric, pass_at = spec
         apply_judge(scored, judge(session["transcript"], rubric, args.judge_model,
-                                  args.timeout), pass_at)
+                                  args.timeout, env), pass_at)
     keep(outdir, case, session, d, scored)
     return {"case": case["id"], **scored, "error": session["error"],
-            "cost_usd": session["cost_usd"], "seconds": session["seconds"]}
+            "tokens": session["tokens"], "seconds": session["seconds"]}
 
 
 def report_line(row: dict) -> str:
@@ -242,7 +438,7 @@ def report_line(row: dict) -> str:
     judged = (f"  judge {j['score']}/5" if "score" in j else
               f"  judge error: {j['error'][:80]}" if "error" in j else "")
     line = (f"{verdict}  {row['case']:<28} score {row['score']:.2f}{judged}"
-            f"  ${row['cost_usd']:.2f}  {row['seconds']}s")
+            f"  {row['tokens']} tok  {row['seconds']}s")
     if row["error"]:
         line += f"\n      session: {row['error'][:200]}"
     for r in row["results"]:
@@ -292,9 +488,13 @@ def scored_skill(summary: dict) -> str:
 def promote(summary: dict, stable: Path, candidate: Path, case_ids: list,
             skill_name: str) -> str | None:
     """Copy the named skill's candidate over its stable, on the evidence of a saved
-    two-arm run of that skill. Returns why it refused, or None once stable has been
-    replaced."""
+    two-arm run of that skill made by the agent this harness drives. Returns why it
+    refused, or None once stable has been replaced."""
     arms = summary.get("arms") or {}
+    ran_by = summary.get("agent") or "unknown"
+    if ran_by != BINARY:
+        return (f"this run was made by {ran_by!r}, not {BINARY!r}; its evidence is about "
+                f"another agent — run both arms again")
     if scored_skill(summary) != skill_name:
         return f"this run scored {scored_skill(summary)!r}, not {skill_name!r}"
     if set(arms) != {"stable", "candidate"}:
@@ -409,8 +609,10 @@ def main() -> int:
     ap.add_argument("--promote", nargs="?", const="", metavar="RUN",
                     help="copy the candidate over stable on the evidence of a saved "
                          "two-arm run (default: the latest under results/), then exit")
-    ap.add_argument("--model", help="model for the session under test")
-    ap.add_argument("--judge-model", default="claude-sonnet-5-5")
+    ap.add_argument("--model", help="model for the session under test (default: the one "
+                                    "your qwen settings pick)")
+    ap.add_argument("--judge-model", help="model for the judge (default: the one your "
+                                          "qwen settings pick)")
     ap.add_argument("--no-judge", dest="judge", action="store_false", default=True)
     ap.add_argument("--timeout", type=int, default=600, help="seconds per turn")
     ap.add_argument("--output-dir", help="default: labs/evals/results/<timestamp>")
@@ -439,8 +641,12 @@ def main() -> int:
         if not (skill / "SKILL.md").exists():
             print(f"error: no SKILL.md for {name} in {skill}", file=sys.stderr)
             return 2
-    if not shutil.which("claude"):
-        print("error: `claude` not on PATH", file=sys.stderr)
+    if not shutil.which(BINARY):
+        print(f"error: `{BINARY}` not on PATH", file=sys.stderr)
+        return 2
+    if not login_found(real_home(), os.environ):
+        print(f"error: no {BINARY} login to seed a run with — sign in first, or set the "
+              f"API key your {BINARY} settings use", file=sys.stderr)
         return 2
 
     cases = [c for c in all_cases if args.case in c["id"]] if args.case else all_cases
@@ -457,16 +663,19 @@ def main() -> int:
               else RESULTS / datetime.now().strftime("%Y-%m-%d_%H%M%S"))
     outdir.mkdir(parents=True, exist_ok=True)
 
-    summary = {"skill": args.name, "arms": {}, "case_filter": args.case,
+    summary = {"skill": args.name, "agent": BINARY, "arms": {}, "case_filter": args.case,
                "judge": args.judge}
     with tempfile.TemporaryDirectory(prefix=f"{args.name}-evals-") as tmpdir:
+        # One isolated home for the run: it holds the login and the session history
+        # every resume reads back, and nothing of the developer's own.
+        env = agent_env(make_isolated_home(Path(tmpdir), real_home()))
         for name, skill in arms.items():
             where = skill.relative_to(REPO) if skill.is_relative_to(REPO) else skill
             print(f"\n{name}: {where}")
             # Hashed before the run, so an edit made while it runs reads as a change.
             entry = {"skill": str(skill), "hash": tree_hash(skill), "cases": []}
             for case in cases:
-                row = run_case(case, skill, args, Path(tmpdir) / name, outdir / name)
+                row = run_case(case, skill, args, Path(tmpdir) / name, outdir / name, env)
                 print(report_line(row), flush=True)
                 entry["cases"].append(row)
             summary["arms"][name] = entry
@@ -478,7 +687,7 @@ def main() -> int:
         print("\n" + comparison_table(compare(summary["arms"]["stable"]["cases"],
                                               summary["arms"]["candidate"]["cases"])))
     print(f"\n{len(rows) - failed}/{len(rows)} passed, "
-          f"${sum(r['cost_usd'] for r in rows):.2f}. results: {outdir}")
+          f"{sum(r['tokens'] for r in rows)} tokens. results: {outdir}")
     return 1 if failed else 0
 
 

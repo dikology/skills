@@ -1,5 +1,5 @@
 """Tests for the runner's judge settings: which rubric a case names, and when the
-judge's score decides the case. No API calls.
+judge's score decides the case, and for the qwen process adapter. No API calls.
 
     python3 -m unittest discover -s labs/evals -v
 """
@@ -9,10 +9,12 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -98,7 +100,7 @@ class SkillByName(unittest.TestCase):
         self.assertIn("orient-quotes-corpus", ids)
         self.assertEqual(len(ids), len(set(ids)))
 
-    def test_the_skill_is_installed_under_its_own_name(self):
+    def test_the_skill_is_installed_where_qwen_discovers_it(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             mutant = root / "improve-writes-before-approval"
@@ -106,9 +108,322 @@ class SkillByName(unittest.TestCase):
             (mutant / "SKILL.md").write_text("mutant\n")
             case = {"id": "x", "vault": "band-or-pottery", "overlay": None}
             ws = run_evals.build_vault(root / "ws", case, mutant, "improve")
-            installed = ws / ".claude" / "skills"
+            installed = ws / ".qwen" / "skills"
             self.assertEqual([p.name for p in installed.iterdir()], ["improve"])
             self.assertEqual((installed / "improve" / "SKILL.md").read_text(), "mutant\n")
+
+
+class IsolatedHome(unittest.TestCase):
+    """Every turn runs against its own QWEN_HOME: the vault's Overlay and installed
+    skill are read, the developer's own settings, hooks and servers are not."""
+
+    REAL = {"$version": 2, "env": {"QWENCLOUD_TOKEN_PLAN_API_KEY": "sk-1"},
+            "mcpServers": {"playwright": {"command": "npx"}},
+            "hooks": {"PreToolUse": [{"type": "command"}]}, "ui": {"theme": "dark"},
+            "security": {"auth": {"selectedType": "openai"}},
+            "model": {"name": "qwen3.8-flash", "baseUrl": "https://api.example/v1"},
+            "modelProviders": {"openai": [{"id": "qwen3.8-flash"}]},
+            "providerMetadata": {"qwencloud": {"version": "abc"}}}
+
+    def test_the_seed_carries_only_how_to_reach_a_model(self):
+        seed = run_evals.seed_settings(self.REAL)
+        self.assertEqual(sorted(seed), ["$version", "env", "model", "modelProviders",
+                                        "providerMetadata", "security"])
+        self.assertEqual(seed["model"]["name"], "qwen3.8-flash")
+
+    def test_a_turn_looks_at_that_home_and_not_the_developers_own(self):
+        env = run_evals.agent_env(Path("/tmp/eval-home"))
+        self.assertEqual(env["QWEN_HOME"], "/tmp/eval-home")
+        self.assertEqual(env["PATH"], os.environ["PATH"])
+
+    def test_the_run_writes_its_home_from_the_settings_it_is_given(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            real = Path(tmp) / "real"
+            real.mkdir()
+            (real / "settings.json").write_text(json.dumps(self.REAL))
+            home = run_evals.make_isolated_home(Path(tmp) / "run", real)
+            self.assertEqual(json.loads((home / "settings.json").read_text()),
+                             run_evals.seed_settings(self.REAL))
+
+    def test_a_login_kept_in_a_file_of_its_own_travels_with_the_seed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            real = Path(tmp) / "real"
+            real.mkdir()
+            (real / "settings.json").write_text(json.dumps(
+                {"security": {"auth": {"selectedType": "qwen-oauth"}}}))
+            (real / "oauth_creds.json").write_text('{"access_token": "t"}')
+            home = run_evals.make_isolated_home(Path(tmp) / "run", real)
+            self.assertEqual(json.loads((home / "settings.json").read_text()),
+                             {"security": {"auth": {"selectedType": "qwen-oauth"}}})
+            self.assertEqual((home / "oauth_creds.json").read_text(), '{"access_token": "t"}')
+
+    def test_a_home_with_no_settings_is_seeded_empty_rather_than_crashing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = run_evals.make_isolated_home(Path(tmp) / "run", Path(tmp) / "nothing")
+            self.assertEqual(json.loads((home / "settings.json").read_text()), {})
+
+    def test_a_login_is_found_before_any_case_costs_a_turn(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bare = Path(tmp)
+            self.assertFalse(run_evals.login_found(bare, {}))
+            (bare / "settings.json").write_text(json.dumps(
+                {"security": {"auth": {"selectedType": "openai"}}, "env": {"K": "v"}}))
+            self.assertTrue(run_evals.login_found(bare, {}))
+            keys = bare / "keys"
+            keys.mkdir()
+            (keys / "oauth_creds.json").write_text("{}")
+            self.assertTrue(run_evals.login_found(keys, {}))
+
+    def test_a_key_handed_over_by_the_environment_counts_as_a_login(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertTrue(run_evals.login_found(Path(tmp), {"OPENAI_API_KEY": "sk-1"}))
+
+
+class PlaySession(unittest.TestCase):
+    """The turn chain, against a recorded stand-in for qwen: turn 2 resumes the session
+    turn 1 reported, and a turn that quietly starts a stranger is caught, not graded."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.ws = Path(self._tmp.name)
+        (self.ws / "note.md").write_text("one\n")
+        self.argv = []
+
+    def event(self, text, sid, init=True, skills=("companion",)):
+        events = []
+        if init:
+            events.append({"type": "system", "subtype": "init", "session_id": sid,
+                           "mcp_servers": []})
+        events.append({"type": "result", "session_id": sid, "is_error": False, "result": text,
+                       "usage": {"input_tokens": 10, "output_tokens": 1},
+                       "stats": {"skills": {"byName": {k: {} for k in skills}}}})
+        return json.dumps(events)
+
+    def play(self, sessions, replies):
+        replies = iter(replies)
+
+        def fake_run(argv, **kwargs):
+            self.argv.append(argv)
+            return subprocess.CompletedProcess(argv, 0, next(replies), "")
+
+        with mock.patch.object(run_evals.subprocess, "run", side_effect=fake_run):
+            return run_evals.play(self.ws, sessions, None, 60, {})
+
+    def test_turn_two_resumes_the_session_turn_one_reported(self):
+        session = self.play([["what should I file?", "yes, write it"]],
+                            [self.event("I'd file this.", "s-1"),
+                             self.event("Written.", "s-1", skills=())])
+        self.assertIn("-r", self.argv[1])
+        self.assertEqual(self.argv[1][self.argv[1].index("-r") + 1], "s-1")
+        self.assertEqual(session["session_ids"], ["s-1"])
+        self.assertIsNone(session["error"])
+        self.assertEqual([t["role"] for t in session["transcript"]],
+                         ["human", "companion", "human", "companion"])
+
+    def test_a_turn_that_answered_as_a_stranger_is_an_error_not_a_memory(self):
+        session = self.play([["first", "second"]],
+                            [self.event("one", "s-1"), self.event("two", "s-2")])
+        self.assertIn("s-1", session["error"])
+        self.assertEqual([t["role"] for t in session["transcript"]],
+                         ["human", "companion", "human"])  # turn 2's reply was not trusted
+
+    def test_the_next_session_starts_fresh_instead_of_resuming_the_last_one(self):
+        self.play([["a session"], ["another"]],
+                  [self.event("one", "s-1"), self.event("two", "s-2")])
+        self.assertNotIn("-r", self.argv[1])
+        self.assertEqual(len(self.argv), 2)
+
+    def test_a_turn_that_reported_no_session_setup_cannot_claim_isolation(self):
+        session = self.play([["hello"]], [self.event("hi", "s-1", init=False)])
+        self.assertFalse(session["init_reported"])
+        self.assertIn("isolat", run_evals.check_run("companion", session))
+
+
+class RunIntegrity(unittest.TestCase):
+    """A case whose session ran the wrong thing passes quietly, which is the failure
+    this harness fears most: it is graded by what the run reports about itself."""
+
+    def session(self, **over) -> dict:
+        return {"skills_invoked": ["companion"], "mcp_servers": [], "error": None,
+                "init_reported": True, **over}
+
+    def test_a_session_that_invoked_the_skill_and_loaded_nothing_is_evidence(self):
+        self.assertIsNone(run_evals.check_run("companion", self.session()))
+
+    def test_a_session_where_the_skill_was_never_invoked_proves_nothing(self):
+        problem = run_evals.check_run("companion", self.session(skills_invoked=[]))
+        self.assertIsNotNone(problem)
+        self.assertIn("companion", problem)
+
+    def test_a_skill_installed_where_nothing_looks_for_it_is_the_usual_way_to_fail(self):
+        problem = run_evals.check_run("companion", self.session(skills_invoked=["pdf"]))
+        self.assertIn("never invoked", problem)
+
+    def test_a_session_that_loaded_an_mcp_server_is_not_the_isolated_vault(self):
+        problem = run_evals.check_run("companion",
+                                      self.session(mcp_servers=[{"name": "playwright"}]))
+        self.assertIn("MCP", problem)
+
+
+class SessionTurn(unittest.TestCase):
+    """The process adapter: one place holds the binary and every flag a turn needs."""
+
+    def test_a_turn_runs_qwen_with_the_prompt_positional(self):
+        argv = run_evals.session_argv("should I quit the band?")
+        self.assertEqual(argv[0], "qwen")
+        self.assertIn("should I quit the band?", argv)
+        self.assertNotIn("-p", argv)
+
+    def test_the_adapter_names_no_other_binary(self):
+        joined = " ".join(run_evals.session_argv("x")) + " " + " ".join(run_evals.judge_argv("x"))
+        self.assertNotIn("claude", joined)
+
+    def test_a_later_turn_resumes_the_session_it_was_handed(self):
+        self.assertNotIn("-r", run_evals.session_argv("x"))
+        argv = run_evals.session_argv("x", resume="9d21")
+        self.assertEqual(argv[argv.index("-r") + 1], "9d21")
+
+    def test_history_is_recorded_because_resume_reads_it_from_disk(self):
+        self.assertIn("--chat-recording", run_evals.session_argv("x"))
+
+    def test_a_turn_answers_without_asking_and_loads_no_mcp_server(self):
+        argv = run_evals.session_argv("x")
+        self.assertEqual(argv[argv.index("--approval-mode") + 1], "yolo")
+        self.assertEqual(json.loads(argv[argv.index("--mcp-config") + 1]), {"mcpServers": {}})
+
+    def test_a_named_model_reaches_qwen(self):
+        argv = run_evals.session_argv("x", model="glm-5.3")
+        self.assertEqual(argv[argv.index("-m") + 1], "glm-5.3")
+
+    def test_the_default_model_is_the_one_the_vault_settings_pick(self):
+        self.assertNotIn("-m", run_evals.session_argv("x"))
+
+    def test_no_flag_of_the_agent_this_harness_left_behind_survives(self):
+        """The runner drives one agent. Its `CLAUDE.md` stays a filename, not a CLI."""
+        source = Path(run_evals.__file__).read_text()
+        for gone in ("claude", "--permission-mode", "--strict-mcp-config",
+                     "--setting-sources", "--output-format", "--resume ",
+                     "total_cost_usd"):
+            self.assertNotIn(gone, source)
+
+
+class JudgeTurn(unittest.TestCase):
+    """The judge reads a transcript and scores it. Editing the vault it graded is not
+    on the table, and qwen has no --disallowedTools, so the lever is stated here."""
+
+    def test_the_judge_is_told_not_to_edit_and_cannot_even_if_it_wants(self):
+        argv = run_evals.judge_argv("rubric")
+        self.assertEqual(argv[argv.index("--approval-mode") + 1], "plan")
+        excluded = argv[argv.index("--exclude-tools") + 1].split(",")
+        for tool in ("write_file", "edit", "notebook_edit", "run_shell_command", "agent"):
+            self.assertIn(tool, excluded)
+
+    def test_the_judge_reads_the_transcript_in_its_prompt_and_nothing_else(self):
+        argv = run_evals.judge_argv("rubric")
+        excluded = argv[argv.index("--exclude-tools") + 1].split(",")
+        for tool in ("read_file", "glob", "grep_search"):
+            self.assertIn(tool, excluded)
+
+    def test_the_judge_is_headless_and_isolated_like_the_session(self):
+        argv = run_evals.judge_argv("rubric")
+        self.assertEqual(argv[0], "qwen")
+        self.assertEqual(argv[argv.index("-o") + 1], "json")
+        self.assertEqual(json.loads(argv[argv.index("--mcp-config") + 1]), {"mcpServers": {}})
+
+    def test_the_judge_model_can_be_named(self):
+        argv = run_evals.judge_argv("x", model="deepseek-v4-pro")
+        self.assertEqual(argv[argv.index("-m") + 1], "deepseek-v4-pro")
+
+
+class ReadTurn(unittest.TestCase):
+    """`qwen -o json` prints an array of events whose last one is the turn's result.
+    fixtures/qwen-turns.json is that shape as qwen 0.26.3 printed it on this machine,
+    with the vault text, paths and ids replaced by placeholders."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.turns = json.loads((run_evals.HERE / "fixtures" / "qwen-turns.json").read_text())
+
+    def read(self, name):
+        return run_evals.read_turn(json.dumps(self.turns[name]))
+
+    def test_the_reply_and_the_session_come_from_the_result_event(self):
+        turn = self.read("turn")
+        self.assertEqual(turn["text"],
+                         "Pottery. Go — the band can wait a week, open studio cannot.")
+        self.assertEqual(turn["session_id"], "9829dc82-6462-40ef-af75-3324f2399e86")
+        self.assertFalse(turn["is_error"])
+        self.assertEqual(turn["error"], "")
+
+    def test_a_turn_that_failed_says_why_instead_of_coming_back_empty(self):
+        turn = self.read("failed_turn")
+        self.assertTrue(turn["is_error"])
+        self.assertIn("Missing API key", turn["error"])
+        self.assertEqual(turn["text"], "")
+
+    def test_tokens_are_counted_because_qwen_reports_no_price(self):
+        self.assertEqual(self.read("turn")["tokens"], 59645)
+
+    def test_the_skills_a_turn_ran_are_named(self):
+        self.assertEqual(self.read("turn")["skills"], ["companion"])
+
+    def test_the_mcp_servers_a_turn_loaded_are_reported(self):
+        self.assertFalse(self.read("turn")["mcp_servers"])
+        self.assertTrue(self.read("second_turn")["mcp_servers"])
+
+    def test_a_run_with_no_init_event_reports_that_it_saw_no_setup(self):
+        """The failed turn in the fixture is a real auth failure: a result event and
+        nothing else. Emptiness must not read as "no MCP server was loaded"."""
+        self.assertFalse(self.read("failed_turn")["init_reported"])
+        self.assertTrue(self.read("turn")["init_reported"])
+
+    def test_a_resumed_turn_keeps_the_session_it_was_resumed_into(self):
+        self.assertEqual(self.read("turn")["session_id"],
+                         self.read("second_turn")["session_id"])
+
+    def test_output_that_is_not_an_event_array_is_not_silently_a_passing_turn(self):
+        with self.assertRaises(ValueError):
+            run_evals.read_turn("[]")
+        with self.assertRaises(ValueError):
+            run_evals.read_turn('{"result": "an object, not an array"}')
+
+
+class ReportLine(unittest.TestCase):
+    """What a case cost is reported in tokens: qwen's result event prices nothing, and
+    a run that prints $0.00 reads like it was free."""
+
+    def row(self, **over) -> dict:
+        return {"case": "orient-quotes-corpus", "passed": True, "score": 1.0, "results": [],
+                "error": None, "judge": {}, "tokens": 59645, "seconds": 17.4, **over}
+
+    def test_a_passing_line_counts_tokens_and_never_dollars(self):
+        line = run_evals.report_line(self.row())
+        self.assertIn("59645 tok", line)
+        self.assertNotIn("$", line)
+        self.assertIn("PASS", line)
+
+    def test_the_session_that_never_ran_still_shows_why(self):
+        line = run_evals.report_line(self.row(passed=False, tokens=0,
+                                              error="Missing API key",
+                                              results=[{"name": "no_writes", "passed": False,
+                                                        "note": "wrote 2 files"}]))
+        self.assertIn("Missing API key", line)
+        self.assertIn("no_writes", line)
+
+    def test_a_kept_grade_records_the_tokens_it_spent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            session = {"transcript": [{"role": "human", "text": "hi", "session": 0}],
+                       "session_ids": ["9d21"], "error": None, "tokens": 1234, "seconds": 3.0,
+                       "skills_invoked": ["companion"], "mcp_servers": []}
+            d = {"added": {}, "removed": [], "modified": {}}
+            run_evals.keep(out, {"id": "orient"}, session, d,
+                           {"passed": True, "score": 1.0, "hard_fail": [], "results": []})
+            grade = json.loads((out / "orient" / "grade.json").read_text())
+            self.assertEqual(grade["tokens"], 1234)
+            self.assertEqual(grade["session_ids"], ["9d21"])
+            self.assertNotIn("cost_usd", grade)
 
 
 def row(case: str, passed: bool, score: float) -> dict:
@@ -159,7 +474,8 @@ class Promote(unittest.TestCase):
                                  "cases": stable_rows},
                       "candidate": {"hash": run_evals.tree_hash(self.candidate),
                                     "cases": candidate_rows}},
-             "skill": "companion", "case_filter": None, "judge": True}
+             "skill": "companion", "agent": run_evals.BINARY, "case_filter": None,
+             "judge": True}
         s.update(over)
         return s
 
@@ -220,6 +536,16 @@ class Promote(unittest.TestCase):
 
     def test_refuses_a_run_of_another_skill(self):
         self.assertRefused(self.promote({**self.winning(), "skill": "improve"}), "improve")
+
+    def test_refuses_evidence_gathered_by_another_agent(self):
+        """A saved run from the claude days scores the same folders and hashes the
+        same files. It is no longer evidence about what a qwen run does."""
+        self.assertRefused(self.promote({**self.winning(), "agent": "claude"}), "claude")
+
+    def test_refuses_a_run_that_recorded_no_agent(self):
+        s = self.winning()
+        del s["agent"]
+        self.assertRefused(self.promote(s), "unknown")
 
     def test_a_run_saved_before_skill_names_counts_as_companion(self):
         s = self.winning()

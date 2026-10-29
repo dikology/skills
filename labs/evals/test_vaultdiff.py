@@ -40,17 +40,26 @@ class VaultDiff(unittest.TestCase):
         self.assertEqual(d["modified"], {"a.md": ["one\n", "one\nand a line\n"]})
         self.assertIn("+and a line", render(d))
 
-    def test_installed_skill_under_dot_claude_is_ignored(self):
+    def test_installed_skill_under_dot_qwen_is_ignored(self):
         before = snapshot(self.vault)
-        (self.vault / ".claude" / "skills").mkdir(parents=True)
-        (self.vault / ".claude" / "skills" / "SKILL.md").write_text("x")
+        (self.vault / ".qwen" / "skills").mkdir(parents=True)
+        (self.vault / ".qwen" / "skills" / "SKILL.md").write_text("x")
         self.assertEqual(diff(before, snapshot(self.vault))["added"], {})
 
-    def test_other_files_under_dot_claude_are_still_seen(self):
+    def test_other_files_under_dot_qwen_are_still_seen(self):
         before = snapshot(self.vault)
-        (self.vault / ".claude").mkdir()
-        (self.vault / ".claude" / "session.md").write_text("whole chat\n")
-        self.assertEqual(list(diff(before, snapshot(self.vault))["added"]), [".claude/session.md"])
+        (self.vault / ".qwen").mkdir()
+        (self.vault / ".qwen" / "session.md").write_text("whole chat\n")
+        self.assertEqual(list(diff(before, snapshot(self.vault))["added"]), [".qwen/session.md"])
+
+    def test_the_sessions_own_args_folder_is_not_something_it_wrote(self):
+        """qwen records each turn's own text under .qwen/tmp/ inside the vault, so a
+        session that wrote nothing at all still shows that file in the diff."""
+        before = snapshot(self.vault)
+        turned = self.vault / ".qwen" / "tmp" / "s-9d21"
+        turned.mkdir(parents=True)
+        (turned / "qwen-skill-args-companion.txt").write_text("should I quit the band?\n")
+        self.assertEqual(diff(before, snapshot(self.vault))["added"], {})
 
 
 if __name__ == "__main__":

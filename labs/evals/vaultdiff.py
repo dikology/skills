@@ -1,7 +1,10 @@
 """What a session changed in a vault: snapshot before, snapshot after, diff.
 
-`.claude/skills/` is where the harness installs the skill, not vault content,
-so it is left out of every snapshot. The rest of `.claude/` is still watched.
+Two folders the runtime makes inside the vault are not vault content and are left
+out of every snapshot: `.qwen/skills/`, where the harness installs the skill, and
+`.qwen/tmp/`, where qwen writes the human turn's own text — so a session that wrote
+nothing at all still shows a new file, and a grader watching writes would blame the
+session for it. The rest of `.qwen/` is still watched.
 """
 
 from __future__ import annotations
@@ -9,14 +12,14 @@ from __future__ import annotations
 import difflib
 from pathlib import Path
 
-SKILL_INSTALL = (".claude", "skills")
+RUNTIME_PATHS = ((".qwen", "skills"), (".qwen", "tmp"))
 
 
 def snapshot(vault: Path) -> dict:
-    """{relative posix path: text} for every file in the vault."""
+    """{relative posix path: text} for every file in the vault but the runtime's own."""
     return {p.relative_to(vault).as_posix(): p.read_text(errors="replace")
             for p in sorted(vault.rglob("*"))
-            if p.is_file() and p.relative_to(vault).parts[:2] != SKILL_INSTALL}
+            if p.is_file() and p.relative_to(vault).parts[:2] not in RUNTIME_PATHS}
 
 
 def diff(before: dict, after: dict) -> dict:

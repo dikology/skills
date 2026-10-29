@@ -21,7 +21,8 @@ command below without a name runs companion. The name decides three things:
 - **The cases**: `cases/<skill>.json`, the skill's own case set. A name with no
   case set is a setup error.
 - **The install path**: the skill is copied into each temp vault as
-  `.claude/skills/<skill>/`, so `/<skill>` invokes it. That holds for `--skill`
+  `.qwen/skills/<skill>/`, so `/<skill>` invokes it — the folder qwen looks for,
+  which is not the folder the plugin ships into. That holds for `--skill`
   too: a mutant folder is installed under the skill's name, not its own.
 
 A run saved before the harness took a name counts as a companion run.
@@ -31,7 +32,9 @@ so `--promote improve` would read `improve` as one.
 
 Fixture vaults, graders and judge rubrics are shared; a case names the ones it uses.
 
-Requires `claude` on PATH. Python 3.9+, standard library only.
+Requires `qwen` on PATH, and a qwen that can reach a model with its own settings —
+the run seeds an isolated `QWEN_HOME` from those settings and nothing else. Python
+3.9+, standard library only.
 
 ## The loop: edit the candidate, compare, promote
 
@@ -49,8 +52,9 @@ one you edit; nobody installs it. A cycle starts with the two byte-identical.
 3. **Promote.** `<skill> --promote` reads the newest saved run of both arms of that
    skill (or `--promote <results dir>`) and copies its candidate over its stable;
    no other skill is touched. It refuses, and
-   changes nothing, when that run scored another skill or one arm only, used `--case` or `--no-judge`, skipped a case in
-   `cases/<skill>.json`, or the candidate lost any case; or when either arm has been edited
+   changes nothing, when that run was made by another agent, scored another skill or one
+   arm only, used `--case` or `--no-judge`, skipped a case in `cases/<skill>.json`, or the
+   candidate lost any case; or when either arm has been edited
    since the run (each arm's files are hashed into `summary.json`). After a promote
    the two copies are identical again, so the next cycle starts clean.
 
@@ -64,17 +68,27 @@ For each case in `cases/<skill>.json`:
 
 1. Copy `fixtures/vaults/<vault>/` to a temp directory and append the case's
    Overlay to its `CLAUDE.md`.
-2. Install the skill under `.claude/skills/<skill>/`, unmodified, the way a
+2. Install the skill under `.qwen/skills/<skill>/`, unmodified, the way a
    Consuming vault installs it.
-3. Play each session's human turns in headless `claude -p`, resuming the session
-   for each turn after the first and starting fresh for the next session. User
-   settings, plugins and MCP servers stay out.
+3. Play each session's human turns in headless `qwen`, resuming the session
+   for each turn after the first and starting fresh for the next session. Every
+   turn runs against a `QWEN_HOME` the run made for itself, seeded with nothing
+   but how to reach a model: user settings, hooks, extensions, user skills and
+   MCP servers stay out, while the vault's own Overlay and installed skill are
+   read. Your own environment still reaches the turn, because that is one way the
+   login arrives. A turn that loaded an MCP server anyway, reported no session
+   setup, never invoked the skill, or answered as a different session than the one
+   it was told to resume, fails the case — a reply that merely looks like the
+   skill is not evidence.
 4. Snapshot the vault before the first turn and after every turn, then grade the
    **transcript**, the **vault diff** and, where order matters (first-run setup,
    one log line per session), the snapshots between turns.
 5. Print one `PASS`/`FAIL` line per case and keep, under `results/<timestamp>/<arm>/<case>/`:
-   `transcript.md`, `transcript.json`, `vault.diff`, `grade.json`. `summary.json`
-   holds the skill's name, every arm's rows and the hash of the skill folder it scored.
+   `transcript.md`, `transcript.json`, `vault.diff`, `grade.json`. `grade.json`
+   records the session ids, the tokens the case spent (qwen reports no price) and
+   the skills it invoked. `summary.json`
+   holds the skill's name, the agent that ran it, every arm's rows and the hash of
+   the skill folder it scored.
 
 With `--arm both` the steps run once per arm, stable first, and a comparison table
 follows. The runner exits 1 when any case fails in any arm.
@@ -86,9 +100,12 @@ the files in their vault. They never read the skill's prompt, and they never che
 wording or section order. A case passes when every hard grader it names passes.
 
 The LLM judge scores only what a regex can't decide, such as whether the reply
-takes a position. A case turns it on with `"judge": true`, which uses
-`judge-rubric.md` and only reports: the score is printed next to the verdict and
-never changes it. Or the case names a rubric and a pass mark,
+takes a position. It reads the transcript in its prompt and holds no tool that
+touches a disk or a shell: plan mode, plus the exclusions listed in `DENIED_TOOLS`,
+so it cannot edit the vault it is grading or go behind the transcript to look. A
+case turns it on with `"judge": true`, which uses `judge-rubric.md` and only
+reports: the score is printed next to the verdict and never changes it. Or the
+case names a rubric and a pass mark,
 `"judge": {"rubric": "soft-posture", "pass_at": 3}`, which reads
 `judge-soft-posture.md`. Then a lower score, or a judge that fails to answer, fails
 the case. Use a pass mark only where posture is the behaviour under test and no

@@ -1,0 +1,103 @@
+{
+  "turn": [
+    {
+      "type": "system",
+      "subtype": "init",
+      "uuid": "2923b65b-e8db-4c39-b347-f9dee8718970",
+      "session_id": "9829dc82-6462-40ef-af75-3324f2399e86",
+      "cwd": "/private/tmp/companion-evals-abc123/orient-quotes-corpus",
+      "model": "qwen3.8-flash",
+      "permission_mode": "yolo",
+      "qwen_code_version": "0.26.3",
+      "agents": [],
+      "tools": ["read_file", "write_file", "edit", "run_shell_command", "skill", "agent"],
+      "mcp_servers": [],
+      "slash_commands": ["companion", "clear", "compact"]
+    },
+    {
+      "type": "assistant",
+      "uuid": "6f0f9d2a-5a8f-4a5c-9f39-4a2e3f6f1a11",
+      "session_id": "9829dc82-6462-40ef-af75-3324f2399e86",
+      "message": {"role": "assistant", "content": [{"type": "text", "text": "Pottery. Go."}]}
+    },
+    {
+      "type": "result",
+      "subtype": "success",
+      "uuid": "1ca6593a-6556-421d-9ad5-efe0d68b5fa4",
+      "session_id": "9829dc82-6462-40ef-af75-3324f2399e86",
+      "is_error": false,
+      "duration_ms": 17410,
+      "duration_api_ms": 12571,
+      "num_turns": 3,
+      "result": "Pottery. Go — the band can wait a week, open studio cannot.",
+      "permission_denials": [],
+      "usage": {
+        "input_tokens": 59004,
+        "output_tokens": 641,
+        "cache_read_input_tokens": 34495,
+        "total_tokens": 59645
+      },
+      "stats": {
+        "models": {
+          "qwen3.8-flash": {
+            "tokens": {"prompt": 59004, "candidates": 641, "total": 59645, "cached": 34495}
+          }
+        },
+        "tools": {"totalCalls": 2, "totalSuccess": 2, "totalFail": 0},
+        "skills": {
+          "totalCalls": 2,
+          "totalSuccess": 2,
+          "totalFail": 0,
+          "byName": {"companion": {"count": 2, "success": 2, "fail": 0}}
+        }
+      }
+    }
+  ],
+  "failed_turn": [
+    {
+      "type": "result",
+      "subtype": "error_during_execution",
+      "uuid": "1ca6593a-6556-421d-9ad5-efe0d68b5fa4",
+      "session_id": "dbc6d292-68b4-4d25-b181-b8d72330c9ee",
+      "is_error": true,
+      "duration_ms": 0,
+      "duration_api_ms": 0,
+      "num_turns": 0,
+      "usage": {"input_tokens": 0, "output_tokens": 0},
+      "permission_denials": [],
+      "error": {
+        "message": "Missing API key for OpenAI-compatible auth. Set settings.security.auth.apiKey, or set the 'OPENAI_API_KEY' environment variable."
+      }
+    }
+  ],
+  "second_turn": [
+    {
+      "type": "system",
+      "subtype": "init",
+      "uuid": "8aa1c2c4-9d59-4bb3-bd2a-2f6fb8e37c52",
+      "session_id": "9829dc82-6462-40ef-af75-3324f2399e86",
+      "cwd": "/private/tmp/companion-evals-abc123/orient-quotes-corpus",
+      "model": "qwen3.8-flash",
+      "permission_mode": "yolo",
+      "qwen_code_version": "0.26.3",
+      "agents": [],
+      "tools": ["read_file", "write_file", "edit", "run_shell_command", "skill", "agent"],
+      "mcp_servers": [{"name": "playwright"}],
+      "slash_commands": ["companion", "clear", "compact"]
+    },
+    {
+      "type": "result",
+      "subtype": "success",
+      "uuid": "5c8c4f69-7ffd-4a02-a67f-a2d0a5a8b3a7",
+      "session_id": "9829dc82-6462-40ef-af75-3324f2399e86",
+      "is_error": false,
+      "duration_ms": 24097,
+      "duration_api_ms": 20086,
+      "num_turns": 1,
+      "result": "Yes, and the log line is filed.",
+      "permission_denials": [],
+      "usage": {"input_tokens": 83697, "output_tokens": 1763, "total_tokens": 85460},
+      "stats": {"skills": {"byName": {"companion": {"count": 1, "success": 1, "fail": 0}}}}
+    }
+  ]
+}

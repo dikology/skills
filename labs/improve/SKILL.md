@@ -54,9 +54,11 @@ FALLBACKS:  No `## Improve` Overlay found.
             skip list: none, treating folded AI capture callouts as not yours
 ```
 
-That is the only time they are named. Don't list them again after the approval,
-and don't stop to ask for an Overlay: the fallbacks are enough to go on. Never
-write an Overlay.
+That is the only time they are named. Say each in these words: the half after the colon
+is the decision it commits to, and `maturity: none, so no promotion moves` shrunk to
+`maturity: not set` leaves the human guessing what you will actually do. Don't list them
+again after the approval, and don't stop to ask for an Overlay: the fallbacks are enough
+to go on. Never write an Overlay.
 
 ## 2. Pick one note
 
@@ -87,7 +89,15 @@ Reply in the language the human writes in. Quotes from the note stay verbatim in
 their source language. Use this shape; drop a line or section whose Overlay field
 is missing instead of filling it with a guess: no index, no INDEX line; no
 maturity, TYPE alone, no MATURITY section and no promotion move, not even a
-`NOT YET` one.
+`NOT YET` one. The example below assumes every field is configured; with one
+missing, its line or section is simply absent. Never print a section to announce
+that its field is missing — the FALLBACKS header already said so once, and a
+`MATURITY: no ladder configured` section still judges the note by a ladder it
+does not have.
+
+With no maturity field, the note's own frontmatter is not a ladder: don't read its
+level, echo it, or reconstruct one from sibling notes that carry levels. `TYPE/MAT:`
+then shows the type alone.
 
 ```
 PAGE:       garden/compost.md
@@ -168,11 +178,20 @@ for approval of that list. Write nothing in the turn that shows it.
 
 Apply them in this turn, without asking again. Touch only the files an approved
 move names: the note, a stub or split note it names, a note it links back from,
-the index for an approved promotion, and the log.
+the index for an approved promotion when the Overlay configures an index, and the
+log when it configures a log. A file in the vault that merely *looks* like an index
+or a log — one you found while reading, that no Overlay field names — is not yours
+to write in, whatever it is called or contains.
 
 - **Structure edits keep the human's prose verbatim.** Add headings, a Definition
   or a section around the existing lines; move whole lines or paragraphs. Never
   reword, shorten, merge, split into bullets or "tidy" a line the human wrote.
+  The unit you move is the whole line: lifting sentences out of the middle of one
+  splits it, and a split line is a rewritten line even when every word survives and
+  the heading above it is new. When a heading wants only part of a line, put the
+  heading over the whole line and leave the line as one line. Say in the move itself
+  what will happen to a long line: "add a heading above it", never "move its
+  experiments", which is a split wearing the word "verbatim".
   Wrapping an existing word in `[[…]]` is allowed; changing the word is not.
   Rewrite prose only when the human asks for it in so many words ("rewrite the
   feeding paragraph").
@@ -200,7 +219,10 @@ from the note you didn't change.
 ## 7. Log
 
 With a log configured, append one line per note per session, in the log's
-existing format, op `improve`, listing the moves applied. A promotion and a split
+existing format, op `improve`, naming every applied move inside that one line. Not
+one line per move and not one per approval: three moves applied is a single line
+that lists three moves, and a note already logged this session gets that line
+rewritten rather than a second one. A promotion and a split
 each get their own line, op `promote` and op `split`. If the Overlay names other
 ops for these, use those. Lines already in the log stay as they are; a later
 approval in the same session updates this session's line instead of adding
@@ -211,6 +233,9 @@ With "none", log nothing.
 
 - **The diagnosis never writes.** Not a section, not a stub, not a log line.
 - **Only approved moves apply.** Unnamed means declined.
+- **A missing Overlay field is dropped, not guessed.** No level read off the note's own
+  frontmatter, no section standing in to say the field is missing, no file written that
+  was never configured. Each fallback is named once, in the words it is stated in.
 - **Keep the human's prose verbatim.** Structure edits move and frame existing
   lines; they never reword them. Rewrite prose only when the human asks for it.
 - **Skip-listed text is never the human's voice.** Never reword it or treat it as

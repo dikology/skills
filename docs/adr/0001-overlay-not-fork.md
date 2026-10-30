@@ -16,10 +16,13 @@ owner only runs the private one, and the public one rots without anyone noticing
 
 ## Decision
 
-**One generic skill, plus a per-vault Overlay.**
+**One generic skill, plus a per-skill Overlay.**
 
 - The skill in this Library assumes an Obsidian vault and nothing else about it.
-- Each Consuming vault declares its specifics in a `## Companion` section of its
+- An Overlay is a section named after one skill (`## Companion`, `## Improve`), not one
+  section per vault: a vault that installs two skills has two Overlays, and one may
+  point at another in prose ("index, log, skip list: as in `## Companion`").
+- Each Consuming vault declares companion's specifics in a `## Companion` section of its
   `CLAUDE.md` or `AGENTS.md`: index, log, filing target, skip list, soft topics, and
   an optional `lang` pin. The agent reads it as prose.
 - Every field has a fallback the skill names out loud when it applies, so a vault

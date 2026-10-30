@@ -49,6 +49,7 @@ import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).parent))
 import graders  # noqa: E402
@@ -60,6 +61,11 @@ DEFAULT_SKILL = "companion"
 VAULTS = HERE / "fixtures" / "vaults"
 CASES = HERE / "cases"
 RESULTS = HERE / "results"
+
+# What the adapter records when the child produced neither stdout nor stderr: the turn
+# never reached a model, so nothing about the skill was tested. `transport_flake` keys on
+# this string, so it lives here once rather than at each exit path.
+NO_OUTPUT = "no output"
 
 # --- the process adapter -------------------------------------------------------
 # One place holds the agent binary and every flag this harness passes it. Moving the
@@ -128,14 +134,20 @@ def agent_env(home: Path) -> dict:
 # run against, because the case is testing a bare Consuming vault.
 SEED_KEYS = ("$version", "env", "security", "model", "modelProviders", "providerMetadata")
 
+# Auto-memory is on by default in a qwen home. Left on, a turn spends itself writing
+# memories about the case instead of running it, and one case remembers its way into the
+# next — so a run's home always turns it off, whatever the developer keeps set.
+MEMORY_OFF = {"memory": {"enableManagedAutoMemory": False, "enableManagedAutoDream": False}}
+
 # A login sometimes sits beside settings.json instead of inside it. These are qwen's own
 # credential files; an isolated home without them can reach no model at all.
 CREDENTIAL_FILES = ("oauth_creds.json", "credentials.json")
 
 
 def seed_settings(real: dict) -> dict:
-    """The settings.json a run's home is written with: how to reach a model, nothing else."""
-    return {k: real[k] for k in SEED_KEYS if k in real}
+    """The settings.json a run's home is written with: how to reach a model, no memory,
+    nothing else."""
+    return {k: real[k] for k in SEED_KEYS if k in real} | MEMORY_OFF
 
 
 def real_home() -> Path:
@@ -151,7 +163,7 @@ def make_isolated_home(root: Path, from_home: Path) -> Path:
     home = root / "agent-home"
     home.mkdir(parents=True, exist_ok=True)
     settings = from_home / "settings.json"
-    seed = seed_settings(json.loads(settings.read_text())) if settings.exists() else {}
+    seed = seed_settings(json.loads(settings.read_text())) if settings.exists() else seed_settings({})
     (home / "settings.json").write_text(json.dumps(seed))
     for name in CREDENTIAL_FILES:
         if (from_home / name).exists():
@@ -303,7 +315,7 @@ def play(ws: Path, sessions: list, model: str | None, timeout: int, env: dict) -
         try:
             turn = read_turn(proc.stdout)
         except ValueError:
-            error = (proc.stderr or proc.stdout)[-2000:] or "no output"
+            error = (proc.stderr or proc.stdout)[-2000:] or NO_OUTPUT
             break
         if proc.returncode != 0 or turn["is_error"]:
             error = turn["error"] or (proc.stderr or "")[-2000:] or "non-zero exit"
@@ -371,7 +383,7 @@ def judge(transcript: list, rubric: Path, model: str | None, timeout: int, env: 
     except subprocess.TimeoutExpired:
         return {"error": f"timed out after {timeout}s"}
     except ValueError:
-        return {"error": (proc.stderr or proc.stdout)[-200:] or "no output"}
+        return {"error": (proc.stderr or proc.stdout)[-200:] or NO_OUTPUT}
 
 
 # --- results ------------------------------------------------------------------
@@ -430,6 +442,32 @@ def run_case(case: dict, skill: Path, args, tmp: Path, outdir: Path, env: dict) 
     keep(outdir, case, session, d, scored)
     return {"case": case["id"], **scored, "error": session["error"],
             "tokens": session["tokens"], "seconds": session["seconds"]}
+
+
+def transport_flake(row: dict) -> bool:
+    """Whether this case never reached the model at all: qwen printed nothing, spent no
+    tokens, and so graded no skill. Observed when several runs share one quota. A turn
+    that timed out, exited non-zero, or ran and misbehaved is not this — the second is
+    the case's own verdict and must not be retried away."""
+    return row.get("error") == NO_OUTPUT and not row.get("tokens")
+
+
+def case_workspace(root: Path, arm: str, attempt: int) -> Path:
+    """One workspace per attempt. The first attempt leaves its copy of the fixture vault
+    in `root/<arm>`; a retry that wrote into the same folder would collide, or merge into
+    a vault the session had already read."""
+    return root / arm if attempt == 1 else root / arm / f"try{attempt}"
+
+
+def run_with_retry(run_at_attempt: Callable[[int], dict]) -> dict:
+    """Run one case, and again if the first attempt reached no model. The retry is
+    recorded, so a saved run says which verdicts came from a second attempt; the flaked
+    attempt leaves only a human turn behind, so nothing of its evidence is kept."""
+    row = run_at_attempt(1)
+    if not transport_flake(row):
+        return dict(row, attempts=1)
+    row = dict(run_at_attempt(2), attempts=2, discarded_error=row["error"])
+    return row
 
 
 def report_line(row: dict) -> str:
@@ -675,7 +713,15 @@ def main() -> int:
             # Hashed before the run, so an edit made while it runs reads as a change.
             entry = {"skill": str(skill), "hash": tree_hash(skill), "cases": []}
             for case in cases:
-                row = run_case(case, skill, args, Path(tmpdir) / name, outdir / name, env)
+                def attempt(n, case=case):
+                    return run_case(case, skill, args,
+                                    case_workspace(Path(tmpdir), name, n),
+                                    outdir / name, env)
+
+                row = run_with_retry(attempt)
+                if row["attempts"] > 1:
+                    print(f"retry  {case['id']:<28} the first attempt reached no model "
+                          f"({row['discarded_error']})", flush=True)
                 print(report_line(row), flush=True)
                 entry["cases"].append(row)
             summary["arms"][name] = entry

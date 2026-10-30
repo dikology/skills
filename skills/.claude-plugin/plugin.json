@@ -1,13 +1,13 @@
 {
   "name": "dikology",
-  "version": "0.1.1",
-  "description": "Companion: a challenger-style thinking partner over your Obsidian vault. Takes positions, quotes your own notes back at you, closes every session with a next-move menu.",
+  "version": "0.2.0",
+  "description": "Two skills for thinking in an Obsidian vault. Companion: a challenger-style thinking partner that takes positions, quotes your own notes back at you, and closes every session with a next-move menu. Improve: a structural review of one note that ends in numbered proposed moves and applies only the ones you approve.",
   "author": {
     "name": "dikology",
     "url": "https://github.com/dikology"
   },
   "repository": "https://github.com/dikology/skills",
   "license": "MIT",
-  "keywords": ["obsidian", "thinking-partner", "challenger", "notes"],
-  "skills": ["./companion"]
+  "keywords": ["obsidian", "thinking-partner", "challenger", "notes", "note-review"],
+  "skills": ["./companion", "./improve"]
 }

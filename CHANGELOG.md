@@ -4,6 +4,72 @@ All notable changes to this Library. Versions follow [semver](https://semver.org
 the Library stays on 0.x until companion has run about ten real sessions with no
 workaround and its evals pass.
 
+## [0.2.0] — in preparation, not tagged
+
+The release gate has not passed: companion's case set does not pass under qwen (#22,
+#23), so no `v0.2.0` tag exists yet and the pin examples in the READMEs stay on
+`v0.1.1`.
+
+### Added
+
+- `improve` skill: a structural review of one note. It reads the note and the notes
+  that link to it — by name or by alias — and replies with a diagnosis (STRUCTURE,
+  CONTENT GAPS, SPLIT/MERGE, MATURITY, numbered ranked PROPOSED MOVES with `NOT YET`
+  reasons, QUESTIONS) that changes no file. Only the moves approved by number are
+  applied, the human's prose stays verbatim, skip-listed text is never touched, new
+  stubs are capped at three per run, and promotion happens only when approved. The log
+  takes one `improve` line per note per session, plus separate `promote` and `split`
+  lines. Six `## Improve` Overlay fields, each with a fallback the skill names once:
+  index, log, schema, maturity, verification marker, skip list. A field may point at
+  another section ("as in `## Companion`"); a folder request gets a candidate list and
+  "which one first?".
+- `labs/improve/` — the Candidate copy, byte-identical to stable from the first
+  release, so the edit → compare → promote loop works for improve too.
+- Evals for improve: the `the-starter` Fixture vault, five cases
+  (`diagnosis-writes-nothing`, `only-approved-moves-apply`, `no-overlay`,
+  `overlay-points-at-companion`, `folder-lists-candidates`), graders `numbered_moves`,
+  `only_approved_moves_applied`, `prose_verbatim`, `one_improve_log_line`,
+  `fallbacks_named`, `no_maturity_ladder`, `candidates_listed`, and the mutants
+  `improve-writes-before-approval` and `improve-rewrites-prose`.
+- The `dikology` plugin ships both skills, so one install gives companion and improve.
+  The plugin and marketplace descriptions are no longer companion-only.
+- READMEs (EN and 中文): an improve row, its Overlay fields with their fallbacks, and
+  an Overlay example showing both sections.
+
+### Changed
+
+- The eval harness takes a skill name — `run_evals.py <skill>` — which resolves that
+  skill's arms (`skills/<skill>/`, `labs/<skill>/`), its case set
+  (`cases/<skill>.json`) and its promotion. Companion's 20 cases moved unchanged from
+  `cases.json` into `cases/companion.json`.
+- The harness drives `qwen`, not `claude`. The skill installs where qwen actually
+  discovers it (`.qwen/skills/`), a run that never invoked the skill or that loaded an
+  MCP server fails instead of reading green, every turn runs against a `QWEN_HOME` the
+  run made for itself, and a case reports the tokens it spent because qwen prices
+  nothing.
+- ADR-0001 amended: an Overlay is a section named after one skill
+  (`## Companion`, `## Improve`), not one section per vault.
+- Evals: a run's own `QWEN_HOME` now switches auto-memory off, whatever the developer
+  keeps set. Auto-memory is on by default, and a turn that stops to write memories
+  spends itself on the harness instead of the vault — and one case remembers its way
+  into the next. The path with no `settings.json` to seed from (a credentials-file
+  login) is seeded the same way; it used to inherit the default.
+- Evals: a case whose attempt reached no model at all (qwen printed nothing, 0 tokens) is
+  replayed once and recorded as `attempts: 2`, because that attempt graded the pipe and
+  not the skill. A turn that timed out, exited non-zero, or ran and misbehaved is never
+  retried.
+- improve: three rules were strengthened after the first qwen gate run broke each of
+  them — a missing `maturity` field is dropped rather than read off the note's own
+  frontmatter, a structure edit moves a whole line and never a sentence carved out of
+  one, and one note gets one `improve` log line per session however many moves were
+  applied. Each was promoted on a two-arm run where the candidate lost no case.
+- `labs/companion/` holds an **unscored Candidate edit**: a rule on what quotation marks
+  promise (a note's exact words, never the model's own phrasing). It ships in no release
+  until #23 runs the two arms and promotes it.
+
+The Library stays 0.x: the 1.0 gate is still about ten real-vault sessions that need no
+workaround, with the evals passing.
+
 ## [0.1.1] — 2026-10-28
 
 ### Changed

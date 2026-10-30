@@ -9,9 +9,9 @@
   "plugins": [
     {
       "name": "dikology",
-      "description": "Companion: a challenger-style thinking partner over your Obsidian vault.",
+      "description": "Companion and Improve: a challenger-style thinking partner and a structural review of one note, over your Obsidian vault.",
       "source": "./skills",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "category": "productivity"
     }
   ]

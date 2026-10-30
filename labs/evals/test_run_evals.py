@@ -127,9 +127,23 @@ class IsolatedHome(unittest.TestCase):
 
     def test_the_seed_carries_only_how_to_reach_a_model(self):
         seed = run_evals.seed_settings(self.REAL)
-        self.assertEqual(sorted(seed), ["$version", "env", "model", "modelProviders",
-                                        "providerMetadata", "security"])
+        self.assertEqual(sorted(seed), ["$version", "env", "memory", "model",
+                                        "modelProviders", "providerMetadata", "security"])
         self.assertEqual(seed["model"]["name"], "qwen3.8-flash")
+
+    def test_the_seed_turns_memory_off_for_the_run(self):
+        """A case is graded on the vault in front of it. A session that stops to write
+        memories spends its turn on the harness, and carries one case into the next."""
+        seed = run_evals.seed_settings(self.REAL)
+        self.assertFalse(seed["memory"]["enableManagedAutoMemory"])
+        self.assertFalse(seed["memory"]["enableManagedAutoDream"])
+
+    def test_memory_stays_off_even_when_the_developer_keeps_it_on(self):
+        real = dict(self.REAL, memory={"enableManagedAutoMemory": True,
+                                       "enableStructuredRecall": True})
+        seed = run_evals.seed_settings(real)
+        self.assertFalse(seed["memory"]["enableManagedAutoMemory"])
+        self.assertNotIn("enableStructuredRecall", seed["memory"])
 
     def test_a_turn_looks_at_that_home_and_not_the_developers_own(self):
         env = run_evals.agent_env(Path("/tmp/eval-home"))
@@ -154,13 +168,17 @@ class IsolatedHome(unittest.TestCase):
             (real / "oauth_creds.json").write_text('{"access_token": "t"}')
             home = run_evals.make_isolated_home(Path(tmp) / "run", real)
             self.assertEqual(json.loads((home / "settings.json").read_text()),
-                             {"security": {"auth": {"selectedType": "qwen-oauth"}}})
+                             {"security": {"auth": {"selectedType": "qwen-oauth"}},
+                              "memory": {"enableManagedAutoMemory": False,
+                                         "enableManagedAutoDream": False}})
             self.assertEqual((home / "oauth_creds.json").read_text(), '{"access_token": "t"}')
 
     def test_a_home_with_no_settings_is_seeded_empty_rather_than_crashing(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = run_evals.make_isolated_home(Path(tmp) / "run", Path(tmp) / "nothing")
-            self.assertEqual(json.loads((home / "settings.json").read_text()), {})
+            self.assertEqual(json.loads((home / "settings.json").read_text()),
+                             {"memory": {"enableManagedAutoMemory": False,
+                                         "enableManagedAutoDream": False}})
 
     def test_a_login_is_found_before_any_case_costs_a_turn(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -428,6 +446,70 @@ class ReportLine(unittest.TestCase):
 
 def row(case: str, passed: bool, score: float) -> dict:
     return {"case": case, "passed": passed, "score": score}
+
+
+class EmptyTurnRetry(unittest.TestCase):
+    """A turn that reached no model, graded as a skill FAIL, is a verdict on the pipe.
+    The run retries that one case once, and says that it did."""
+
+    def test_an_empty_turn_that_spent_nothing_is_a_flake(self):
+        self.assertTrue(run_evals.transport_flake({"error": "no output", "tokens": 0}))
+
+    def test_a_session_that_ran_is_never_a_flake(self):
+        # 295k tokens and a session id: the session happened and misbehaved, which is
+        # the case's own verdict, not the pipe's.
+        self.assertFalse(run_evals.transport_flake({"error": "no output", "tokens": 295883}))
+
+    def test_only_an_empty_turn_qualifies(self):
+        for err in (None, "turn 1 timed out after 600s", "non-zero exit",
+                    "qwen answered as a different session"):
+            self.assertFalse(run_evals.transport_flake({"error": err, "tokens": 0}), err)
+
+    def test_the_flaked_case_runs_again_and_says_so(self):
+        tries = []
+        flaked = {"case": "no-overlay", "passed": False, "error": "no output", "tokens": 0}
+        good = {"case": "no-overlay", "passed": True, "error": None, "tokens": 389355}
+
+        def fake_run(n):
+            tries.append(n)
+            return flaked if n == 1 else good
+
+        out = run_evals.run_with_retry(fake_run)
+        self.assertEqual(tries, [1, 2])
+        self.assertTrue(out["passed"])
+        self.assertEqual(out["attempts"], 2)
+        self.assertEqual(out["discarded_error"], "no output")
+
+    def test_a_clean_case_is_not_run_twice(self):
+        tries = []
+
+        def fake_run(n):
+            tries.append(n)
+            return {"case": "x", "passed": True, "error": None, "tokens": 10}
+
+        out = run_evals.run_with_retry(fake_run)
+        self.assertEqual(tries, [1])
+        self.assertEqual(out["attempts"], 1)
+        self.assertNotIn("discarded_error", out)
+
+    def test_a_second_empty_turn_still_fails_after_two_attempts(self):
+        def fake_run(n):
+            return {"case": "x", "passed": False, "error": "no output", "tokens": 0}
+
+        out = run_evals.run_with_retry(fake_run)
+        self.assertEqual(out["attempts"], 2)
+        self.assertFalse(out["passed"])
+
+    def test_a_retry_gets_a_workspace_of_its_own(self):
+        """The first attempt leaves its copy of the fixture vault where build_vault put
+        it; a retry into the same folder would either collide or merge into a vault that
+        was already read."""
+        root = Path("/tmp/evals")
+        first = run_evals.case_workspace(root, "stable", 1)
+        second = run_evals.case_workspace(root, "stable", 2)
+        self.assertEqual(first, root / "stable")
+        self.assertEqual(second, root / "stable" / "try2")
+        self.assertNotEqual(first, second)
 
 
 class CompareArms(unittest.TestCase):

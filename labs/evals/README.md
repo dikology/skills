@@ -74,7 +74,10 @@ For each case in `cases/<skill>.json`:
    for each turn after the first and starting fresh for the next session. Every
    turn runs against a `QWEN_HOME` the run made for itself, seeded with nothing
    but how to reach a model: user settings, hooks, extensions, user skills and
-   MCP servers stay out, while the vault's own Overlay and installed skill are
+   MCP servers stay out, and auto-memory is switched off in that home whatever the
+   developer keeps set — a turn that stops to write memories spends itself on the
+   harness instead of the vault, and one case would remember its way into the next.
+   The vault's own Overlay and installed skill are still
    read. Your own environment still reaches the turn, because that is one way the
    login arrives. A turn that loaded an MCP server anyway, reported no session
    setup, never invoked the skill, or answered as a different session than the one
@@ -89,6 +92,12 @@ For each case in `cases/<skill>.json`:
    the skills it invoked. `summary.json`
    holds the skill's name, the agent that ran it, every arm's rows and the hash of
    the skill folder it scored.
+
+A case whose attempt reached no model at all — qwen printed nothing and the case spent 0
+tokens — is played once more, and its row says `attempts: 2` beside the error it
+discarded. That attempt graded the pipe rather than the skill and left no evidence but
+the human turn, so nothing is lost by replacing it. A turn that timed out, exited
+non-zero, or ran and misbehaved is never retried: that verdict belongs to the case.
 
 With `--arm both` the steps run once per arm, stable first, and a comparison table
 follows. The runner exits 1 when any case fails in any arm.

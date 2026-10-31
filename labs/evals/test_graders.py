@@ -76,7 +76,7 @@ class OrientQuotesCorpus(unittest.TestCase):
         reply = '- [[the band]] — "The wheel is the only place my hands stop asking what time it is."'
         self.assertFalse(grade(["orient_quotes_corpus"], evidence(reply))["passed"])
 
-    def test_quote_is_credited_to_the_nearest_link(self):
+    def test_a_quote_offered_by_two_notes_passes_on_the_one_that_holds_it(self):
         reply = ('- [[pottery]] and [[the band]] — '
                  '"I joined the band to have a reason to leave the house on Thursdays."')
         out = grade(["orient_quotes_corpus", "quotes_verbatim"], evidence(reply))
@@ -119,7 +119,7 @@ class QuotesVerbatim(unittest.TestCase):
         out = grade(["quotes_verbatim"], evidence(reply))
         self.assertTrue(out["passed"], out)
 
-    def test_a_dated_entry_proposed_for_a_note_is_not_a_quote(self):
+    def test_a_proposed_entry_quoting_the_human_s_words_is_not_a_corpus_quote(self):
         for entry in ('```\n- **2026-10-22** — reversed, see [[the band]]: "the drive home was mine"\n```',
                       '2026-10-22 — on the band, see [[pottery]]: "the drive home was mine"'):
             ev = evidence(GOOD_ORIENT + "\n\nShall I add:\n" + entry)
@@ -156,6 +156,86 @@ class QuotesVerbatim(unittest.TestCase):
     def test_quoting_the_human_in_chat_is_not_checked_against_notes(self):
         ev = evidence('You said "I hate Thursdays" a minute ago. Which is it?')
         self.assertTrue(grade(["quotes_verbatim"], ev)["passed"])
+
+    def test_the_human_s_own_words_are_not_a_corpus_quote_beside_a_link(self):
+        # gate_companion_v3 contradiction-typed/candidate: the reply hands the human's
+        # turn back to them, and a [[link]] later in the sentence was its credited note.
+        reply = ('You just named something a note doesn\'t: "Working alone at the kitchen '
+                 'table has made me slower, and I miss having people to think out loud '
+                 'with." Nothing in this vault mentions another person — [[working from '
+                 'home]] is "with nobody walking past," which you wrote as a benefit.')
+        out = grade(["quotes_verbatim"], kitchen_ev(reply))
+        self.assertTrue(out["passed"], out)
+
+    def test_the_human_s_own_words_in_a_proposed_entry_are_not_a_corpus_quote(self):
+        reply = ('Say the word and I\'ll append under the original:\n'
+                 '> 2026-10-30 — reversed. "I want the office now." See [[the hybrid offer]].')
+        self.assertTrue(grade(["quotes_verbatim"], kitchen_ev(reply))["passed"])
+
+    def test_a_quote_passes_when_any_note_the_line_offers_holds_it(self):
+        reply = ('- [[working from home]] and [[the hybrid offer]] — '
+                 '"I\'m never going back to a desk I have to commute to."')
+        out = grade(["quotes_verbatim"], kitchen_ev(reply))
+        self.assertTrue(out["passed"], out)
+
+    def test_a_note_offered_on_the_wrapped_part_of_a_line_still_counts(self):
+        # gate_companion_v3 contradiction-typed/candidate: the paragraph names the old
+        # note, quotes it a line later and names the offer after the quote, so the
+        # nearest link was the offer — which holds none of it. A wrap is where the
+        # reply ran out of width, not where it started a new claim.
+        reply = ("This isn't a preference weighing, it's a contradiction. "
+                 "[[working from home]], written\n2024-11-03, says \"I'm never going back "
+                 "to a desk I have to commute to.\" [[the hybrid offer]]\nis a desk you "
+                 "commute to three days a week, and you're asking me whether to take it.")
+        out = grade(["quotes_verbatim"], kitchen_ev(reply))
+        self.assertTrue(out["passed"], out)
+
+    def test_a_wrapped_line_still_divides_its_sentences(self):
+        # Joining the wrap puts [[working from home]] on the same line as the fragment —
+        # but in the sentence before it, and only [[the hybrid offer]] is offered for the
+        # fragment, which holds none of it. Without the divider this claim would pass on
+        # the earlier sentence's note.
+        reply = ('[[working from home]] says the commute is two hours. "I do my best work '
+                 'at the kitchen table,\nwith nobody walking past." [[the hybrid offer]] is '
+                 'the desk three days a week.')
+        out = grade(["quotes_verbatim"], kitchen_ev(reply))
+        self.assertFalse(out["passed"])
+        note = result(out, "quotes_verbatim")["note"]
+        self.assertIn("[[the hybrid offer]]", note)
+        self.assertNotIn("working from home", note)
+
+    def test_a_truncated_suffix_fails_when_no_offered_note_holds_it(self):
+        # gate_companion_v3 stable/reversal-annotated: the reply elides a note's line to
+        # its tail and quotes the tail where only [[mornings]] is offered. That the
+        # vault holds the words somewhere is not the claim the line makes, and the
+        # quote [[mornings]] does hold is not in the failure.
+        reply = ('What the reversal kills: it buries "never going back." It does **not** '
+                 'touch [[mornings]] — "I\'m sharpest before ten."')
+        out = grade(["quotes_verbatim"], kitchen_ev(reply))
+        self.assertFalse(out["passed"])
+        note = result(out, "quotes_verbatim")["note"]
+        self.assertIn("never going back", note)
+        self.assertIn("[[mornings]]", note)
+        self.assertNotIn("sharpest before ten", note)
+
+    def test_a_chinese_translation_of_an_english_note_fails_every_note_offered(self):
+        reply = '- [[the band]] 或 [[pottery]] — “我加入乐队是为了周四能有理由出门。”'
+        out = grade(["quotes_verbatim"], evidence(reply))
+        self.assertFalse(out["passed"])
+        note = result(out, "quotes_verbatim")["note"]
+        self.assertIn("[[the band]]", note)
+        self.assertIn("[[pottery]]", note)
+
+    def test_a_link_that_does_not_resolve_is_named_and_a_passing_quote_is_not(self):
+        reply = ('- [[office life]] or [[ceramics]] — "An office is two hours of my day."\n'
+                 '- [[working from home]] — "An office is two hours of my day I never '
+                 'get back."')
+        out = grade(["quotes_verbatim"], kitchen_ev(reply))
+        self.assertFalse(out["passed"])
+        note = result(out, "quotes_verbatim")["note"]
+        self.assertIn("[[office life]]", note)
+        self.assertIn("[[ceramics]]", note)
+        self.assertNotIn("[[working from home]]", note)
 
 
 class NoWrites(unittest.TestCase):

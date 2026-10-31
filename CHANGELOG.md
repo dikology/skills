@@ -6,9 +6,9 @@ workaround and its evals pass.
 
 ## [0.2.0] — in preparation, not tagged
 
-The release gate has not passed: companion's case set does not pass under qwen (#22,
-#23), so no `v0.2.0` tag exists yet and the pin examples in the READMEs stay on
-`v0.1.1`.
+The release gate has not passed: with the grader artifacts in #22 gone, companion's
+case set still does not pass under qwen on #23's genuine quoting failures, so no
+`v0.2.0` tag exists yet and the pin examples in the READMEs stay on `v0.1.1`.
 
 ### Added
 
@@ -58,6 +58,14 @@ The release gate has not passed: companion's case set does not pass under qwen (
   replayed once and recorded as `attempts: 2`, because that attempt graded the pipe and
   not the skill. A turn that timed out, exited non-zero, or ran and misbehaved is never
   retried.
+- Evals: `quotes_verbatim` reads a quote as a claim about every note the line offers as
+  its source, not about the nearest link. A fragment passes when any offered note holds
+  it verbatim and the failure names only the notes it could not find it in; a wrapped
+  paragraph is the one line its reader sees; and words the human said in the session are
+  handed back to them, not claimed about a note. Re-grading the saved `gate_companion_v3`
+  and `gate_companion_v2` transcripts flips the two artifact failures
+  (`contradiction-typed`/candidate, `first-run-approved`/candidate) and no other verdict;
+  the truncated, translated and scare-quote failures are #23's, and still fail.
 - improve: three rules were strengthened after the first qwen gate run broke each of
   them — a missing `maturity` field is dropped rather than read off the note's own
   frontmatter, a structure edit moves a whole line and never a sentence carved out of

@@ -43,14 +43,42 @@ class Result:
 
 # --- quotes and links --------------------------------------------------------
 
-# A wikilink and a quoted span on the same line, in either order:
-# [[note]] — "text"  or  "text" — [[note]], in "", “”, «» or 「」 marks. The gap
-# between them holds no other link or quote, so a quote is credited to the link
-# nearest it. Nor does it cross a sentence end (". ", "? ", 。): a quote in one
-# sentence and a link in the next aren't a quote of that note.
+# A wikilink, and a quoted span in "", “”, «» or 「」 marks.
 _LINK = r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]"
 _QUOTED = r"[\"“«「『]([^\"”»」』\n]+)[\"”»」』]"
-_GAP = r"(?:(?![.!?]\s)[^\n\"“«「『\[\]。！？])*?"
+
+# A sentence ends at a `.`, `!` or `?` that another word follows ("e.g." and "1.5"
+# hold), or at a full-width 。！？, which Chinese prose writes without a space.
+_STOP = r"[.!?](?=\s)|[。！？]"
+_SENTENCE_END = re.compile(_STOP)
+
+# A line that opens a block — a bullet, a number, a heading, a blockquote, a table
+# row, a rule or a code fence — says something of its own. A reply wrapped at eighty
+# columns does not: it ran out of width, and where it ran out is not where it started
+# a new claim about a note.
+_BLOCK_START = re.compile(r"^\s*(?:[-*+]\s|\d+[.)]\s|#{1,6}\s|>\s?|\||```|~~~|-{3,}\s*$)")
+
+
+def claim_lines(text: str) -> list:
+    """The reply's lines as its reader sees them, soft wraps joined."""
+    out = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or _BLOCK_START.match(raw):
+            out.append(line)
+        elif out and out[-1]:
+            out[-1] += " " + line
+        else:
+            out.append(line)
+    return [line for line in out if line]
+
+
+# A wikilink and a quoted span with nothing but a short gap between them, in either
+# order: [[note]] — "text" or "text" — [[note]]. The gap holds no other link or quote
+# and crosses no sentence end. quotes() reads a claim off the whole line beside the
+# fragment instead (see quote_sources); this pairing is left for the one grader that
+# asks *where* in a reply a note was first quoted, which needs a position.
+_GAP = rf"(?:(?!{_STOP})[^\n\"“«「『\[\]])*?"
 QUOTE_RE = re.compile(f"{_LINK}{_GAP}{_QUOTED}|{_QUOTED}{_GAP}{_LINK}")
 
 # A quote this short ("Pottery", "Thursday evenings") could match a heading or a
@@ -69,13 +97,56 @@ def outside_menu(text: str) -> str:
     return "\n".join(line for line in text.splitlines() if not MENU_OPTION.match(line))
 
 
-def quotes(text: str) -> list:
-    """(link target, quoted text) pairs, in order of appearance, outside menu options."""
+def _undivided(x: int, y: int, dividers: list) -> bool:
+    """No sentence end, loose bracket or other quoted span lies between these offsets.
+
+    A divider is a range; a single character's end is (p, p + 1), so a divider sitting
+    right where the walk starts divides it, and one touching where it stops does not."""
+    return not any(x < e and s < y for s, e in dividers)
+
+
+def quote_sources(text: str) -> list:
+    """([notes offered as sources], quoted fragment) pairs, in order of appearance.
+
+    A fragment is a claim about the [[links]] the line offers beside it: every note
+    reachable from it without crossing another quote, a loose bracket or a sentence
+    end, on the line as its reader sees it rather than as the model wrapped it. Where
+    a line offers several notes, the fragment is a quote of that line — which of them
+    the words came from is the reply's phrasing, not a claim to fail it over. A
+    fragment nothing beside it offers a note for says nothing about a note, so it is
+    not returned, and a link inside someone else's quote is the note's own text.
+
+    Quotes and links are masked before the dividers are read: a fragment's closing
+    period sits inside its own quotes, so `"text" — [[note]]` stays one claim, and a
+    note's name may hold a dot."""
     out = []
-    for m in QUOTE_RE.finditer(outside_menu(text)):
-        target, quote = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
-        out.append((target.strip(), quote))
+    for line in claim_lines(outside_menu(text)):
+        spans = [(m.start(), m.end(), m.group(1)) for m in re.finditer(_QUOTED, line)]
+        links = [(m.start(), m.end(), m.group(1).strip()) for m in re.finditer(_LINK, line)
+                 if not any(a <= m.start() < b for a, b, _ in spans)]
+        if not spans or not links:
+            continue
+        masked = list(line)
+        for a, b, _ in spans + links:
+            masked[a:b] = ["\x01"] * (b - a)
+        marks = "".join(masked)
+        ends = ([(m.start(), m.start() + 1) for m in _SENTENCE_END.finditer(marks)]
+                + [(i, i + 1) for i, c in enumerate(marks) if c in "[]"])
+        bounds = [(a, b) for a, b, _ in spans]
+        for a, b, fragment in spans:
+            dividers = ends + [s for s in bounds if s != (a, b)]
+            targets = list(dict.fromkeys(
+                name for ls, le, name in links
+                if (le <= a and _undivided(le, a, dividers))
+                or (ls >= b and _undivided(b, ls, dividers))))
+            if targets:
+                out.append((targets, fragment))
     return out
+
+
+def quotes(text: str) -> list:
+    """(link target, quoted text) pairs, one per note the line offers as its source."""
+    return [(t, q) for targets, q in quote_sources(text) for t in targets]
 
 
 def note_key(target: str) -> str:
@@ -113,14 +184,25 @@ def quoted_from_note(quote: str, note_text: str) -> bool:
                                                 quote[:1].upper() + quote[1:]))
 
 
-def check_quote(target: str, quote: str, vault: Path) -> str | None:
-    """None if the quote is verbatim in the note the link resolves to; else why not."""
-    path = notes(vault).get(note_key(target))
-    if path is None:
-        return f"[[{target}]] does not resolve"
-    if not quoted_from_note(quote, path.read_text()):
-        return f"not verbatim in [[{target}]]: \"{quote}\""
-    return None
+def quote_claim(targets: list, quote: str, vault: Path) -> str | None:
+    """None when the fragment is verbatim in any note the reply offers as its source.
+    Else the failure, naming only the notes it could not find it in."""
+    by_name = notes(vault)
+    absent, missing = [], []
+    for target in targets:
+        path = by_name.get(note_key(target))
+        if path is None:
+            missing.append(target)
+        elif not quoted_from_note(quote, path.read_text()):
+            absent.append(target)
+    if len(absent) + len(missing) < len(targets):
+        return None
+    parts = []
+    if absent:
+        parts.append("not verbatim in " + " or ".join(f"[[{t}]]" for t in absent))
+    if missing:
+        parts.append(" or ".join(f"[[{t}]]" for t in missing) + " does not resolve")
+    return "; ".join(parts) + f': "{quote}"'
 
 
 def replies(ev: Evidence) -> list:
@@ -229,7 +311,7 @@ def session_log_lines(ev: Evidence, section: str = "Companion") -> tuple:
 def verified(found: list, vault: Path) -> list:
     """The (target, quote) pairs long enough to show a note was read, and verbatim in it."""
     return [(t, q) for t, q in found if len(q.split()) >= MIN_QUOTE_WORDS
-            and check_quote(t, q, vault) is None]
+            and quote_claim([t], q, vault) is None]
 
 
 def g_orient_quotes_corpus(ev: Evidence) -> Result:
@@ -302,28 +384,24 @@ def g_one_log_line_per_session(ev: Evidence) -> Result:
     return Result(name, True, f"{path}: one line from each of {len(added)} sessions")
 
 
-# A line that opens with a date ("- **2026-10-22** — reversed, see [[note]]: "…"") is an
-# entry companion files or proposes to file, such as a reversal annotation.
-ENTRY = re.compile(r"^\s*(?:[-*]\s+)?(?:\*\*)?\d{4}-\d{2}-\d{2}\b")
-
-
-def entry_quotes(text: str) -> set:
-    """The quoted spans on the reply's dated entry lines."""
-    return {m.group(1) for line in text.splitlines() if ENTRY.match(line)
-            for m in re.finditer(_QUOTED, line)}
-
-
 def g_quotes_verbatim(ev: Evidence) -> Result:
-    """Every quote the companion attributes to a note, in any turn, is in that note.
-    A dated entry that quotes the human's own words, such as a proposed reversal
-    annotation, is new text for the note, not a claim about it, so it is exempt."""
-    found = [(t, q) for turn in ev.transcript if turn["role"] == "companion"
-             for t, q in quotes(turn["text"])
-             if not (q in entry_quotes(turn["text"]) and said_by_human(ev, q))]
-    bad = [why for t, q in found if (why := check_quote(t, q, ev.vault))]
+    """Every quote the companion attributes to a note, in any turn, is verbatim in a
+    note the reply offers as its source. Where a line offers several notes, any of them
+    holding the fragment is enough, and a failure names only the ones it could not find
+    it in. Words the human said this session are quoted back to them, not claimed about
+    a note, so they are not corpus quotes — in a dated entry or anywhere else."""
+    found, bad = 0, []
+    for text in replies(ev):
+        for targets, quote in quote_sources(text):
+            if said_by_human(ev, quote):
+                continue
+            found += 1
+            why = quote_claim(targets, quote, ev.vault)
+            if why:
+                bad.append(why)
     if bad:
         return Result("quotes_verbatim", False, "; ".join(bad))
-    return Result("quotes_verbatim", True, f"{len(found)} linked quotes, all verbatim")
+    return Result("quotes_verbatim", True, f"{found} linked quotes, all verbatim")
 
 
 def touched(d: dict, allowed: tuple = ()) -> list:

@@ -121,6 +121,15 @@ the case. Use a pass mark only where posture is the behaviour under test and no
 regex can see it. `--no-judge` skips the judge, pass marks included; such a case prints
 `judge error: skipped`, because its posture went ungraded.
 
+A quoted fragment is a claim about the notes the same line offers beside it: every
+`[[link]]` reachable from it without crossing another quote, a loose bracket or a
+sentence end, and one wrapped paragraph counts as the one line its reader sees. Where
+a line offers several notes, `quotes_verbatim` fails the fragment only when none of
+them holds it verbatim, and names only the notes it could not find it in. A fragment
+nothing beside it offers a note for quotes no note, and words the human said in the
+session are handed back to them rather than claimed about a note, so neither is a
+corpus quote.
+
 Machine text is the folded `AI capture` callouts in any note, every note on the
 Overlay's skip list, and the log. In a case that names it,
 `machine_text_never_quoted` fails a reply that quotes any of it, linked or not,

@@ -6,9 +6,13 @@ workaround and its evals pass.
 
 ## [0.2.0] — in preparation, not tagged
 
-The release gate has not passed: with the grader artifacts in #22 gone, companion's
-case set still does not pass under qwen on #23's genuine quoting failures, so no
-`v0.2.0` tag exists yet and the pin examples in the READMEs stay on `v0.1.1`.
+#23 is fixed and promoted, so companion's case set now passes under qwen on the quoting
+failures that held the release: `gate_companion_v5` scored the Candidate at 19/20 against
+Stable's 13/20, losing no case, and `companion --promote` ran on that evidence. What is still
+outstanding is the run that *follows* a promotion, so the numbers describe the bytes that ship
+with both arms identical — `--promote` makes them identical, but gate_companion_v5 measured the
+Candidate before it became Stable, and `lang-pin-zh` only passes on both arms once both arms are
+the fixed copy. No `v0.2.0` tag exists yet; that is #17, and #23 was its last open blocker.
 
 ### Added
 
@@ -71,9 +75,28 @@ case set still does not pass under qwen on #23's genuine quoting failures, so no
   frontmatter, a structure edit moves a whole line and never a sentence carved out of
   one, and one note gets one `improve` log line per session however many moves were
   applied. Each was promoted on a two-arm run where the candidate lost no case.
-- `labs/companion/` holds an **unscored Candidate edit**: a rule on what quotation marks
-  promise (a note's exact words, never the model's own phrasing). It ships in no release
-  until #23 runs the two arms and promotes it.
+- companion: **a quote is a copy, not a recollection** (#23, promoted on `gate_companion_v5`).
+  The Candidate already said quotation marks promise a note's exact words and still lost cases
+  under qwen, so the promise is now a shape plus two tests the model can actually run. Marks take
+  one shape, the **quote line** — `- [[note]] — "the note's characters"` — one line, one source
+  note, one span pasted out of it; a line naming a note says what *that* note says, so a mark and a
+  link meet nowhere else in a reply (the Close menu's option lines excepted: there the link names
+  where a line will land). **Pointing is not quoting**: a phrase held up to be weighed, named, or
+  asked about is companion's object, not the note's evidence, so it goes in `code` even when its
+  words are verbatim someone else's. And copying is byte-for-byte — capitals, punctuation, slips —
+  in a reply and in anything written into a note, because a recomposed word (`slow` for `slower`),
+  a dropped one, a comma added, or an emphasis marker inside the marks is a claim no note keeps.
+  A reply that is not in the notes' language keeps its copies on quote lines and its prose free of
+  marks: `“ ”` and `「 」` are the marks too, and a 中文 reading follows the quote as `（注：…）`,
+  never in its place. Non-adjacent sentences of one note are joined with a bare `…`, not with
+  brackets. A contradiction is asked, not decided: the reply that surfaces one carries the note's
+  quote line, the human's words on a line naming no note, all three types, and the question; their
+  new position is not a confirmation, naming the type is not permission to write, and the dated
+  annotation keeps its `[[link]]` and copies their line as they typed it. Before sending, the
+  reply is checked one line at a time. Measured across all 20 cases of both arms, marked spans that
+  copy nothing fell from 59 and 56 (Stable) to 7 and 24 (the two fixed runs) — a real drop, not a
+  cure: what is left is one rhetorical habit, naming the human's own question in order to reframe
+  it, on lines that name no note and so are invisible to `quotes_verbatim`.
 - The glossary at the repo root is now `GLOSSARY.md`, and a multi-context repo would use
   `GLOSSARY-MAP.md`, following the rename the upstream skills adopted on 2026-08-15.
   `AGENTS.md`, `docs/agents/domain.md` and both READMEs point at the new name, and

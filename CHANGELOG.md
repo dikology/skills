@@ -93,10 +93,19 @@ the fixed copy. No `v0.2.0` tag exists yet; that is #17, and #23 was its last op
   quote line, the human's words on a line naming no note, all three types, and the question; their
   new position is not a confirmation, naming the type is not permission to write, and the dated
   annotation keeps its `[[link]]` and copies their line as they typed it. Before sending, the
-  reply is checked one line at a time. Measured across all 20 cases of both arms, marked spans that
-  copy nothing fell from 59 and 56 (Stable) to 7 and 24 (the two fixed runs) — a real drop, not a
-  cure: what is left is one rhetorical habit, naming the human's own question in order to reframe
-  it, on lines that name no note and so are invisible to `quotes_verbatim`.
+  reply is checked one line at a time. Measured across all 20 cases of both arms of
+  `gate_companion_v4` and `gate_companion_v5`, marked spans that copy nothing fell from 59 and 56
+  (Stable) to 7 and 24 (the two runs of the fixed copy) — a real drop, not a cure: what is left is
+  one rhetorical habit, naming the human's own question in order to reframe it, on lines that name
+  no note and so are invisible to `quotes_verbatim`.
+- `labs/companion/` holds an **unscored Candidate edit** from the review of that promotion: the
+  Close-menu exception was stranded from the pre-send check (which says a link and marks meet only
+  on a quote line, while the menu's `[a]` and `[e]` lines pair them), so the check now names `[a]`
+  as the exception and `[e]` proposes its open question in `code` — a string to type, not a quote,
+  which is what the skill itself teaches. Also fixed: the Russian exemplar dropped the note's final
+  period inside its own marks, in a file that says copying is byte-for-byte. `skills/companion/` is
+  the copy `gate_companion_v5` measured; these lines ship in no release until a two-arm run of the
+  Candidate loses nothing and is promoted.
 - The glossary at the repo root is now `GLOSSARY.md`, and a multi-context repo would use
   `GLOSSARY-MAP.md`, following the rename the upstream skills adopted on 2026-08-15.
   `AGENTS.md`, `docs/agents/domain.md` and both READMEs point at the new name, and

@@ -74,6 +74,12 @@ case set still does not pass under qwen on #23's genuine quoting failures, so no
 - `labs/companion/` holds an **unscored Candidate edit**: a rule on what quotation marks
   promise (a note's exact words, never the model's own phrasing). It ships in no release
   until #23 runs the two arms and promotes it.
+- The glossary at the repo root is now `GLOSSARY.md`, and a multi-context repo would use
+  `GLOSSARY-MAP.md`, following the rename the upstream skills adopted on 2026-08-15.
+  `AGENTS.md`, `docs/agents/domain.md` and both READMEs point at the new name, and
+  `docs/agents/domain.md` is byte-identical to the refreshed
+  `setup-matt-pocock-skills` template again. No skill text, case set or grader named the
+  old file, so no shipped byte moved and no gate result changed.
 
 The Library stays 0.x: the 1.0 gate is still about ten real-vault sessions that need no
 workaround, with the evals passing.

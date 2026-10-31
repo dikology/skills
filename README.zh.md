@@ -129,7 +129,7 @@ Overlay。两个技能都一样：有几条硬规则写在技能里，不靠 Ove
 - `labs/evals/`：评测工具：合成的 Fixture 笔记库、写好剧本的会话、评分器。按名字跑
   任何技能（`run_evals.py improve`），用例取自 `labs/evals/cases/<技能名>.json`。
 - 仓库根目录的 `.claude-plugin/`：插件市场的清单文件。
-- `CONTEXT.md`：术语表（英文）：Overlay、Corpus、Consuming vault、Fixture vault、Stable/Candidate。
+- `GLOSSARY.md`：术语表（英文）：Overlay、Corpus、Consuming vault、Fixture vault、Stable/Candidate。
 - `docs/adr/`：设计决定和背后的理由（英文）。
 
 ## 许可

@@ -12,4 +12,4 @@ The five default triage labels, unchanged: `needs-triage`, `needs-info`, `ready-
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` at the repo root, ADRs in `docs/adr/`. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` at the repo root, ADRs in `docs/adr/`. See `docs/agents/domain.md`.

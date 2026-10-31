@@ -136,7 +136,7 @@ fallback for each item, and let each vault say the rest.
   graders. It runs any skill by name (`run_evals.py improve`), taking that skill's
   cases from `labs/evals/cases/<skill>.json`.
 - `.claude-plugin/` at the repo root holds the marketplace manifest.
-- `CONTEXT.md` is the glossary: Overlay, Corpus, Consuming vault, Fixture vault, Stable/Candidate.
+- `GLOSSARY.md` is the glossary: Overlay, Corpus, Consuming vault, Fixture vault, Stable/Candidate.
 - `docs/adr/` holds the decisions and the reasons behind them.
 
 ## License

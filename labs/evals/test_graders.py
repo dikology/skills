@@ -875,6 +875,17 @@ class ContradictionSurfaced(unittest.TestCase):
                                  "should I take the hybrid offer?")
         self.assertFalse(self.grade(kitchen_ev(reply))["passed"])
 
+    def test_the_three_split_across_two_replies_fails(self):
+        # gate_companion_v6 lost reversal-annotated this way: Orient asks the three-way
+        # against the opening request, and the later reply carries their new words and
+        # the question but points back at the earlier quote instead of copying it again.
+        orient = (f'[[working from home]] — "{OLD_LINE}"\n'
+                  'You, today: "should I take the hybrid offer?"\n\n'
+                  "Is this a reversal, nuance, or a domain mismatch?")
+        push = SURFACED.replace(f'[[working from home]] — "{OLD_LINE}"\n', "")
+        turns = [("/companion should I take the hybrid offer?", orient), (NOW, push)]
+        self.assertFalse(self.grade(kitchen_ev("", turns))["passed"])
+
 
 REVERSED = [("/companion should I take the hybrid offer?", "orient"),
             (NOW, SURFACED),

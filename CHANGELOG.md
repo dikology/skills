@@ -106,6 +106,27 @@ the fixed copy. No `v0.2.0` tag exists yet; that is #17, and #23 was its last op
   period inside its own marks, in a file that says copying is byte-for-byte. `skills/companion/` is
   the copy `gate_companion_v5` measured; these lines ship in no release until a two-arm run of the
   Candidate loses nothing and is promoted.
+- `labs/companion/` holds a second **unscored Candidate edit** (#24), against the one case still
+  failing on the shipped bytes: `gate_companion_v5` scored `reversal-annotated` 0.75 because the
+  dated reversal annotation was a compound line. The paragraph asked for "one dated line" that
+  "links the note holding the new position" and said nothing about what may stand inside marks on
+  it, so the model reached for the Close menu's `[a]` shape, quoted the *older* note's sentence,
+  and glued the link on — and `quote_sources` credits every mark to the notes the same line offers,
+  which here was only `[[the hybrid offer]]`, a note holding none of those words. The copy was
+  exact; the line's shape is what failed. The annotation now has its own literal line,
+  `- **YYYY-MM-DD** — reversal — [[<new position note>]]: <their words, exactly as typed>`, holding
+  no marks, so there is no claim to mis-credit; `[a]` keeps its exception and the paragraph says
+  the two shapes are not to be merged. What that costs, plainly: marks were the only place a grader
+  could see the copy rule, so an unmarked line that re-cases or trims their words now passes every
+  grader — the rule is prose, not a check. Measured on the filtered case (`--case reversal`, 1 case
+  × 3 runs each): `base1`–`base3` on the pre-edit copy passed 3/3, so green alone proved nothing
+  (6 PASS / 3 FAIL across the runs on record); `fix11`–`fix13` passed with the words unmarked but
+  dropped the human's terminal period, and putting their sentence last instead of after an em-dash
+  cured it — `fix14`–`fix16` passed 3/3, each writing one dated line, no marks, the turn copied
+  byte for byte with its punctuation. Pinned at the grader seam in `test_graders.py` (the v5 line as
+  a mutant that must fail, beside the template that must pass); no grader, fixture or mutant
+  changed, and the case's `expectations` now describe the shape the skill prescribes.
+  `skills/companion/` stays `e981bb4e`, the copy `gate_companion_v5` measured.
 - The glossary at the repo root is now `GLOSSARY.md`, and a multi-context repo would use
   `GLOSSARY-MAP.md`, following the rename the upstream skills adopted on 2026-08-15.
   `AGENTS.md`, `docs/agents/domain.md` and both READMEs point at the new name, and

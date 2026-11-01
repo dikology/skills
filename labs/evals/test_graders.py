@@ -173,20 +173,17 @@ class QuotesVerbatim(unittest.TestCase):
         self.assertTrue(grade(["quotes_verbatim"], kitchen_ev(reply))["passed"])
 
     def test_a_dated_annotation_is_credited_only_to_the_note_it_links(self):
-        # gate_companion_v5 reversal-annotated/candidate: the proposed dated line puts the
-        # older note's sentence in marks and offers only [[the hybrid offer]] beside it. The
-        # words are a perfect copy — the line's shape is what fails, one note per line.
-        compound = ('- **2026-10-31** — on "I\'m never going back to a desk I have to '
-                    'commute to": reversal — [[the hybrid offer]]. "Working alone at the '
-                    'kitchen table has made me slower, and I miss having people to think '
-                    'out loud with."')
+        # gate_companion_v5 reversal-annotated/candidate: the dated line puts the older note's
+        # sentence in marks and offers only [[the hybrid offer]], so the credit lands on a note
+        # holding none of it — the words themselves were a perfect copy of [[working from home]].
+        older = "I'm never going back to a desk I have to commute to."
+        compound = (f'- **2026-10-31** — on "{older}": reversal — [[the hybrid offer]]. '
+                    f'"{NOW}"')
         out = grade(["quotes_verbatim"], kitchen_ev(compound))
         self.assertFalse(out["passed"])
         self.assertIn("[[the hybrid offer]]", result(out, "quotes_verbatim")["note"])
-        # The shape the skill prescribes: one link, and no marks claiming a note's words.
-        template = ('- **2026-10-31** — reversal: I want the office now. Working alone at '
-                    'the kitchen table has made me slower, and I miss having people to '
-                    'think out loud with — [[the hybrid offer]].')
+        # The shape the skill now prescribes: one link and no marks, so there is nothing to credit.
+        template = f'- **2026-11-01** — reversal — [[the hybrid offer]]: {NOW}'
         self.assertTrue(grade(["quotes_verbatim"], kitchen_ev(template))["passed"])
 
     def test_a_quote_passes_when_any_note_the_line_offers_holds_it(self):

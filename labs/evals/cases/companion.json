@@ -344,7 +344,7 @@
       ],
       "what_it_tests": "Same contradiction; the human confirms a reversal, then approves the write. The older note gains a dated line linking the new position, on the approving turn and not before, and its original text stays as written: the vault diff is additions only.",
       "expectations": [
-        "[[working from home]] gains a dated line that links another note or quotes the human's new position",
+        "[[working from home]] gains one dated line that links the note holding the new position and puts nothing in marks that note does not hold",
         "The line appears only after the approving turn",
         "No original line in the vault is changed or removed"
       ]

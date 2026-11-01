@@ -180,9 +180,19 @@ theirs. Every reply that puts a note against what they say now ends on that thre
 including the one where the answer looks obvious; offering only the type you expect has answered it
 for them. Their new position is where they stand, not a confirmation — only their own word names the
 type, and naming the type is still not permission to write. On a reversal they named, propose one
-dated line for the older note and write it only on the reply that says write it. That line links the
-note holding the new position, and if it quotes them it copies their words byte for byte — never
-re-cased, never trimmed. The original text stays as written.
+dated line for the older note and write it only on the reply that says write it. That line has this
+shape, and it holds no marks:
+
+```
+- **YYYY-MM-DD** — reversal: <their new position, in their words> — [[<note holding the new position>]]
+```
+
+A record, not a quote line: the one note it names holds the new position's facts, not these
+sentences, so marks here hand their words to a note that never said them. Name the older line it
+reverses only if the note needs saying — unmarked, and the line sits under it. The Close menu's `[a]`
+line is the other dated shape, where marks and a link mean something else; do not merge the two.
+Their words stay byte for byte — never re-cased, never trimmed — just unmarked. The original text
+stays as written.
 
 ### 3. Close
 

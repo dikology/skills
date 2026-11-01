@@ -825,19 +825,27 @@ def said_by_human(ev: Evidence, text: str) -> bool:
 
 def thinking_turns(ev: Evidence) -> list:
     """The human turns a fileable line can come from: not a /command that opens a
-    session, and nothing from the turn that asked to close onwards."""
+    session, and not the turn that summoned the options it was answered with. A reply can
+    carry option lines before the Close — the walk goes on past them, since what the human
+    says after an early menu is exactly the thinking the [a] line is meant to record."""
     out = []
     for t in ev.transcript:
         if t["role"] == "human":
             out.append(t["text"])
         elif MENU_OPTION.search(t["text"]):
             out = out[:-1]
-            break
     return [t for t in out if not _COMMAND.match(t)]
 
 
 def _sentences(turn: str) -> list:
     return [s for s in re.split(r"(?<=[.!?])\s+", _norm(turn)) if s]
+
+
+# Asking to end the session is not the human thinking aloud, whatever shape the reply
+# that answers it took. Position alone cannot say which turn that is: a menu can run
+# early, and then the request sits nowhere near the options it was answered with.
+_CLOSING_REQUEST = re.compile(r"\b(?:wrap up|stop here|end here|finish here|call it"
+                              r" (?:a day|here)|that'?s enough)\b", re.I)
 
 
 def fileable(ev: Evidence, text: str) -> bool:
@@ -850,7 +858,8 @@ def fileable(ev: Evidence, text: str) -> bool:
         sents = _sentences(turn)
         for i in range(len(sents)):
             for j in range(i + 1, len(sents) + 1):
-                if " ".join(sents[i:j]).rstrip(".!?") == line:
+                cand = " ".join(sents[i:j]).rstrip(".!?")
+                if cand == line and not _CLOSING_REQUEST.search(cand):
                     return True
     return False
 

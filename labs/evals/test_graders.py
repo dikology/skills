@@ -585,6 +585,22 @@ class LineFiledUnderTarget(unittest.TestCase):
     def test_asking_to_wrap_up_is_not_the_human_s_line(self):
         self.assertFalse(self.grade(filed(entry='- **2026-10-19** — "Let\'s wrap up here."'))["passed"])
 
+    def test_a_menu_on_an_early_reply_leaves_the_later_line_fileable(self):
+        # gate_companion_v6 lost the stable arm this way: the model ran the whole Close
+        # shape on reply 1, so the fileable pool stopped there and never saw the sentence
+        # the human said after it — a correct, dated, verbatim filing graded as invented.
+        early = [(PICKED[0][0], MENU)] + PICKED[1:]
+        out = self.grade(filed(), turns=early)
+        self.assertTrue(out["passed"], out)
+
+    def test_a_closing_request_stays_unfileable_behind_an_early_menu(self):
+        # The pool drops the turn that summoned the options. When a menu ran early, the
+        # wrap-up request is not that turn, so the sentence itself has to be what fails.
+        early = [(PICKED[0][0], MENU), (POSITION, "Fair. Then the band stays."),
+                 ("Let's wrap up here.", "Filed."), ("a", MENU)]
+        out = self.grade(filed(entry='- **2026-10-19** — "Let\'s wrap up here."'), turns=early)
+        self.assertFalse(out["passed"], out)
+
     def test_filed_into_a_new_file_instead_of_a_note_fails(self):
         after = {**FILING, "lines.md": f'## Lines I said\n\n- **2026-10-19** — "{LINE}"\n'}
         out = self.grade(after)

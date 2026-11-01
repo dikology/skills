@@ -14,6 +14,22 @@ with both arms identical — `--promote` makes them identical, but gate_companio
 Candidate before it became Stable, and `lang-pin-zh` only passes on both arms once both arms are
 the fixed copy. No `v0.2.0` tag exists yet; that is #17, and #23 was its last open blocker.
 
+`gate_companion_v6` (2026-11-01, 20 cases × 2 arms, qwen, judge on, 9,704,776 tokens) ran that
+follow-up cycle and **did not promote: 37/40, candidate lost 2**. It also answered #24: on the
+fixed Candidate the compound dated annotation occurred in **0 of 8 runs** — `fix11`–`fix16`, the
+gate, and a replay — while the same grader failed 3 of 9 runs on the previous copy. Both losses
+are other defects, each reproduced once and passing its replay, so neither is deterministic: the
+Candidate's `reversal-annotated` failed `contradiction_surfaced` because the model asked the
+three-way question inside the Orient reply and then pointed back at its own citation, leaving no
+single reply holding the note's quote, the human's words and the question together; the
+Candidate's `lang-pin-zh` failed `quotes_verbatim` on `[[thursday evenings]] 那句"必须有事从周四下来"`,
+a 中文 rendering inside marks — the residue #23 recorded as a rate rather than a cure. The Stable
+arm's only loss, `line-filed-under-target`, is a false FAIL: the model printed `NEXT MOVES` on
+reply 1, which `thinking_turns()` reads as the close, so the pool emptied and a verbatim dated
+filing was graded as "nothing under ## Lines I said is a whole sentence the human said" — proven
+by re-scoring the saved transcript, 0 tokens. Three new blockers, no promotion, `skills/companion`
+still `e981bb4e`, and the run that follows a promotion is still the thing the tag needs.
+
 ### Added
 
 - `improve` skill: a structural review of one note. It reads the note and the notes
@@ -126,7 +142,10 @@ the fixed copy. No `v0.2.0` tag exists yet; that is #17, and #23 was its last op
   byte for byte with its punctuation. Pinned at the grader seam in `test_graders.py` (the v5 line as
   a mutant that must fail, beside the template that must pass); no grader, fixture or mutant
   changed, and the case's `expectations` now describe the shape the skill prescribes.
-  `skills/companion/` stays `e981bb4e`, the copy `gate_companion_v5` measured.
+  `skills/companion/` stays `e981bb4e`, the copy `gate_companion_v5` measured. Both unscored
+  Candidate bullets above were scored together in `gate_companion_v6` and the Candidate lost two
+  cases there, so nothing promoted: the annotation template did its job and the losses were
+  elsewhere, both described in the release note above.
 - The glossary at the repo root is now `GLOSSARY.md`, and a multi-context repo would use
   `GLOSSARY-MAP.md`, following the rename the upstream skills adopted on 2026-08-15.
   `AGENTS.md`, `docs/agents/domain.md` and both READMEs point at the new name, and

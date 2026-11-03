@@ -68,38 +68,31 @@ class Span:
 KINDS = ("claim-ok", "claim-fail", "label", "human-verbatim", "note-copy-unowned",
          "machine-copy", "self-quote", "human-edited", "no-source")
 
-_SNAPSHOT = {}
 
+@dataclass
+class VaultView:
+    """The vault as the session saw it: the Corpus a mark may credit, and the machine text
+    it may not. Built once per arm-run from `start_vault`, which is the case's Overlay plus
+    the Fixture vault — without the Overlay the log is just another note and gets credited
+    as one. Machine text is never the human's voice, so a mark holding it copies no note."""
+    corpus: dict
+    machine: list
 
-def corpus_of(view: dict) -> dict:
-    """{note name: the human's text of that note} — the Corpus, read the way
-    `graders.human_text()` reads it: no log, no skip-listed note, no `AI capture` callout,
-    no Overlay file. Those words belong to the machine instead: machine text is never the
-    human's voice, so a mark holding it is not a copy of any note."""
-    skip = set(skipped(view)) | set(OVERLAY_FILES)
-    return {path_key(p): _split_callouts(t)[1] for p, t in view.items()
-            if p.endswith(".md") and p not in skip}
+    @classmethod
+    def of(cls, ev: Evidence) -> "VaultView":
+        snap = start_vault(ev)
+        skip = set(skipped(snap)) | set(OVERLAY_FILES)
+        return cls({path_key(p): _split_callouts(t)[1] for p, t in snap.items()
+                    if p.endswith(".md") and p not in skip},
+                   machine_text(snap))
 
+    def holders(self, frag: str) -> list:
+        """Every note whose human text holds this span, by name."""
+        return sorted(n for n, text in self.corpus.items() if quoted_from_note(frag, text))
 
-def view_of(ev: Evidence) -> dict:
-    """The vault the session saw: `start_vault`'s view, which is the case's Overlay plus the
-    Fixture vault — without it the log is just another note and gets credited as one."""
-    key = (id(ev.transcript), str(ev.vault))
-    if key not in _SNAPSHOT:
-        _SNAPSHOT[key] = start_vault(ev)
-    return _SNAPSHOT[key]
-
-
-def note_holders(ev: Evidence, frag: str) -> list:
-    """Every note whose human text holds this span, by name."""
-    return sorted(name for name, text in corpus_of(view_of(ev)).items()
-                  if quoted_from_note(frag, text))
-
-
-def machine_holders(ev: Evidence, frag: str) -> list:
-    """Where this span's words live if they are machine text, as `machine_text` names it."""
-    return [where for where, body in machine_text(view_of(ev))
-            if quoted_from_note(frag, body)]
+    def machine_from(self, frag: str) -> list:
+        """Where this span's words live if they are machine text, as `machine_text` names it."""
+        return [where for where, body in self.machine if quoted_from_note(frag, body)]
 
 
 _STOPWORDS = frozenset("""a an and as at be but by for from if in into is it its of on or
@@ -143,7 +136,8 @@ def carries_a_claim(frag: str) -> bool:
     return len(frag.split()) >= MIN_QUOTE_WORDS
 
 
-def _ungraded(ev: Evidence, case: str, n: int, line: str, frag: str, earlier: list) -> Span:
+def _ungraded(ev: Evidence, view: VaultView, case: str, n: int, line: str, frag: str,
+              earlier: list) -> Span:
     """A mark on a line the gate credits to no note: then whose words are these?"""
     if not carries_a_claim(frag):
         return Span(case, n, line, frag, "label", False, False,
@@ -154,7 +148,7 @@ def _ungraded(ev: Evidence, case: str, n: int, line: str, frag: str, earlier: li
         # check, only whose words these are.
         return Span(case, n, line, frag, "human-verbatim", False, False,
                     "the human's words, on a line naming no note")
-    held = note_holders(ev, frag)
+    held = view.holders(frag)
     if held:
         # Not broken by #26's definition — "a real copy credited to a note that does not
         # hold it, or marks that copy nothing at all": a note does hold these words. It is
@@ -162,7 +156,7 @@ def _ungraded(ev: Evidence, case: str, n: int, line: str, frag: str, earlier: li
         return Span(case, n, line, frag, "note-copy-unowned", False, False,
                     "a copy of " + " or ".join(f"[[{h}]]" for h in held)
                     + ", named on no line of its own")
-    machine = machine_holders(ev, frag)
+    machine = view.machine_from(frag)
     if machine:
         return Span(case, n, line, frag, "machine-copy", False, True,
                     "a copy of " + "; ".join(machine) + " — machine text speaks for no note")
@@ -176,7 +170,8 @@ def _ungraded(ev: Evidence, case: str, n: int, line: str, frag: str, earlier: li
                 "no note, no human line, no earlier reply holds it")
 
 
-def _graded(ev: Evidence, case: str, n: int, line: str, frag: str, targets: list) -> Span:
+def _graded(ev: Evidence, view: VaultView, case: str, n: int, line: str, frag: str,
+            targets: list) -> Span:
     """A mark the gate does credit to notes. `quote_claim` answers for it, unchanged, so
     this bucket is the gate's own verdict and the audit can be checked against it."""
     if said_by_human(ev, frag):
@@ -186,7 +181,7 @@ def _graded(ev: Evidence, case: str, n: int, line: str, frag: str, targets: list
     if why is None:
         return Span(case, n, line, frag, "claim-ok", True, False,
                     "verbatim in " + " or ".join(targets))
-    held = note_holders(ev, frag)
+    held = view.holders(frag)
     where = ("held by " + " or ".join(f"[[{h}]]" for h in held)
              if held else "no note holds these words")
     return Span(case, n, line, frag, "claim-fail", True, True, f"{why} — {where}")
@@ -204,6 +199,7 @@ def audit(ev: Evidence, case: str = "") -> list:
     """Every marked span in every reply of one arm's run, and who owns its words."""
     out = []
     texts = replies(ev)
+    view = VaultView.of(ev)
     for n, text in enumerate(texts, 1):
         claims = list(quote_sources(text))  # exactly what the gate credits, whole reply
         for line in claim_lines(outside_menu(text)):
@@ -211,9 +207,9 @@ def audit(ev: Evidence, case: str = "") -> list:
                 frag = m.group(1)
                 found = _credit_for(claims, frag)
                 if found is None:
-                    out.append(_ungraded(ev, case, n, line, frag, texts[:n - 1]))
+                    out.append(_ungraded(ev, view, case, n, line, frag, texts[:n - 1]))
                 else:
-                    out.append(_graded(ev, case, n, line, frag, found[0]))
+                    out.append(_graded(ev, view, case, n, line, frag, found[0]))
     return out
 
 

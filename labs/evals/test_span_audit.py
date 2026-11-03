@@ -175,6 +175,18 @@ class MachineTextHasNoOwner(unittest.TestCase):
         self.assertTrue(got[0].broken)
 
 
+    def test_a_span_copied_from_a_skip_listed_note_claims_no_note(self):
+        # The third way into machine text: `digests/` on the Overlay's skip list. The
+        # digest is generated, so [[sabbatical digest]] holds no line a reply may quote —
+        # the same exclusion `skip_list_never_quoted` grades, applied to who owns a mark.
+        line = "Main motivation identified: recovering from burnout after the spring reorg"
+        got = audit(evidence(f'The digest puts it plainly: "{line}".', vault=SABBATICAL,
+                             human="should I take the sabbatical?",
+                             overlay="## Companion\n\n- index: [[home]]\n- skip list: `digests/`\n"))
+        self.assertEqual([s.kind for s in got], ["machine-copy"])
+        self.assertTrue(got[0].broken)
+
+
 class CreditsTheWayTheGateCredits(unittest.TestCase):
     def test_a_second_span_on_a_joined_quote_line_is_credited_only_as_the_gate_credits_it(self):
         # `graders.claim_lines()` joins a soft wrap, so both spans below land on one claim

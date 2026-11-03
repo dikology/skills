@@ -29,6 +29,10 @@ _Avoid_: test vault, sample data
 Stable is the published copy of a skill under `skills/`; it changes only by promotion. Candidate is the working copy under `labs/`, scored against Stable on the same Fixture vaults before it may replace it. The two are the eval runner's arms.
 _Avoid_: prod/dev, v1/v2
 
+**Mark**:
+The quotation marks themselves in a companion reply — `"`, `«»`, `“”`, `「」`, in any script. A mark is a promise that the words inside are someone's exact words; the **Span** is what sits inside them.
+_Avoid_: quote mark, emphasis
+
 **Span**:
 One run of characters inside quotation marks in a reply — the unit the quoting promise is kept or broken on. A span either holds a note's or the human's exact words, or it claims that someone spoke when no one did.
 _Avoid_: excerpt, quote fragment

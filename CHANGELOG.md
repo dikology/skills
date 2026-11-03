@@ -12,7 +12,14 @@ Stable's 13/20, losing no case, and `companion --promote` ran on that evidence. 
 outstanding is the run that *follows* a promotion, so the numbers describe the bytes that ship
 with both arms identical — `--promote` makes them identical, but gate_companion_v5 measured the
 Candidate before it became Stable, and `lang-pin-zh` only passes on both arms once both arms are
-the fixed copy. No `v0.2.0` tag exists yet; that is #17, and #23 was its last open blocker.
+the fixed copy. No `v0.2.0` tag exists yet. #17's run criterion was amended on 2026-11-03, because
+three gates had been eaten by coin flips rather than by defects: the tag needs one full two-arm run of
+both skills' case sets, on the bytes that ship, in which **no case fails on both arms**, and whose
+candidate arm reports **0 broken spans** in the span audit — a single-arm loss is named here with the
+replays that pass it. #23, #24 and #25 are closed on evidence. Two things stand against that bar now:
+**#26**, whose shape brought `lang-pin-zh` from 2 fails in 4 runs to 1 in 3 but has not met its own
+three-consecutive criterion, and **#27**, where two rules in the skill collide and the case flips on
+both arms.
 
 `gate_companion_v6` (2026-11-01, 20 cases × 2 arms, qwen, judge on, 9,704,776 tokens) ran that
 follow-up cycle and **did not promote: 37/40, candidate lost 2**. It also answered #24: on the
@@ -95,16 +102,47 @@ arm broke the promise 8 times (5.4% of its marks) and passed all 20, its graders
     things with nothing to copy them from), and the human's words recalled slightly edited while their
     line is weighed against a note. The pre-send check binds on the line, not the reply: *each mark
     against the links on its own line, never against the paragraph's*.
-  - Measured. `--case lang` ×2 + `--case reversal` ×1 on the new copy: 9/9 PASS with 0
-    `quotes_verbatim` rejections; on the bytes this replaces, `lang-pin-zh` failed 2 of its 4 runs and
-    `gate25_candidate` lost `lang-follows-human`, `lang-quote-stays-source` and `reversal-annotated`
-    the same way. AC 3: `lang-pin-zh` 3 consecutive runs and `reversal-annotated` 3 consecutive runs,
-    all 1.00, each with **0 broken and 0 unowned** spans — against `audit25l1`'s 6 broken of 16 marks
-    (1 graded) and `audit25r1`'s 2 of 10 on the shipped bytes. `gate26_both` (20 cases × 2 arms,
-    judge on, 9,271,120 tokens): the Candidate arm wrote **0 broken spans in all 20 cases** (139 marks,
-    119 of them graded claims, every one verbatim, 1 unowned) while the Stable arm in the same run
-    broke the promise 8 times (5.4% of its marks) and passed all 20 of its cases — its graders failed
-    **none** of those 8, two of which copy the log's own words back as if a person had said them.
+  - Measured. First rate check, on the copy before the `code`-for-phrases clause was added
+    (`--case lang` ×2 + `--case reversal` ×1): 9/9 PASS with 0 `quotes_verbatim` rejections — and the
+    audit still found 1 broken span in the first run and 4 in the second, all of them the model's own
+    中文 or Russian phrase wearing corner marks on a line naming no note. That residue is why the
+    clause exists. AC 3 was met on those bytes: `lang-pin-zh` 3 consecutive runs and
+    `reversal-annotated` 3 consecutive runs (`fix26b_*`), all 1.00, each with **0 broken and 0
+    unowned** spans — against `audit25l1`'s 6 broken of 16 marks (1 graded) and `audit25r1`'s 2 of 10.
+  - **Then the record moved, and it moved against this change.** The two sentences fixed after review
+    were measured too (`fix26c_*`, three runs per case): `reversal-annotated` passed 3/3 with 0 broken
+    spans, but `lang-pin-zh` passed 2 of 3 — the third failed `quotes_verbatim` on four 中文
+    renderings wearing 「」 on lines that name notes, `「减一样换一样」` and `「为了周四出门才加入」` beside
+    `[[the band]]`, `「万一以后要用」` beside `[[thursday evenings]]`, and a one-character `「人」` the
+    grader credits to both — 8 broken of 20 marks in the audit. So AC 3's three-consecutive bar is
+    **not met by the copy as it now stands**, and #26 stays open: the shape took this case from
+    2 fails in 4 runs to 1 in 3, which is a rate, not the cure its acceptance criteria ask for. The
+    pointer sentence named one form (`那句「…」`) and the run wrote another (`唯一写明「…」的笔记`); that
+    form is named too now, with the #27 collision fix beside it.
+  - AC 3 a third time, on the bytes that also carry #27's fix (`fix27_*`, 9 runs): **9/9 PASS**, and
+    `quotes_verbatim` clean in all six pinned/reversal runs — the case-level half is met at last. The
+    audit is not satisfied: three broken spans remain, all of them the model's own words wearing
+    corner marks on lines naming no note — `「人」` and `「没有」` (one character each) and
+    `「陶艺填同一个位置」`, in `fix27_pin2` and `fix27_pin3`. AC 3 asks for 0 broken *graded or not*, so
+    #26 stays open on the invisible half even though the mechanism that loses cases is gone: the
+    single run that failed for the visible reason (`fix26c_pin3`) is not repeated, and the residue is
+    now the 中文 emphasis habit at one-character scale, which no grader has ever seen.
+  - `gate26_both` (20 cases × 2 arms, judge on, 9,271,120 tokens): the Candidate arm wrote **0 broken
+    spans in all 20 cases** (139 marks, 119 of them graded claims, every one verbatim) — with one
+    `unowned` it does not count as broken: `skip-list-never-quoted`'s MY TAKE carried
+    `[[sabbatical]]`'s true line in marks on a sentence naming no note, which breaks the Orient
+    reply's own "MY TAKE … holds no marks" with a copy that happens to be honest. The Stable arm in
+    the same run broke the promise 8 times (5.4% of its marks) and passed all 20 of its cases — its
+    graders failed **none** of those 8, two of which copy the log's own words back as if a person had
+    said them.
+  - Two sentences in this change were wrong in the way they could be read, and were found by review
+    rather than by a run: the human's-words cure said "name it with a link", which beside a mark is
+    the one shape `quote_sources` charges to that note (now: copy their line above on its own line,
+    and the arguing sentence holds no marks); and the gloss was said both to carry a foreign line's
+    content wherever a sentence needs it and never to stand in place of a quote (now: it sits beside a
+    copy, and never replaces the quote line a reply owes when it needs the line as evidence).
+    `gate26_both` measured the bytes before these two fixes, so the next both-arm run is the one that
+    describes what ships.
   - **Not promoted.** The run scored 39/40: the Candidate lost `unpicked-menu-resurfaces`
     (`unpicked_menu_named_once`, 0.67) on a reply that named the unpicked Spanish menu a second time
     while following an older Posture rule — *name the pattern when the human reuses a framing from
@@ -115,6 +153,25 @@ arm broke the promise 8 times (5.4% of its marks) and passed all 20, its graders
     counting the gate. The collision is in the skill's own rules and predates this change — but under
     the runner's loss rule, a flip on this case blocks promotion whichever arm it lands on.
     `skills/companion` stays `e981bb4e`.
+- companion: **name the framing, not the note it came from** (#27, `labs/companion/`, measured on
+  `fix27_unp1`–`fix27_unp3`). Two rules had been reading against each other: Posture's *name the
+  pattern when the human reuses a framing from another note that may not fit here*, and the Close
+  menu's *say the unpicked line once; don't return to it unless the human does*. Neither said what a
+  pattern is called by, and the only two hands available were the framing or the other note — naming
+  the note is exactly the topic the second rule says must not come back. `gate26_both`'s candidate
+  reply took the note: `you're doing the same arithmetic in [[spanish class]] … It may not fit here`,
+  clean on every quoting rule and failing `unpicked_menu_named_once`. Posture's bullet now names the
+  framing in `code` and links nothing unless the human named that note first; the unpicked-menu step
+  says the same thing from its side, so the two cannot be read as a contradiction.
+  - Measured: the case passed 3 of 3 (`fix27_unp1`–`unp3`, 1.00 each, span audit 0/0/0 broken), and
+    session 2's first reply still names the unpicked menu in all three — the collision's cheap exit
+    of dropping the opening was not taken. What this does **not** prove is that the pattern survives:
+    on the old bytes 2 of 3 replies imported a cross-note comparison, on these bytes 0 of 3 did, and
+    the one reply that weighed a framing (`fix27_unp2`, `the two sides are not the same kind of
+    money`) weighed the car's own ratio, not the class's. **No grader fails when the pattern is
+    missing**, so `unpicked-menu-resurfaces` can only ever show the collision is gone; making the
+    feature measurable needs a new fixture and case where the human carries note A's test into note
+    B unprompted. Recorded on #27 rather than glossed.
 - Evals: the span audit (`span_audit.py`). `quotes_verbatim` sees a mark only where its own line
   offers a `[[link]]`, so an arm-run can pass every case with the quoting promise broken on lines
   that name no note. The audit walks every marked span in a saved run's transcripts and asks, of each,

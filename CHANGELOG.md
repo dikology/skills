@@ -103,7 +103,8 @@ arm broke the promise 8 times (5.4% of its marks) and passed all 20, its graders
     line is weighed against a note. The pre-send check binds on the line, not the reply: *each mark
     against the links on its own line, never against the paragraph's*.
   - Measured. First rate check, on the copy before the `code`-for-phrases clause was added
-    (`--case lang` ×2 + `--case reversal` ×1): 9/9 PASS with 0 `quotes_verbatim` rejections — and the
+    (`fix26_lang1`, `fix26_lang2`, `fix26_rev1`: `--case lang` ×2 + `--case reversal` ×1): 9/9 PASS
+    with 0 `quotes_verbatim` rejections — and the
     audit still found 1 broken span in the first run and 4 in the second, all of them the model's own
     中文 or Russian phrase wearing corner marks on a line naming no note. That residue is why the
     clause exists. AC 3 was met on those bytes: `lang-pin-zh` 3 consecutive runs and

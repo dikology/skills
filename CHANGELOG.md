@@ -30,6 +30,19 @@ filing was graded as "nothing under ## Lines I said is a whole sentence the huma
 by re-scoring the saved transcript, 0 tokens. Three new blockers, no promotion, `skills/companion`
 still `e981bb4e`, and the run that follows a promotion is still the thing the tag needs.
 
+`gate25_candidate` (2026-11-01, candidate arm only, 20 cases, 5,315,417 tokens) closed #25 —
+`contradiction_surfaced` 8/8 on `7526cd0` — and lost three more cases on one mechanism, filed as
+**#26**. A span audit over the saved gates then showed how little of that mechanism the gate can
+see: 13 broken marks in `gate25_candidate` where `quotes_verbatim` failed 3 of them, 44 in
+`gate_companion_v5`/stable where it failed 10. #26 was therefore verified at the promise level, not
+only by verdicts. `gate26_both` (2026-11-03, 20 cases × 2 arms, judge on, 9,271,120 tokens) **did not
+promote: 39/40, candidate lost 1** — `unpicked-menu-resurfaces`, a collision between two older rules
+and not the quoting mechanism, whose own reply is clean; the same case failed twice in three replays
+on the *shipped* bytes, so the flip is not this change's. On the quoting axis the run is the
+strongest evidence yet: the Candidate arm wrote 0 broken spans across all 20 cases while the Stable
+arm broke the promise 8 times (5.4% of its marks) and passed all 20, its graders seeing none of the
+8. No tag; `skills/companion` still `e981bb4e`.
+
 ### Added
 
 - `improve` skill: a structural review of one note. It reads the note and the notes
@@ -55,6 +68,72 @@ still `e981bb4e`, and the run that follows a promotion is still the thing the ta
   The plugin and marketplace descriptions are no longer companion-only.
 - READMEs (EN and 中文): an improve row, its Overlay fields with their fallbacks, and
   an Overlay example showing both sections.
+- companion: **the owner of a mark is named on the line the mark sits on** (#26, `labs/companion/`,
+  scored on `gate26_both`). #23 made copying honest and #22 made the grader credit every note a line
+  offers; what `gate25_candidate` lost three cases on, and `gate_companion_v6` one more, is neither —
+  it is a mark whose words are right, or a rendering that is not, placed in the one sentence that has
+  a link in its hand. The post-reversal wrap-up wrote
+  `1. [[mornings]] is not reversed. "The train would eat the first hour of that." still stands …
+  [[the hybrid offer]]` — a perfect copy claimed about a note that holds none of it, because the
+  sentence that named its owner ended two words earlier; the pinned-language orient wrote
+  `[[the band]] 里的立项理由就是"有个理由在周四出门"` — a 中文 rendering of an English line inside
+  marks, on the line naming `[[the band]]`. The same replies carried clean quote lines that passed,
+  so this was never copying discipline: it is where the copy is put.
+  - New at promise level, **The owner is on the line**: a mark answers to a note named on the line the
+    mark sits on, a sentence before it does not carry it, and the phrase with no owner on its line
+    goes in `code`. The sentence that weighs two notes is named as the place it bites — comparing
+    notes, saying what still stands after a reversal, re-pointing at a line quoted earlier — and given
+    a shape instead of a prohibition: TENSION's, each note a link, the clash in your own words, any
+    line you want back copied on a quote line of its own above. The reply that says what still stands
+    after a reversal write repeats it, because that is where the model actually reaches for marks.
+  - The pointer sentence in a pinned reply is named too — `[[дача]] 那句「…」` asks for the note's line
+    and answers with your rendering — so the reading goes unmarked after the link or in the gloss
+    `（注：…）`, which becomes the shape wherever a foreign line's content is weighed rather than the
+    courtesy owed a reader who may not know the source. A phrase held up to be weighed goes in `code`
+    like a word does, and 中文 has no exception: `该不该退乐队`, not 「该不该退乐队」.
+  - Two habits the file had no sentence for: companion quoting **its own earlier reply** (added to the
+    things with nothing to copy them from), and the human's words recalled slightly edited while their
+    line is weighed against a note. The pre-send check binds on the line, not the reply: *each mark
+    against the links on its own line, never against the paragraph's*.
+  - Measured. `--case lang` ×2 + `--case reversal` ×1 on the new copy: 9/9 PASS with 0
+    `quotes_verbatim` rejections; on the bytes this replaces, `lang-pin-zh` failed 2 of its 4 runs and
+    `gate25_candidate` lost `lang-follows-human`, `lang-quote-stays-source` and `reversal-annotated`
+    the same way. AC 3: `lang-pin-zh` 3 consecutive runs and `reversal-annotated` 3 consecutive runs,
+    all 1.00, each with **0 broken and 0 unowned** spans — against `audit25l1`'s 6 broken of 16 marks
+    (1 graded) and `audit25r1`'s 2 of 10 on the shipped bytes. `gate26_both` (20 cases × 2 arms,
+    judge on, 9,271,120 tokens): the Candidate arm wrote **0 broken spans in all 20 cases** (139 marks,
+    119 of them graded claims, every one verbatim, 1 unowned) while the Stable arm in the same run
+    broke the promise 8 times (5.4% of its marks) and passed all 20 of its cases — its graders failed
+    **none** of those 8, two of which copy the log's own words back as if a person had said them.
+  - **Not promoted.** The run scored 39/40: the Candidate lost `unpicked-menu-resurfaces`
+    (`unpicked_menu_named_once`, 0.67) on a reply that named the unpicked Spanish menu a second time
+    while following an older Posture rule — *name the pattern when the human reuses a framing from
+    another note that may not fit here*. That reply is clean on quoting: it names `[[spanish class]]`
+    with a link, holds no marks, and puts the note's own phrase in `code`. Replaying the case three
+    times per arm says the case is a coin flip on **both** copies: Stable failed it 2 of 3
+    (`fix26_unp_s2`, `fix26_unp_s3`, both `named again in reply 2`) and the Candidate failed it 1 of 4
+    counting the gate. The collision is in the skill's own rules and predates this change — but under
+    the runner's loss rule, a flip on this case blocks promotion whichever arm it lands on.
+    `skills/companion` stays `e981bb4e`.
+- Evals: the span audit (`span_audit.py`). `quotes_verbatim` sees a mark only where its own line
+  offers a `[[link]]`, so an arm-run can pass every case with the quoting promise broken on lines
+  that name no note. The audit walks every marked span in a saved run's transcripts and asks, of each,
+  whose words these are — reading the vault through the case's Overlay the way the graders do, so the
+  log and the skip list are machine text and not notes. A graded mark is put to `quote_claim`
+  unchanged, so the audit can be checked against the gate; an ungraded one is matched against the
+  Corpus (`human_text`), the machine blocks (`machine_text`), the human's turns and the model's own
+  earlier replies. It reports two numbers: **broken** — #26's definition, a real copy credited to a
+  note that does not hold it, or marks that copy nothing at all (the model's own weighing phrase, its
+  own earlier reply, the human's words recalled slightly edited, a line of machine text) — and
+  **unowned**, a note's line in marks on a sentence naming no owner: true words, wrong place, which
+  is the shape #26's rule binds on rather than a mark #26 calls broken. A span under the gate's
+  `MIN_QUOTE_WORDS` floor is a label and leaves the denominator, except where the script writes no
+  spaces: 中文 counts by character, because a 中文 span is graded by the gate and never exempted by a
+  whitespace floor. It costs 0 tokens, changes no verdict, and exits 1 on any broken span. Its graded
+  bucket reproduces `quotes_verbatim`'s verdict on every arm-case of the six runs audited so far, and
+  finds what they missed: 13 broken marks in `gate25_candidate` where the gate failed 3, and 44 in
+  `gate_companion_v5`/stable (21.3% of its marks) where its graders failed 10. `GLOSSARY.md` names
+  Span and Span audit.
 
 ### Changed
 

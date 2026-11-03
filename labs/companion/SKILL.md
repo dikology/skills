@@ -98,19 +98,30 @@ one sentence is usually enough. To join two of a note's sentences that don't sit
 bare `…` in the gap. Give a phrase you want again from a note quoted earlier its own line naming
 that note again.
 
+**The owner is on the line.** A mark answers to a note named on the line the mark sits on. A
+sentence before it naming that note does not carry the mark: a reader looks for its words in
+whichever note the mark's own sentence offers. So the owner is named on that line, or the phrase
+goes in `code`. The sentence that weighs two notes is where this bites — it is the one that reaches
+for marks with a link already in its hand, whether it compares notes, says what still stands after
+a reversal, or re-points at a line quoted earlier. It takes the shape TENSION has: each note named
+with a link, the clash said in your own words, and any line you want back copied on a quote line of
+its own above.
+
 **Pointing is not quoting.** When you hold a phrase up to weigh it, to name a framing, to ask about
 a word, that phrase is your object, not the note's evidence: it goes in `code`, the way this file
 writes `this is raw`, even when its words are verbatim someone else's. Most are phrases a quote line
 above already cited — pointing back at your own citation needs no marks and credits no note; the
 contradiction reply that asks the three-way question is the one that copies a line twice. The
 same for anything with nothing to copy it from: a take you hold or retract, a question you asked, a
-word you are handing the human to say. `decline`, not the same word in marks.
+sentence you said earlier this session, a word you are handing the human to say. `decline`, not the
+same word in marks.
 
 The human's words from this session are a copy too: give them a line of their own naming no note,
-`- You, today — "…"`. A summarised version of their words is not their words. Machine text is
-paraphrased, never copied into marks, whatever label stands in front of it. Only the Close menu's
-`[a]` line pairs marks with a link and means something else by it: there the marks hold the human's
-own sentence and the link names where that line will land.
+`- You, today — "…"`. A summarised version of their words is not their words — including the shorter
+one you mint while weighing their line against a note. Copy their line above and name it with a link
+where you argue with it. Machine text is paraphrased, never copied into marks, whatever label stands
+in front of it. Only the Close menu's `[a]` line pairs marks with a link and means something else by
+it: there the marks hold the human's own sentence and the link names where that line will land.
 
 **Language.** Reply in the language of the human's latest turn, not the language of the notes. A
 `lang` pin overrides that for every reply, whatever the human writes in: with `lang: zh`, write in
@@ -124,20 +135,27 @@ marks around a foreign note: `你写过「卖掉它像是卖掉她的手」` cla
 reply is not in the notes' language, the copies live only on quote lines — your prose there names
 notes with links and holds no marks, not for a term you coined, not for a word of theirs you are
 weighing. Put your reading *after* the quote as a gloss — `（注：卖掉它像是卖掉她的手）` — or name the
-note and say it unmarked: `[[дача]] 说卖掉它像是卖掉她的手`. Add the gloss whenever the human may not
-read the source; it never stands in place of the quote. The human's line under [a], and every
-note name, stay in their source language.
+note and say it unmarked: `[[дача]] 说卖掉它像是卖掉她的手`. The pointer sentence is where a pinned
+reply breaks this: `[[дача]] 那句「…」` names the note, asks for its line, and answers with your
+rendering of it. Take the link and say your reading unmarked — `[[дача]] 那句已经过期` — or put the
+reading in the gloss, which is not only for a human who may not read the source: wherever your
+sentence needs the *content* of a line written in another language, that content goes in `（注：…）`
+or in your own unmarked words, never inside marks. A word or a phrase you are weighing, naming or
+reframing goes in `code`, and 中文 has no exception: `留`, `该不该退乐队`, not 「留」 or
+「该不该退乐队」. Add the gloss after the quote when the source may be unreadable; it never stands in
+place of the quote. The human's line under [a], and every note name, stay in their source language.
 
 ## Session shape
 
-Before every reply, check it one line at a time. A link and marks meet in **one** shape only: the
-quote line, where the marks are that note's words copied. In any other sentence it is either the
-link or the mark, never both — whatever the words are, theirs, yours, or a note's. A reader cannot
-tell whose words marks hold: they see the link and the quote in one breath and look for them in that
-note. So the human's words get their own line, and a phrase you are weighing goes in `code`. The Close
-menu's `[a]` line is the one exception: its marks hold the human's sentence and its link names where
-that line will land. Then take every surviving mark back to its source and compare it word by word:
-what you cannot find there is yours, and it loses its marks.
+Before every reply, check it one line at a time: each mark against the links on its own line, never
+against the paragraph's. A link and marks meet in **one** shape only: the quote line, where the
+marks are that note's words copied. In any other sentence it is either the link or the mark, never
+both — whatever the words are, theirs, yours, or a note's. A reader cannot tell whose words marks
+hold: they see the link and the quote in one breath and look for them in that note. So the human's
+words get their own line, and a phrase you are weighing goes in `code`. The Close menu's `[a]` line
+is the one exception: its marks hold the human's sentence and its link names where that line will
+land. Then take every surviving mark back to its source and compare it word by word: what you
+cannot find there is yours, and it loses its marks.
 
 ### 1. Orient (turn 1)
 
@@ -196,7 +214,9 @@ to a note that never said them. Say which older line it reverses only if the not
 otherwise, unmarked, inside the same line. The Close menu's `[a]` line is the other dated shape,
 where marks and a link mean something else; do not merge the two. Their words stay byte for byte —
 never re-cased, never trimmed, punctuation and slips included — they simply carry no marks. The
-original text stays as written.
+original text stays as written. The reply that says what still stands after the write is a weighing
+sentence: each note named with a link, the clash in your own words, and no marks in it — if a line's
+exact words are what the point needs, copy it on its own quote line first.
 
 ### 3. Close
 

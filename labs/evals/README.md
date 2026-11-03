@@ -9,7 +9,8 @@ python3 labs/evals/run_evals.py                         # companion, every case,
 python3 labs/evals/run_evals.py <skill>                 # any Library skill, by name
 python3 labs/evals/run_evals.py <skill> --arm both      # stable and candidate, compared case by case
 python3 labs/evals/run_evals.py <skill> --promote       # candidate -> stable, if it lost nothing
-python3 -m unittest discover -s labs/evals -v           # graders' and runner's own tests (no API calls)
+python3 labs/evals/span_audit.py labs/evals/results/<run>   # every mark in a saved run, graded or not
+python3 -m unittest discover -s labs/evals -v           # harness's own tests: graders, runner, audit (no API calls)
 ```
 
 ## Running a skill by name
@@ -168,6 +169,37 @@ most 25 lines: a list, not a diagnosis of each.
 `no_transcript` is graded on every case, named or not: no file a session writes may
 hold two or more of one session's human turns. A one-turn session can't be told apart
 from a filed line that way, so those cases also grade `no_writes`.
+
+## The span audit: what the gate cannot see
+
+`quotes_verbatim` grades a mark only where the mark's own line offers a `[[link]]`. A translated,
+trimmed, self-coined or self-quoted phrase in marks on a line that names no note is invisible to
+every grader, so an arm-run can pass 20/20 with the shipped promise — marks hold a note's or the
+human's exact words — broken in it. `span_audit.py` walks every marked span in a saved run's
+transcripts and says who owns each one's words. A graded mark is put to the gate's own `quote_claim`,
+unchanged, so the two can be checked against each other; an ungraded one is matched against the
+Corpus, the machine blocks, the human's turns and the reply's own earlier sentences — `human_text`,
+`machine_text` and `start_vault`, reading the Fixture vault through the case's Overlay, so the log is
+machine text and not a note a mark may credit. It grades nothing and changes no
+verdict; `results/` is gitignored, so this is how a gate's evidence is re-read without spending it
+again. Costs 0 tokens.
+
+Two numbers, because a run fails the promise two ways:
+
+- **broken** — a real copy credited to a note that does not hold it (`claim-fail`), or marks that
+  copy nothing at all: the model's own weighing phrase (`no-source`), its own earlier reply
+  (`self-quote`), the human's words recalled slightly edited (`human-edited`), a line of machine
+  text (`machine-copy`). The exit code says 1 when a run has any.
+- **unowned** — `note-copy-unowned`: a note's line in marks on a sentence naming no owner. True
+  words, wrong place. Not broken by that definition, and reported beside it.
+
+A span too short to read as a claimed line is `label` and is left out of the denominator — the
+harness's own `MIN_QUOTE_WORDS` floor, counted by character rather than by word where the script has
+no spaces, because a 中文 span is graded but never exempted by a whitespace floor.
+
+Before trusting a new classifier over a gate, check it reproduces the gate's own verdicts: run it
+with `--arm` and compare its `claim-fail` per case against `grade.json`. On the six runs audited so
+far it agrees with `quotes_verbatim` on every arm-case, and finds spans the gate never saw.
 
 ## Fixture vaults
 

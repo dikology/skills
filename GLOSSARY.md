@@ -28,3 +28,11 @@ _Avoid_: test vault, sample data
 **Stable / Candidate**:
 Stable is the published copy of a skill under `skills/`; it changes only by promotion. Candidate is the working copy under `labs/`, scored against Stable on the same Fixture vaults before it may replace it. The two are the eval runner's arms.
 _Avoid_: prod/dev, v1/v2
+
+**Span**:
+One run of characters inside quotation marks in a reply — the unit the quoting promise is kept or broken on. A span either holds a note's or the human's exact words, or it claims that someone spoke when no one did.
+_Avoid_: excerpt, quote fragment
+
+**Span audit**:
+Going through every Span in a run's replies and saying whose words each one holds, including the Spans no grader can see: a Span is a claim about a note only where its own line names one. The measurement behind any claim that a run quoted honestly, as distinct from a run that passed.
+_Avoid_: lint, quote check

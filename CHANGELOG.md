@@ -60,7 +60,7 @@ shown open: that arm meets #17's 0-broken clause while 16 note lines sit where t
   caught by the instrument and invisible to the gate. With `fix26h_pin1` that is 5 doors over 3
   `lang-pin-zh` runs: **1.67/run**.
 - **AC 4: met on the door number, not met on the bar.** On the final copy `8a965e9e`
-  (`fix28_final_*`, all six hash-verified, 706,861 tok): **0.67 wrong-door per `lang-pin-zh` run**
+  (`fix28_final_*`, all six hash-verified, 806,871 tok): **0.67 wrong-door per `lang-pin-zh` run**
   (2, 0, 0) against that 1.67 baseline, 1 door across the three English cases, and
   `framing-carried-over` clean at 0 doors with `framing_named` passing and the judge at 5/5 — so the
   widened rule did not re-open #27's collision. But the third run **failed `quotes_verbatim`** on
@@ -68,6 +68,12 @@ shown open: that arm meets #17's 0-broken clause while 16 note lines sit where t
   still open on, not #28's mechanism. So *three consecutive runs at 0 broken* is **not met**, and by
   the old defect rather than the new one. Not promoted; `skills/companion` untouched; the both-arm
   gate unspent.
+- **What this ticket cost**: 3,219,299 eval tokens over 22 candidate case-runs on four byte-strings
+  (8 on `b36c3eba` for the baseline, 3 on `7d758546`, 4 on `68c0b016`, 7 on the final `8a965e9e`) — of
+  which the instrument itself spent 0, and 1,276,669 went on the two interim copies the review retired
+  before they were worth scoring. That is the honest price of writing the shape before checking where
+  the doors were: the scope error was findable at 0 tokens by splitting `gate26_both`'s 16 doors by
+  case, and it was not found until a review axis asked for it.
 `fix28_v2_fram1` (superseded bytes) also passed on its hard graders with the judge erroring (`judge
 error: no JSON in reply`, the judge's reply holding a `<identity>` role-setting block — treated as
 noise, not as input).

@@ -255,15 +255,25 @@ def wrong_doors(ev: Evidence, case: str = "") -> list:
 
     It is counted, never graded: #26's `broken` is about marks, and this number sits beside
     it. A span is skipped when it is too short to read as a line (the gate's own floor), when
-    it is a note's name rather than its text, or when the Corpus does not hold it at all —
-    which covers the model's own weighing phrase, the Overlay's field vocabulary, and machine
-    text, since `VaultView.corpus` is built without the Overlay, the skip list or a callout."""
+    it is a note's name rather than its text, when the human said it this session, or when the
+    Corpus does not hold it at all — which covers the model's own weighing phrase, the Overlay's
+    field vocabulary, and machine text, since `VaultView.corpus` is built without the Overlay,
+    the skip list or a callout.
+
+    The human's turns are read before the Corpus, as `_ungraded` reads them: a line the human
+    carried in is their words, and #27's `framing_named` *requires* those words in `code` on a
+    line holding no link. Without this the instrument counts as a wrong door the one shape that
+    grader passes — `framing-carried-over`'s `what I paid against what came back`, which the
+    human said and [[the evening class]] happens to hold."""
     out = []
     view = VaultView.of(ev)
+    said = human_turns(ev)
     for n, text in enumerate(replies(ev), 1):
         for line in claim_lines(outside_menu(text)):
             for frag in CODE_SPAN.findall(line):
                 if not carries_a_claim(frag) or names_a_note(frag, view):
+                    continue
+                if any(quoted_from_note(frag, turn) for turn in said):
                     continue
                 held = view.holders(frag)
                 if held:

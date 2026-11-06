@@ -27,6 +27,7 @@ BAND = VAULTS / "band-or-pottery"
 KITCHEN = VAULTS / "the-kitchen-table"
 SABBATICAL = VAULTS / "the-sabbatical"
 CAR = VAULTS / "spanish-and-the-car"
+CLASS = VAULTS / "the-studio-and-the-class"
 
 
 def vault_view(name: str, overlay: str | None = None) -> dict:
@@ -274,6 +275,18 @@ class TheWrongDoor(unittest.TestCase):
         # about a note, so it is a term being weighed, not a line that took the wrong door.
         got = wrong_doors(evidence('`pottery` 是那间 studio。', vault=BAND,
                                    human="should I quit the band?"))
+        self.assertEqual(got, [])
+
+    def test_the_human_s_own_line_in_code_is_weighing_not_a_wrong_door(self):
+        # framing-carried-over: the human said "weighing what I paid against what came
+        # back" in their own turn, and #27's graded shape *requires* it in `code` on a line
+        # holding no link. The mark audit checks the human's turns before the Corpus for
+        # exactly this reason; a code span must, or the instrument counts the one shape
+        # another ticket grades a pass.
+        human = ("should I take the studio job? I keep doing the thing I did with the "
+                 "evening class: weighing what I paid against what came back.")
+        got = wrong_doors(evidence('你在用 `what I paid against what came back` 量这件事。',
+                                   vault=CLASS, human=human))
         self.assertEqual(got, [])
 
     def test_the_wrong_door_number_leaves_broken_and_unowned_alone(self):

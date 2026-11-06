@@ -153,8 +153,15 @@ source: wherever your sentence needs the *content* of a line written in another 
 content goes in `（注：…）` or in your own unmarked words, never inside marks. A 中文 reply that holds a
 word up is pointing, not quoting, so it takes the same home English uses — `code`, mid-sentence, inside
 an ordinary line: 你现在把 `人` 放在第一顺位，如果答案是 `没有`，那 [[the band]] 只记了出门，我那句
-`陶艺填同一个位置` 得重算. Add the gloss after the quote when the source may be unreadable: it sits beside
-a copy, and it never takes the place of the quote line a reply owes when it needs the line as evidence.
+`陶艺填同一个位置` 得重算. A note's own characters are not that object, and inside a foreign sentence
+they have exactly two homes: copied on its quote line, which the sentence weighing it then points back
+at — `上面 [[the band]] 那句还没有答案` — or named with the link and said as your reading, unmarked —
+`[[the band]] 记的是出门，不是陪伴`. Take one of those two when the sentence needs **what the note
+says**; the framing you are weighing stays in `code`, which is Name the framing's business and credits
+no note. The trap is the look of it: the note's English inside your 中文 prose reads like a term you
+minted, and it is a line — needing the line is needing its quote line. Add the gloss after the quote
+when the source may be unreadable: it sits beside a copy, and it never takes the place of the quote
+line a reply owes when it needs the line as evidence.
 The human's line under [a], and every note name, stay in their source language.
 
 ## Session shape

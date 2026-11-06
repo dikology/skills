@@ -32,6 +32,39 @@ what still stands between this candidate and #17's 0-broken clause is the pointe
 seen in a third surface form this round — which #28 says cannot be diagnosed until the instrument can
 see the wrong door it is going through.
 
+**#28's instrument landed, and the prose round it unlocked is measured but not closed.**
+`span_audit.py` now reports a third number beside `broken` and `unowned`: `wrongdoor`, a `code` span
+whose characters the Corpus holds — a copy that took the wrong door, which no grader reads because
+marks copy and `code` weighs. AC 1 and AC 2 met at 0 tokens: the verdict on `fix26d_pin2` is the 5
+derived by hand in the issue, and on `gate26_both` the classifier **adds 16 to the candidate arm
+without moving its published 139 marks / 119 graded / 0 broken / 1 unowned** — which is the hole
+shown open: that arm meets #17's 0-broken clause while 16 note lines sit where the clause cannot read.
+Probing all 2,208 saved code spans found the one exclusion the issue did not name: a span that is only
+a note's *name*, a `# heading` or a `[[link]]` points at a note instead of copying its text, and the
+Corpus holds names — 83 of the 276 corpus-held spans are that. The Overlay-field vocabulary the issue
+asked to exclude needed no banned-string list: the Corpus is built without the Overlay, the skip list
+or an `AI capture` callout, so `lang: zh` and `this is raw` are simply not in it. Reading the new
+number against #27's case then caught a false positive in it: `framing-carried-over`'s
+`what I paid against what came back` is the **human's** own line, and `framing_named` grades putting
+it in `code` — so the walk reads the human's turns before the Corpus, as `_ungraded` already does.
+- **AC 3, the baseline the prose was written against** (1,135,759 tok): two candidate runs of
+  `--case lang` on `b36c3eba`, hash-verified as the on-disk copy. `fix28_base1` passed **all four
+  cases at 0 broken and 0 unowned while carrying 7 wrong-door copies** — the failure #28 predicts,
+  caught by the instrument and invisible to the gate. `fix28_base2` spent its 3 broken on the pointer
+  sentence and 0 doors. With `fix26h_pin1` that is 5 doors over 3 `lang-pin-zh` runs: **1.67/run**.
+- **AC 4, met on the door number and not on the bar.** The shape is #24's method — two named doors
+  stated where a pinned reply composes, not the paragraph's last gasp: a note's characters inside a
+  foreign sentence are either copied on their quote line and pointed back at, or named with a link and
+  said unmarked; `code` keeps the framing, which is Name the framing's business. First draft said
+  "a phrase **you made**", which collides with #27's graded shape; corrected before measuring
+  (`68c0b016`, `fix28_v2_*`): **0 wrong-door in 3 of 3 `lang-pin-zh` runs** against 1.67/run, and
+  `framing_named` still passes on the same copy. But `fix28_v2_1` broke one mark —
+  `"I joined the the band"`, a doubled word inside a *graded* quote, not #28's mechanism — so the
+  three-consecutive-0-broken bar #26 has never met is **still not met**, by a different defect than
+  the one #28 instrumented. Not promoted; `skills/companion` untouched; the both-arm gate unspent.
+`fix28_v2_fram1` also passed on its hard graders with the judge erroring (`judge error: no JSON in
+reply`, the judge's reply holding a `<identity>` role-setting block — treated as noise, not as input).
+
 `gate_companion_v6` (2026-11-01, 20 cases × 2 arms, qwen, judge on, 9,704,776 tokens) ran that
 follow-up cycle and **did not promote: 37/40, candidate lost 2**. It also answered #24: on the
 fixed Candidate the compound dated annotation occurred in **0 of 8 runs** — `fix11`–`fix16`, the

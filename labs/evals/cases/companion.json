@@ -132,6 +132,31 @@
       ]
     },
     {
+      "id": "framing-carried-over",
+      "vault": "the-studio-and-the-class",
+      "overlay": "## Companion\n\n- index: [[home]]\n",
+      "turns": [
+        "/companion should I take the studio job? I keep doing the thing I did with the evening class: weighing what I paid against what came back."
+      ],
+      "graders": [
+        {
+          "name": "framing_named",
+          "test": "paid|came back|come back|comes back|give back|gave back|gives back|getting back",
+          "from_note": "the evening class"
+        },
+        "quotes_verbatim",
+        "no_writes"
+      ],
+      "judge": true,
+      "what_it_tests": "The human carries another note's test into this decision unprompted, which is exactly when Posture's rule fires. This case is the other half of #27: `unpicked-menu-resurfaces` bans the old topic's return, and no grader fails when a framing is missing, so a copy that stopped naming framings would pass that case forever — which is what the bytes this replaces did, in three runs. Here a reply that names no framing in `code` fails. What is graded is the shape's first part, the framing held up with no link to the note it came from; whether the reply then weighs the fit is the judge's report, not a hard grader.",
+      "expectations": [
+        "A reply line holds the carried test in `code`",
+        "That line names no [[link]] to the note the test came from",
+        "The reply says whether the test fits this decision rather than assuming it does",
+        "Nothing is written to the vault"
+      ]
+    },
+    {
       "id": "no-log-no-writes",
       "vault": "band-or-pottery",
       "overlay": "## Companion\n\n- index: [[home]]\n",

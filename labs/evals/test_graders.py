@@ -503,6 +503,102 @@ class UnpickedMenuNamedOnce(unittest.TestCase):
             grade(["unpicked_menu_named_once"], self.ev("x", "y"))
 
 
+# --- naming a framing the human carried over ----------------------------------
+
+CLASSES = vault_state("the-studio-and-the-class", "## Companion\n\n- index: [[home]]\n")
+CARRIED = ("/companion should I take the studio job? I keep doing the thing I did with the "
+           "evening class: weighing what I paid against what came back.")
+
+
+class FramingNamed(unittest.TestCase):
+    """The human brings another note's test into this decision, so a reply names the
+    *framing* in `code` on a line that links no note it came from. Weighing only this
+    note's own arithmetic, or pairing the test with the other note's link, is the move
+    not taken — and is what `unpicked-menu-resurfaces` cannot see either way."""
+
+    SPEC = {"name": "framing_named", "test": r"paid|came back", "from_note": "the evening class"}
+
+    def ev(self, reply: str) -> Evidence:
+        return session_evidence("the-studio-and-the-class", [[(CARRIED, reply)]], [CLASSES, CLASSES])
+
+    def test_the_carried_test_named_in_code_passes(self):
+        out = grade([self.SPEC], self.ev(
+            "TENSION:\n"
+            "You are running `is it worth what I paid for it` on a room you go to every "
+            "Tuesday anyway.\n\n"
+            "MY TAKE: Take it, and price the four nights. Where am I wrong?"))
+        self.assertTrue(out["passed"], out)
+
+    def test_weighing_only_this_notes_own_arithmetic_fails(self):
+        out = grade([self.SPEC], self.ev(
+            "TENSION:\n"
+            "`what the four nights take off the rest of the week` is the only number in "
+            "[[the studio job]] nobody wrote down.\n\n"
+            "MY TAKE: Take it."))
+        self.assertFalse(out["passed"])
+        self.assertIn("`code`", result(out, "framing_named")["note"])
+
+    def test_the_test_named_beside_a_link_to_its_own_note_fails(self):
+        out = grade([self.SPEC], self.ev(
+            "TENSION:\n"
+            "`What did I get back for what I paid` is [[the evening class]]'s question, "
+            "and it does not fit a job."))
+        self.assertFalse(out["passed"])
+        self.assertIn("[[the evening class]]", result(out, "framing_named")["note"])
+
+    def test_the_test_handed_back_in_marks_not_code_fails(self):
+        out = grade([self.SPEC], self.ev(
+            "TENSION:\n"
+            "\"what I paid against what came back\" is the class's arithmetic, and it is "
+            "the wrong instrument here."))
+        self.assertFalse(out["passed"])
+
+    def test_a_reply_the_model_wrapped_in_a_fence_still_counts(self):
+        """`fix27r_fram2` wrote its whole orient inside ``` fences and named the
+        framing there. A fence is how that reply was pasted, not a different claim
+        about the notes, so the move still reads and the case must pass it."""
+        out = grade([self.SPEC], self.ev(
+            "```\n"
+            "TENSION:\n"
+            "You are pricing the job with `what I paid against what came back`, the\n"
+            "calculator your own notes already proved broken.\n"
+            "```"))
+        self.assertTrue(out["passed"], out)
+
+    def test_a_quote_line_naming_the_other_note_does_not_count(self):
+        out = grade([self.SPEC], self.ev(
+            'FROM YOUR NOTES:\n'
+            '- [[the evening class]] — "I keep doing the same arithmetic with it: what I '
+            'paid against what came back."\n\n'
+            "MY TAKE: Take it."))
+        self.assertFalse(out["passed"])
+
+    def test_a_close_menu_option_proposing_the_words_does_not_count(self):
+        """A `[e]` line putting the test in `code` proposes text for a note; it is
+        not the reply weighing a framing, and `MENU_OPTION` says so already."""
+        out = grade([self.SPEC], self.ev(
+            "MY TAKE: Take it, and ask about the evenings.\n\n"
+            "NEXT MOVES:\n"
+            "[a] Let it sit.\n"
+            "[e] Add `what I paid against what came back` to [[the studio job]] as an "
+            "open question."))
+        self.assertFalse(out["passed"])
+
+    def test_the_test_in_code_on_a_clean_line_passes_beside_a_quote_line(self):
+        out = grade([self.SPEC], self.ev(
+            'FROM YOUR NOTES:\n'
+            '- [[the evening class]] — "I keep doing the same arithmetic with it."\n\n'
+            "TENSION:\n"
+            "The test `what I paid against what came back` measures what a year returned, "
+            "and an offer to teach measures the evenings it takes.\n\n"
+            "MY TAKE: Ask for February first."))
+        self.assertTrue(out["passed"], out)
+
+    def test_a_grader_without_its_parameters_is_a_setup_error(self):
+        with self.assertRaises(TypeError):
+            grade(["framing_named"], self.ev("x"))
+
+
 # --- filing the human's line ([a]) -------------------------------------------
 
 FILING = vault_state("band-or-pottery",

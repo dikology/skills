@@ -97,6 +97,15 @@ def outside_menu(text: str) -> str:
     return "\n".join(line for line in text.splitlines() if not MENU_OPTION.match(line))
 
 
+# An inline `code` span: the shape a reply uses for a phrase it is weighing rather
+# than quoting, which is the only shape a naming of a framing can take. Neither edge
+# may touch another backtick, which is what stops a fence's ``` marker from opening a
+# span across the sentence after it — `fix27r_fram2` wrapped its whole orient in one.
+# The cost: a doubled-backtick span (`` `x` ``) matches nothing; companion replies
+# write those never, and a missed span only ever fails a case.
+CODE_SPAN = re.compile(r"(?<!`)`([^`\n]+)`(?!`)")
+
+
 def _undivided(x: int, y: int, dividers: list) -> bool:
     """No sentence end, loose bracket or other quoted span lies between these offsets.
 
@@ -809,6 +818,38 @@ def g_unpicked_menu_named_once(ev: Evidence, topic: str) -> Result:
     return Result(name, True, "named once, in the second session's first reply")
 
 
+def g_framing_named(ev: Evidence, test: str, from_note: str) -> Result:
+    """A reply names the framing the human carried in from another note: the test itself
+    in `code`, on a line that links nothing to `from_note`. `test` is a regex for that
+    test's own words, `from_note` the note it came from.
+
+    This is the half `unpicked-menu-resurfaces` cannot see: it bans the old topic's
+    *presence*, so a copy that stopped naming framings altogether would pass it forever.
+    A pass here only comes from doing the move."""
+    name = "framing_named"
+    pat = re.compile(test, re.I)
+    key = note_key(from_note)
+    paired = marks = None
+    for k, text in enumerate(replies(ev), 1):
+        for line in claim_lines(outside_menu(text)):
+            for span in CODE_SPAN.findall(line):
+                if not pat.search(span):
+                    continue
+                if key not in links(line):
+                    return Result(name, True,
+                                  f"reply {k} names the framing `{span}` on a line that "
+                                  "links no note it could have come from")
+                paired = paired or (f"reply {k} names `{span}` in `code` on the same line "
+                                    f"as [[{from_note}]]")
+        if paired is None:
+            held = [q for q in quoted_spans(text) if pat.search(q)]
+            if held:
+                marks = marks or (f"reply {k} holds \"{held[0]}\" in marks, where a copy is "
+                                  "claimed; a framing being weighed goes in `code`")
+    return Result(name, False, paired or marks or
+                  f"no reply names a framing in `code` /{test}/")
+
+
 # --- the human's line ([a]) and transcripts -------------------------------------
 
 def human_turns(ev: Evidence, session: int | None = None) -> list:
@@ -1313,6 +1354,7 @@ GRADERS = {
     "one_log_line_per_session": g_one_log_line_per_session,
     "writes_only_log": g_writes_only_log,
     "unpicked_menu_logged": g_unpicked_menu_logged,
+    "framing_named": g_framing_named,
     "unpicked_menu_named_once": g_unpicked_menu_named_once,
     "line_filed_under_target": g_line_filed_under_target,
     "line_handed_back": g_line_handed_back,

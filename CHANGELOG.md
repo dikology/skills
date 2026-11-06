@@ -18,8 +18,12 @@ both skills' case sets, on the bytes that ship, in which **no case fails on both
 candidate arm reports **0 broken spans** in the span audit — a single-arm loss is named here with the
 replays that pass it. #23, #24 and #25 are closed on evidence. Two things stand against that bar now:
 **#26**, whose shape brought `lang-pin-zh` from 2 fails in 4 runs to 1 in 3 but has not met its own
-three-consecutive criterion, and **#27**, where two rules in the skill collide and the case flips on
-both arms.
+three-consecutive criterion and still leaves broken spans in the audit, and **#27**, whose rule
+collision is fixed in the candidate — `fix27b_fram1`–`fix27b_unp3`: 6 of 6 PASS, the framing named in
+3 of 3 replies, `unpicked-menu-resurfaces` 3 of 3 with the menu named once — but not promoted, because
+its last criterion is a both-arm run that has not been spent. companion's case set is 21 since #27's
+`framing-carried-over` was added, and `fix27b_unp2`'s one `human-edited` span is #26's residue still
+standing between this candidate and the audit's 0-broken clause.
 
 `gate_companion_v6` (2026-11-01, 20 cases × 2 arms, qwen, judge on, 9,704,776 tokens) ran that
 follow-up cycle and **did not promote: 37/40, candidate lost 2**. It also answered #24: on the
@@ -155,24 +159,57 @@ arm broke the promise 8 times (5.4% of its marks) and passed all 20, its graders
     the runner's loss rule, a flip on this case blocks promotion whichever arm it lands on.
     `skills/companion` stays `e981bb4e`.
 - companion: **name the framing, not the note it came from** (#27, `labs/companion/`, measured on
-  `fix27_unp1`–`fix27_unp3`). Two rules had been reading against each other: Posture's *name the
+  `fix27b_fram1`–`fix27b_unp3`). Two rules had been reading against each other: Posture's *name the
   pattern when the human reuses a framing from another note that may not fit here*, and the Close
   menu's *say the unpicked line once; don't return to it unless the human does*. Neither said what a
   pattern is called by, and the only two hands available were the framing or the other note — naming
   the note is exactly the topic the second rule says must not come back. `gate26_both`'s candidate
   reply took the note: `you're doing the same arithmetic in [[spanish class]] … It may not fit here`,
-  clean on every quoting rule and failing `unpicked_menu_named_once`. Posture's bullet now names the
-  framing in `code` and links nothing unless the human named that note first; the unpicked-menu step
-  says the same thing from its side, so the two cannot be read as a contradiction.
-  - Measured: the case passed 3 of 3 (`fix27_unp1`–`unp3`, 1.00 each, span audit 0/0/0 broken), and
-    session 2's first reply still names the unpicked menu in all three — the collision's cheap exit
-    of dropping the opening was not taken. What this does **not** prove is that the pattern survives:
-    on the old bytes 2 of 3 replies imported a cross-note comparison, on these bytes 0 of 3 did, and
-    the one reply that weighed a framing (`fix27_unp2`, `the two sides are not the same kind of
-    money`) weighed the car's own ratio, not the class's. **No grader fails when the pattern is
-    missing**, so `unpicked-menu-resurfaces` can only ever show the collision is gone; making the
-    feature measurable needs a new fixture and case where the human carries note A's test into note
-    B unprompted. Recorded on #27 rather than glossed.
+  clean on every quoting rule and failing `unpicked_menu_named_once`.
+  - The first fix (`29cf8fc`, measured on `fix27_unp1`–`unp3`) passed the case 3 of 3 and took the
+    move with it. It stated the collision as a prohibition — *leave the other note's topic unnamed* —
+    and a reply that never names a framing satisfies a prohibition perfectly. Read out of those
+    transcripts rather than their `grade.json`: 0 of 3 session-2 replies imported a cross-note
+    comparison, against 2 of 3 on the bytes before. Nothing could tell *the ban worked* from *the ban
+    won*, because no grader fails when the pattern is missing.
+  - The copy is now shape-first, with one owner. Posture's bullet is **Name the framing** and gives the
+    sentence three parts — the test in `code`, what it measures there, what this note asks instead —
+    so naming has a form to take; the link is absent because the shape holds *your* phrase up to weigh,
+    not because the bullet forbids twice. The unpicked-menu step keeps only its own promise (say it
+    once) and points at that shape.
+  - Evals: the hole closed with a new Fixture vault and case. `the-studio-and-the-class` puts the
+    paid-against-returned arithmetic in one note's own line and makes the other note a decision about
+    evenings with no money in it, so a reply naming that test is carrying it over, not finding it here.
+    `framing-carried-over` has the human carry it unprompted, and `framing_named` (`test`, `from_note`)
+    fails a reply that names no framing in `code` on a line linking no note — the half the collision
+    case structurally cannot see. It grades the naming, not the arguing: a reply that copies the phrase
+    up and weighs nothing still passes, and the judge only reports that, so this ticket's *read the
+    replies, not just the verdicts* stays load-bearing.
+  - Measured on one set of bytes (candidate `02323656…` in all six, `skills/companion` untouched). The
+    framing case **3 of 3 PASS and named in 3 of 3** — each reply put `what I paid against what came
+    back` in `code` and said what it measures and what the job asks instead.
+    - AC 2, first half — met: `unpicked-menu-resurfaces` passed 3 consecutive runs
+      (`fix27b_unp1`–`unp3`, 1.00 each), the menu named in session 2's reply 1 and gone by reply 2.
+    - AC 2, second half — **not met by that case, and not met by any run of it**: 0 of 3 import a
+      cross-note framing, because Posture's trigger needs the human to bring a test and that session's
+      never does. The old bytes named one in 2 of 3 on their own initiative; the requirement is now
+      carried by `framing-carried-over`, which is the instrument the ticket's comment asked for.
+    - AC 3, first clause — met: no case scored worse than the shipped copy on the shape graders; all
+      six ran 1.00 with `quotes_verbatim` clean. AC 3, second clause — **not met**: the span audit
+      gives 0 broken in five runs and one in `fix27b_unp2`, `"fix or sell"`, the human's `fix the car
+      or sell it` recalled edited on a line naming no note, invisible to the gate. That is #26's
+      residue, not this mechanism's; #26 stays open, and so does #17's 0-broken bar.
+    - AC 4 — not met, see below.
+  - One failure was the harness's, found by reading the reply instead of the verdict. `fix27r_fram2`
+    graded FAIL against an earlier draft that stripped fenced blocks — the reply had named its framing
+    inside one, and the fence's own backticks were opening a span across the sentence. `CODE_SPAN` now
+    refuses an edge touching another backtick, and the same run then failed for the real reason: it put
+    `[[the evening class]]` on the framing line, the collision wearing this case's clothes. That reply
+    is why the bullet says where the note's name may go — a quote line of its own — not only where it
+    may not.
+  - **Not promoted.** The six runs above are `--case` replays on one arm, which `--promote` refuses by
+    design; this ticket's last criterion is a both-arm gate, unspent, and it will score #26's open copy
+    in the same candidate.
 - Evals: the span audit (`span_audit.py`). `quotes_verbatim` sees a mark only where its own line
   offers a `[[link]]`, so an arm-run can pass every case with the quoting promise broken on lines
   that name no note. The audit walks every marked span in a saved run's transcripts and asks, of each,

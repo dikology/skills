@@ -166,6 +166,18 @@ line reading the note's level, and a change to its maturity. For "improve
 folder's notes and ask a question, with no more than one numbered list and at
 most 25 lines: a list, not a diagnosis of each.
 
+`framing_named` takes `test` (a regex for the words of the test the human carried in from
+another note) and `from_note` (the note it came from). It wants one non-menu reply line that
+holds a `code` span matching `test` on a line linking nothing to `from_note`. It exists because
+`unpicked_menu_named_once` sees only the old topic's *presence*: a copy that stopped naming
+framings would pass that case forever, and here the bytes it replaced fail — `fix27_unp1`–`unp3`
+name none. Read the claim narrowly: it grades the shape's first part, that the framing is held
+up in `code` with no note's link beside it. That the reply then weighs the fit instead of
+echoing the human's clause is the judge's report, never a hard grader, so a reply that copies
+the phrase up and argues with nothing passes. A fence marker is not a span's edge, so
+a reply the model wrapped whole inside a fenced block still counts (`fix27r_fram2` named its
+framing there); the test handed back in marks rather than `code` fails, since marks claim a copy.
+
 `no_transcript` is graded on every case, named or not: no file a session writes may
 hold two or more of one session's human turns. A one-turn session can't be told apart
 from a filed line that way, so those cases also grade `no_writes`.
@@ -213,6 +225,7 @@ None contains real notes.
 | `the-sabbatical` | Voice: the note about a sabbatical holds the human's reason and, beside it, a folded `AI capture` callout arguing the opposite. The index also links a generated digest, in a folder the skip-list case names |
 | `mum-and-the-studio` | Soft topics: a `family/` note that invites a position (whether mum moves in), and a `work/` note that isn't soft until the human flags it raw |
 | `spanish-and-the-car` | The log: two unrelated topics, so one session's unpicked menu is easy to spot in the next, and a log with one earlier line. Also the session where the human only asks, so there is no line to file |
+| `the-studio-and-the-class` | Framing-naming: the class note holds the human's paid-against-returned arithmetic in their own words, and the studio offer is a decision about evenings with no money in it, so a reply that names that test is carrying it over rather than finding it here |
 | `the-kitchen-table` | Contradictions: an older note says the kitchen table is where the human does their best work and they'll never commute again, and a scripted turn says they want the office now. A job offer note gives the new position somewhere to link |
 | `the-dacha` | Language: a vault written in Russian, about whether to sell a grandmother's dacha. Russian turns, English turns, and a `lang: zh` pin all meet the same Russian notes |
 | `the-starter` | Improve: a sourdough `starter` note with visible gaps (no Definition, a term with no note of its own, a term never explained, an unsourced claim, a paragraph that wants to be its own note), four inbound links from three notes, one through its alias, and no index entry. A folded `AI capture` callout holds an unsourced claim that is not the human's. A schema file and a log with one earlier line, so a diagnosis that writes anything shows up in the diff, and an approval shows exactly which files its moves touched. Run with no Overlay, the same log and schema sit there unconfigured, as decoys. Two notes live in `bakes/`, for a folder request |
@@ -236,8 +249,8 @@ present it must match the file name): `id`, `vault`, `overlay` (Markdown, or nul
 vault with no Overlay), either `turns` (one session) or `sessions` (a list of turn
 lists, each a fresh session), `graders`, and optionally `"judge": true`. A grader is
 named as a string from `graders.GRADERS`, or as `{"name": ..., <parameter>: ...}`
-when it takes one (`unpicked_menu_named_once` takes `topic`, the contradiction
-graders take `note`, the language graders take `lang`, `one_improve_log_line` takes `op`, `promote` and `split` for a vault that renames them). `judge` is `true` or
+when it takes parameters (`unpicked_menu_named_once` takes `topic`, `framing_named` takes
+`test` and `from_note`, the contradiction graders take `note`, the language graders take `lang`, `one_improve_log_line` takes `op`, `promote` and `split` for a vault that renames them). `judge` is `true` or
 `{"rubric": ..., "pass_at": ...}` (see above). The runner checks names, parameters
 and rubric files before it makes any API call. In a first-run case, the last
 turn is the one that approves the Overlay. `what_it_tests` and `expectations` are for the

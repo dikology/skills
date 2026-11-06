@@ -41,6 +41,14 @@ _Avoid_: excerpt, quote fragment
 Going through every Span in a run's replies and saying whose words each one holds, including the Spans no grader can see: a Span is a claim about a note only where its own line names one. The measurement behind any claim that a run quoted honestly, as distinct from a run that passed.
 _Avoid_: lint, quote check
 
+**Two-shape scan**:
+What companion does to its own reply before sending it: read the sentences, find the ones holding both a Mark and a link, and keep only the two shapes allowed to hold both — the quote line, where the Span is the note's characters, and the Close menu's `[a]` line, where the Span is the human's. Any other sentence that holds both puts its Span on a quote line or says the note's meaning unmarked. Named for the unit it reads: a Mark answers to the links its own **sentence** offers, and in 中文 a sentence runs on past every `，` and `——`, not merely to the end of a clause.
+_Avoid_: lint, self-check, pre-send check
+
+**Script test**:
+The cheap half of the Two-shape scan, for a reply that is not in the Corpus's language: a Span written in the reply's own language is not a copy, because in that reply the only two voices are the note's characters and the human's. Naming a line (`那句`, `说的是`) hands nothing to the note — what follows is the reply's reading, and a reading wears no Mark. Measured on the saved pinned replies: every broken Span at that site was in the reply's language, every legal one in the note's.
+_Avoid_: translation check, language guard
+
 **Wrong door**:
 A note's own characters put in `code` instead of in a Mark. Not a Span — `code` makes no promise that someone spoke — and so invisible to every grader: the copy is true, the owner is named nowhere, and the quote line it owes is never written. The third number the Span audit reports, beside broken and unowned.
 _Avoid_: code span, misquoted, invisible copy

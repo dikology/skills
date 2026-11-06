@@ -26,11 +26,65 @@ its last criterion is a both-arm run that has not been spent. companion's case s
 `framing-carried-over` was added. #26's door-sort is the one measured gain of the round — on
 `26c99207` it held **0 spans broken invisibly across 28 marks** (`fix26e_*`) — but that copy carried a
 clause that bans #27's graded shape, and the collision-free copy that replaces it (`b36c3eba`) has not
-reached that number: `lang-pin-zh` lost its single run on it with 2 broken of 8 (`fix26h_pin1`). No
-copy since `af3b94` (`fix26b_*`: 3/3 PASS, 0 broken of 23) has met AC 3's three-consecutive bar, and
-what still stands between this candidate and #17's 0-broken clause is the pointer sentence's rendering —
-seen in a third surface form this round — which #28 says cannot be diagnosed until the instrument can
-see the wrong door it is going through.
+reached that number: `lang-pin-zh` lost its single run on it with 2 broken of 8 (`fix26h_pin1`). The
+copy that met AC 3's three-consecutive bar last was `af3b94` (`fix26b_*`: 3/3 PASS, 0 broken of 23), and
+it predates #27's framing shape, so it cannot carry it. What stood between this candidate and #17's
+0-broken clause was the pointer sentence's rendering — seen in a third, then a fourth, surface form —
+which #28 says cannot be diagnosed until the instrument can see the wrong door it is going through.
+**That is the gap the next round closed: `b3e23878` met AC 3's bar at last, on the sentence-sweep below
+rather than on a fifth named form.**
+
+**#26's three-consecutive criterion is met, on a scan the sweep pointed at.** Two prose changes, written
+after a 0-token sweep of every saved run rather than after another reading of the failing case.
+
+- **Where the graded failures actually sit.** Across 98 run dirs there are 45 graded `claim-fail`s, and
+  **41 of them are one sentence holding both a link and a Mark** — 18 with the Mark first and the cite
+  after it (`你想念的是"X"这件事本身——[[the band]] 里…`), 14 with the cite first and the Mark two clauses
+  down (`[[money 2026]] 说工作室比排练房贵，所以连"退掉更省钱"也站不住`), 9 with links on both sides. Only 4
+  sit on a legal quote line, and those are inexact copies, not misplaced ones: the `the the` stutter
+  twice (`fix26f_pin1`, `fix28_v2_1` — a re-typed line, not a re-read one) and `[…]` standing in for
+  the bare `…` twice. The rule the file ships forbids exactly the 41; what it never said is the unit,
+  because the harness joins a wrapped paragraph and cuts it only at `。！？` (or `.!?` before a word),
+  so `，`, `；`, `、` and `——` leave a 中文 sentence open: the note named at a clause's head owns every
+  Mark that follows it to the clause's end.
+- **The shape, at the place the model composes.** `Session shape` now opens with the **two-shape scan**
+  — the sentences holding both a link and a Mark are the quote line and the `[a]` line, and every other
+  one puts its Span on a quote line or says the note's meaning unmarked — with the sentence-scope fact
+  stated beside it, since the old check said "one line at a time" and a 中文 line is a paragraph. The
+  copy promise gained its missing half: a quote line is pasted from the note re-read now, not from your
+  own earlier reply, and the gap between two of a note's sentences takes a bare `…` because brackets
+  are characters the note never wrote.
+- **The script test, which is the cheapest discriminator in the file.** Mining the same construction in
+  the saved pinned replies found the model already does the right thing **88 times in 98**: `那句`,
+  `那条`, `说的是`, `写的是` followed by an unmarked reading. Of the 10 that wore Marks, **every broken one
+  held 中文 and every legal one held the note's own characters** (`"Of course it is."`, `"I liked it
+  anyway"`, `「продать её руки」`). So the test is one look, no note lookup: in a reply that is not in
+  the Corpus's language, a Span in the reply's own language is not a copy — unless the human typed it
+  this session. The `Language` paragraph's two named pointer forms (`那句「…」`, `唯一写明「…」的笔记`)
+  went with it: a blacklist that had to be re-widened every round, replaced by the test that covers the
+  fifth form before it appears.
+- **Measured, 2,153,072 eval tokens over 10 case-runs on two byte-strings, each run hash-verified
+  against the arm it scored.** On the scan alone
+  (`29703a24`, 691,174 tok): `fix26i_scan1` FAIL, `scan2`–`scan3` PASS — 2 of 3, and **0 broken
+  invisibly, 0 unowned, 0 wrong-door in all three**; the one loss was a 中文 rendering at
+  `没人回答的那句"要不要写自己的歌"`, the fifth form. On the copy that adds the script test
+  (`b3e23878`, 457,562 tok): **`fix26j_script1`–`script3` 3/3 PASS at 1.00, 0 `quotes_verbatim`
+  rejections, 0 broken / 0 unowned / 0 wrong-door across 19 marks** — AC 3's bar, both halves, met for
+  the first time on a copy that also carries #27's framing shape and #28's door rule.
+- **Guards (1,004,336 tok), because the scan is read before every reply, not only a pinned one:**
+  `reversal-annotated` PASS (`grev`, 564,656), `framing-carried-over` PASS at judge 4/5 (`gfram`,
+  42,274 — #27's graded shape still stands, so the new clause does not repeat the collision #26's
+  review found), `lang-follows-human` and `lang-follows-human-en` PASS (`gfol`, 335,903),
+  `lang-quote-stays-source` PASS (`gstay`, 61,503). **Five of the six arm-cases audit 0 broken**; the
+  sixth is `lang-follows-human` with **one invisible `no-source`**: `«готов ли я платить за памятник
+  чужими руками»`, the model's own coinage in Russian marks, plus 2 wrong-door copies across
+  `grev`/`gfol`. The script test is silent where the reply is in the notes' language, so habit 2 of
+  #26's four survives there — reported rather than smoothed, since AC 3 names the case it targets and
+  this is not it.
+- **Not met, and not spent:** AC 5, one full both-arm gate at 20/20 — ≈9.7M tokens, the maintainer's
+  call, and the last companion criterion between this candidate and #17's tag. `skills/companion` is
+  untouched; no promotion. One guard chain was cancelled by me mid-run after a shell-quoting slip in
+  my own command, so its spend is unreported and it left no transcript.
 
 **#28's instrument landed, and the prose round it unlocked is measured but not closed.**
 `span_audit.py` now reports a third number beside `broken` and `unowned`: `wrongdoor`, a `code` span
@@ -132,6 +186,20 @@ arm broke the promise 8 times (5.4% of its marks) and passed all 20, its graders
   The plugin and marketplace descriptions are no longer companion-only.
 - READMEs (EN and 中文): an improve row, its Overlay fields with their fallbacks, and
   an Overlay example showing both sections.
+- companion: **the reply is scanned for the sentences where a Mark and a link meet** (#26,
+  `labs/companion/`, scored on `b3e23878`). The rule that a link and marks meet only on a quote line
+  shipped twice and still lost a pinned case in about one run in three, so this round wrote the missing
+  *unit* rather than another forbidden form: `Session shape` opens with the **two-shape scan** (a
+  sentence holding both a Mark and a link is the quote line or the `[a]` line — everything else puts its
+  Span on a quote line or says the note's meaning unmarked), states beside it that `，；、` and `——` keep
+  a 中文 sentence open while only `。！？` end it, and adds the **script test** for a reply that is not in
+  the Corpus's language: a Span in the reply's own language is not a copy. The two named pointer forms
+  in `Language` were retired with it — a blacklist re-widened every round while the fifth form appeared
+  one run later. The copy promise gained its source (`open the note again as you write the line`, not
+  your own earlier reply — the `the the` stutter) and its join (a bare `…`; `[…]` puts brackets in the
+  note it never wrote). Measured 3/3 PASS on `lang-pin-zh` with 0 broken / 0 unowned / 0 wrong-door
+  spans, `reversal` / `framing` / both `lang-follows` / `quote-stays` all PASS; `GLOSSARY.md` names the
+  scan and the test. Not promoted — AC 5's both-arm gate is unspent.
 - companion: **the owner of a mark is named on the line the mark sits on** (#26, `labs/companion/`,
   scored on `gate26_both`). #23 made copying honest and #22 made the grader credit every note a line
   offers; what `gate25_candidate` lost three cases on, and `gate_companion_v6` one more, is neither —

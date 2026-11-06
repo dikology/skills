@@ -156,13 +156,12 @@ on them exactly as it does on `"`: 中文 inside marks claims a line no note hol
 where your 中文 belongs. When your reply is not in the notes' language, the copies live only on quote
 lines — your prose there names notes with links and holds no marks, not for a term you coined, not for
 a word of theirs you are weighing. Put your reading *after* the quote as a gloss —
-`（注：卖掉它像是卖掉她的手）` — or name the note and
-say it unmarked: `[[дача]] 说卖掉它像是卖掉她的手`. That unmarked saying is the scan's second shape, and a
-pinned reply owes it to the end of the sentence: `，` and `——` keep the note you named the owner of
-anything you mark after them. So wherever your sentence needs the *content* of a line written in
-another language, that content is the gloss `（注：…）` or your own unmarked words — the gloss is not only
-for a human who may not read the source. A 中文 reply that holds a word up is pointing, not quoting, so
-it takes the same home English uses — `code`, mid-sentence, inside
+`（注：卖掉它像是卖掉她的手）` — or name the note and say it unmarked:
+`[[дача]] 说卖掉它像是卖掉她的手`. That unmarked saying is the scan's second shape, and a
+pinned reply owes it to the end of the sentence. So wherever your sentence needs the *content* of a
+line written in another language, that content is the gloss `（注：…）` or your own unmarked words — the
+gloss is not only for a human who may not read the source. A 中文 reply that holds a word up is
+pointing, not quoting, so it takes the same home English uses — `code`, mid-sentence, inside
 an ordinary line: 你现在把 `人` 放在第一顺位，如果答案是 `没有`，那 [[the band]] 只记了出门，我那句
 `陶艺填同一个位置` 得重算. That home keeps what you and the human made, not the note's characters, and
 here the pull is strongest: a note's English inside your 中文 prose *looks* like a term being weighed.
@@ -180,15 +179,14 @@ that note's characters copied, and the Close menu's `[a]` line, where the marks 
 sentence and the link names where it lands. Every other sentence that holds both goes back to one of
 two shapes before you send it: the marked words move up onto a quote line of their own, or the
 sentence keeps its link and says what the note means in your own words, unmarked —
-`[[the band]] 里担心的是那笔钱还没花完`. A true copy is not a reason to stay: the sentence weighing a
-note is where a reader looks for its owner, so a copy belongs on its quote line even when you could
-find every character of it in the note.
+`[[the band]] 里担心的是那笔钱还没花完`.
 
 A sentence is longer than it looks. `，`, `；`, `、` and `——` join clauses into one sentence, and only
-`。！？` — or `.`, `!`, `?` with another word after them — end one. So the note you name at the head of
-a clause owns every mark that follows it to the clause's end, whatever sits in between, and a reply
-that put its stress mid-clause has already made a claim about that note. A reader cannot tell whose
-words marks hold: they see the link and the quote in one breath and look for them in that note.
+`。！？` — or `.`, `!`, `?` with another word after them — end one. So the note named at a clause's head is
+owner of every mark that follows it to the end of that sentence: a reply that put its stress three
+clauses later has still made a claim about that note. Another mark, or a stray bracket, cuts that reach
+short — and a mark left with no owner in reach is no safer, because the reader who met the link one
+breath earlier looks for the words in that note anyway.
 
 In a reply that is not in the notes' language, the **script test** settles most of the scan before you
 compare a single word: marks hold whoever spoke, and in that reply the only two voices are the note's
@@ -222,8 +220,7 @@ Choir is the thing you'd actually miss. Where am I wrong?
 ```
 
 TENSION and MY TAKE are your sentences and hold no marks. When you need a note's words there, put
-them on a quote line above; a link naming that note is enough inside your sentence — and that link is
-enough to the end of the sentence, which in 中文 runs on past every `，` and `——` after it. When a note
+them on a quote line above; a link naming that note is enough inside your sentence. When a note
 already contradicts what they came to ask about, name that here, in your own words, and wait: the
 three-way question belongs to a later reply, the one that holds their new words.
 

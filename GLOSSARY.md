@@ -42,11 +42,11 @@ Going through every Span in a run's replies and saying whose words each one hold
 _Avoid_: lint, quote check
 
 **Two-shape scan**:
-What companion does to its own reply before sending it: read the sentences, find the ones holding both a Mark and a link, and keep only the two shapes allowed to hold both — the quote line, where the Span is the note's characters, and the Close menu's `[a]` line, where the Span is the human's. Any other sentence that holds both puts its Span on a quote line or says the note's meaning unmarked. Named for the unit it reads: a Mark answers to the links its own **sentence** offers, and in 中文 a sentence runs on past every `，` and `——`, not merely to the end of a clause.
+What companion does to its own reply before sending it: read the sentences, find the ones holding both a Mark and a link, and keep only the two shapes allowed to hold both — the quote line, where the Span is the note's characters, and the Close menu's `[a]` line, where the Span is the human's. Any other sentence that holds both puts its Span on a quote line or says the note's meaning unmarked. Named for those two shapes, not for a tool. The Span audit's **line** is the outer bound — a wrapped paragraph is one line as its reader sees it — and inside it the reach stops at a sentence end (`。！？`, or `.!?` before a word), at another Mark, or at a loose bracket; a 中文 sentence runs on past `，；、` and `——`, which is where the reach is wider than it looks.
 _Avoid_: lint, self-check, pre-send check
 
 **Script test**:
-The cheap half of the Two-shape scan, for a reply that is not in the Corpus's language: a Span written in the reply's own language is not a copy, because in that reply the only two voices are the note's characters and the human's. Naming a line (`那句`, `说的是`) hands nothing to the note — what follows is the reply's reading, and a reading wears no Mark. Measured on the saved pinned replies: every broken Span at that site was in the reply's language, every legal one in the note's.
+The cheap half of the Two-shape scan, for a reply that is not in the Corpus's language: a Span written in the reply's own language is not a copy, because in that reply the only two voices are the note's characters and the human's. Naming a line (`那句`, `说的是`) hands nothing to the note — what follows is the reply's reading, and a reading wears no Mark. Silent where the reply is in the notes' language: there the script says nothing about who spoke.
 _Avoid_: translation check, language guard
 
 **Wrong door**:

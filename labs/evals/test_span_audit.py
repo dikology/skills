@@ -19,10 +19,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from graders import Evidence  # noqa: E402
-from span_audit import audit, audit_run  # noqa: E402
+from span_audit import audit, audit_run, wrong_doors  # noqa: E402
 
 VAULTS = Path(__file__).parent / "fixtures" / "vaults"
 DACHA = VAULTS / "the-dacha"
+BAND = VAULTS / "band-or-pottery"
 KITCHEN = VAULTS / "the-kitchen-table"
 SABBATICAL = VAULTS / "the-sabbatical"
 CAR = VAULTS / "spanish-and-the-car"
@@ -200,6 +201,91 @@ class CreditsTheWayTheGateCredits(unittest.TestCase):
         self.assertEqual([s.kind for s in got], ["claim-ok", "note-copy-unowned"])
         self.assertEqual([s.graded for s in got], [True, False])
         self.assertEqual([s.broken for s in got], [False, False])
+
+
+class TheWrongDoor(unittest.TestCase):
+    """#28: a code span holding the Corpus's own characters is a copy that took the wrong
+    door — Marks copy, `code` weighs, so a note's line in `code` never gets a quote line and
+    neither `quotes_verbatim` nor the mark audit can see it. Expected counts are worked by
+    hand against the band-or-pottery Fixture vault."""
+
+    def test_a_note_s_line_in_code_is_counted_though_it_is_a_true_copy(self):
+        # fix26d_pin2 reply 1: [[the band]]'s whole sentence, copied correctly two lines
+        # above, re-housed in `code` as the thing being weighed. True words, wrong door.
+        reply = ('如果 `The drive home was the best part.` 说的其实是回程，那乐队就不是负担。')
+        got = wrong_doors(evidence(reply, vault=BAND, human="should I quit the band?"))
+        self.assertEqual([s.span for s in got], ["The drive home was the best part."])
+        self.assertEqual([s.holder for s in got], ["the band"])
+
+    def test_a_fragment_of_a_note_s_line_in_code_is_counted_too(self):
+        # fix26d_pin2 reply 2: `nobody has a claim on` is [[thursday evenings]]'s words, and
+        # the reply weighs them as its own term. A fragment is still the note's characters.
+        got = wrong_doors(evidence('所谓 `nobody has a claim on` 只是没有排期。',
+                                   vault=BAND, human="should I quit the band?"))
+        self.assertEqual([s.holder for s in got], ["thursday evenings"])
+
+    def test_the_same_line_in_code_twice_is_counted_twice(self):
+        # fix26d_pin2 puts `Nobody says no and nobody writes anything` in `code` twice in
+        # one reply; the number counts copies, not distinct strings.
+        reply = ('`Nobody says no and nobody writes anything` 是事实。\n\n'
+                 '而 `Nobody says no and nobody writes anything` 还没有答案。')
+        got = wrong_doors(evidence(reply, vault=BAND, human="should I quit the band?"))
+        self.assertEqual(len(got), 2)
+
+    def test_the_model_s_own_term_in_code_is_not_counted(self):
+        # The door `code` exists for: 用退乐队换三小时 is the reply's own compression, weighed
+        # not copied. No note holds it, so it is not a copy in the wrong door.
+        got = wrong_doors(evidence('你把这件事说成 `用退乐队换三小时`。',
+                                   vault=BAND, human="should I quit the band?"))
+        self.assertEqual(got, [])
+
+    def test_machine_text_in_code_is_no_copy_because_the_corpus_holds_it_not(self):
+        # What SKILL.md itself writes in `code`: `this is raw`. It lives in an AI capture
+        # callout, and the digest line below on the Overlay's skip list, so neither is in
+        # the Corpus the number is read against — the exclusion the issue asks for comes
+        # from how the Corpus is built, not from a list of banned strings.
+        line = "Main motivation identified: recovering from burnout after the spring reorg"
+        reply = f'The file writes `this is raw`, the digest `"{line}"`.'
+        got = wrong_doors(evidence(reply, vault=SABBATICAL, human="should I take the sabbatical?",
+                                   overlay="## Companion\n\n- index: [[home]]\n"
+                                           "- skip list: `digests/`\n"))
+        self.assertEqual(got, [])
+
+    def test_naming_a_note_or_a_filing_target_in_code_is_not_a_copy(self):
+        # The harness vocabulary that IS corpus-held: a note's own name appears in the index
+        # and in its title line, so `working from home` matches the Corpus and clears the
+        # word floor. Pointing at a note by name is what SKILL.md prescribes ("every note
+        # name … stay in their source language"), so it is not a copy that took the wrong
+        # door. Same for the filing target `# Thursday evenings`.
+        reply = ('The index lists `working from home` and `the hybrid offer`, filed under '
+                 '`# Thursday evenings`.')
+        got = wrong_doors(evidence(reply, vault=KITCHEN, human="I want the office now."))
+        self.assertEqual(got, [])
+
+    def test_a_link_in_code_is_naming_not_copying(self):
+        # 63 spans across the saved runs are `[[note]]` written in `code`. The brackets are
+        # the pointing shape; no note's line is inside them.
+        got = wrong_doors(evidence('Read `[[working from home]]` first.', vault=KITCHEN,
+                                   human="I want the office now."))
+        self.assertEqual(got, [])
+
+    def test_a_span_below_the_claim_floor_is_a_term_not_a_line(self):
+        # `pottery` is one word: the gate's own floor says a span that short says nothing
+        # about a note, so it is a term being weighed, not a line that took the wrong door.
+        got = wrong_doors(evidence('`pottery` 是那间 studio。', vault=BAND,
+                                   human="should I quit the band?"))
+        self.assertEqual(got, [])
+
+    def test_the_wrong_door_number_leaves_broken_and_unowned_alone(self):
+        # AC 2: a third number must not move the two the audit already reports. The same
+        # span in marks and in `code`: the mark is graded, the code copy is the third number.
+        reply = ('- [[the band]] — "The drive home was the best part."\n'
+                 '如果 `The drive home was the best part.` 说的是回程，那乐队就不是负担。')
+        marks = audit(evidence(reply, vault=BAND, human="should I quit the band?"))
+        self.assertEqual([s.kind for s in marks], ["claim-ok"])
+        self.assertEqual([s.broken for s in marks], [False])
+        self.assertEqual(len(wrong_doors(evidence(reply, vault=BAND,
+                                                  human="should I quit the band?"))), 1)
 
 
 class AuditingASavedRun(unittest.TestCase):

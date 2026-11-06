@@ -8,7 +8,7 @@ the log and an `AI capture` callout are words no note spoke in the human's voice
 in a reply and classifies it, graded or not, so a verdict can be checked at the
 promise level rather than at the grader's.
 
-Two numbers, because #26 names two defects:
+Three numbers, because #26 names two defects and #28 a third:
 
 - **broken** — its own definition: *a real copy credited to a note that does not
   hold it, or marks that copy nothing at all*. Kinds `claim-fail`, `machine-copy`,
@@ -17,10 +17,19 @@ Two numbers, because #26 names two defects:
 - **unowned** — kind `note-copy-unowned`: a note's line in marks on a sentence that
   names no owner. True words, wrong place — the shape #26's cure asks for, reported
   beside the count rather than inside it.
+- **wrongdoor** — `wrong_doors`: a `code` span whose characters the Corpus holds. Marks
+  copy, `code` weighs, so a note's line parked in `code` is credited to no note, graded
+  by no grader, and never given the quote line it owes. Neither number above can see it,
+  which is how #17's 0-broken bar can be met by a copy that moved its lines out of Marks
+  — `fix26d_pin2`: 9 marks, 0 of them unowned, 5 of 16 code spans the Corpus's own words.
+  Not broken by #26's definition (a note does hold these words) and not a mark, so it is
+  counted beside them and changes no verdict.
 
 `label` (a span too short to read as a claimed line, by the gate's own
 `MIN_QUOTE_WORDS`, and by character rather than word where the script has no spaces)
-is neither, and is left out of the denominator.
+is neither, and is left out of the denominator. The same floor and the same Corpus serve
+`wrongdoor`, plus one exclusion: a span that is only a note's *name* (or a `# heading`,
+or a `[[link]]`) is pointing at a note, not copying its text — the shape `code` exists for.
 
 It measures. It grades nothing, and changes no verdict: `graders.py` stays the
 arbiter of PASS and FAIL.
@@ -46,10 +55,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import vaultdiff  # noqa: E402
-from graders import (MIN_QUOTE_WORDS, OVERLAY_FILES, Evidence, _QUOTED, _norm,  # noqa: E402
-                    _split_callouts, claim_lines, human_turns, machine_text, outside_menu,
-                    path_key, quote_claim, quote_sources, quoted_from_note, replies,
-                    said_by_human, skipped, start_vault)
+from graders import (CODE_SPAN, MIN_QUOTE_WORDS, OVERLAY_FILES, Evidence, _QUOTED,  # noqa: E402
+                    _norm, _split_callouts, claim_lines, human_turns,  # noqa: E402
+                    machine_text, outside_menu, path_key, quote_claim,  # noqa: E402
+                    quote_sources, quoted_from_note, replies, said_by_human,  # noqa: E402
+                    skipped, start_vault)  # noqa: E402
 
 
 @dataclass
@@ -67,6 +77,19 @@ class Span:
 
 KINDS = ("claim-ok", "claim-fail", "label", "human-verbatim", "note-copy-unowned",
          "machine-copy", "self-quote", "human-edited", "no-source")
+
+
+@dataclass
+class CodeCopy:
+    """One `code` span in one companion reply whose characters a note holds: a copy that
+    took the wrong door. Marks copy, `code` weighs, so these words never reach a quote line
+    and no grader reads them — the hole #28 names."""
+    case: str
+    reply: int
+    line: str
+    span: str
+    holder: str      # the note whose text holds the span
+    detail: str = ""
 
 
 @dataclass
@@ -213,6 +236,45 @@ def audit(ev: Evidence, case: str = "") -> list:
     return out
 
 
+def names_a_note(frag: str, view: VaultView) -> bool:
+    """The span is a note's own name, not a line taken out of it.
+
+    The harness writes note names and filing targets in `code` (`working from home`,
+    `# Thursday evenings`), and the Corpus holds a name — in its own title line and in
+    every index bullet that links it — so `holders` alone reads all of that as a copy.
+    Pointing at a note by name credits no line, which is what `code` is for."""
+    bare = _norm(frag).lower().strip()
+    for prefix in ("#", "[["):
+        bare = bare.removeprefix(prefix)
+    return bare.removesuffix("]]").strip() in view.corpus
+
+
+def wrong_doors(ev: Evidence, case: str = "") -> list:
+    """Every `code` span in every reply whose characters a note holds: a copy that took the
+    wrong door, invisible to `quotes_verbatim` and to the mark audit.
+
+    It is counted, never graded: #26's `broken` is about marks, and this number sits beside
+    it. A span is skipped when it is too short to read as a line (the gate's own floor), when
+    it is a note's name rather than its text, or when the Corpus does not hold it at all —
+    which covers the model's own weighing phrase, the Overlay's field vocabulary, and machine
+    text, since `VaultView.corpus` is built without the Overlay, the skip list or a callout."""
+    out = []
+    view = VaultView.of(ev)
+    for n, text in enumerate(replies(ev), 1):
+        for line in claim_lines(outside_menu(text)):
+            for frag in CODE_SPAN.findall(line):
+                if not carries_a_claim(frag) or names_a_note(frag, view):
+                    continue
+                held = view.holders(frag)
+                if held:
+                    also = ", ".join(f"[[{h}]]" for h in held[1:])
+                    out.append(CodeCopy(case, n, line, frag, held[0],
+                                        f"[[{held[0]}]] holds these words; in `code` they are"
+                                        f" weighed, so no quote line was ever owed to them"
+                                        + (f" (also in {also})" if also else "")))
+    return out
+
+
 ARMS = ("stable", "candidate")
 FIXTURE_VAULTS = Path(__file__).parent / "fixtures" / "vaults"
 CASES_DIR = Path(__file__).parent / "cases"
@@ -251,6 +313,7 @@ def audit_run(root, cases: dict, arms: list | None = None) -> list:
                           diff=dict(EMPTY_DIFF), vault=FIXTURE_VAULTS / name,
                           snapshots=[vault_view(name, overlay)])
             spans = audit(ev, case)
+            doors = wrong_doors(ev, case)
             counts = Counter(s.kind for s in spans)
             meaningful = [s for s in spans if s.kind != "label"]
             rows.append({"arm": arm, "case": case, "spans": len(spans),
@@ -258,9 +321,11 @@ def audit_run(root, cases: dict, arms: list | None = None) -> list:
                          "graded": sum(1 for s in spans if s.graded),
                          "broken": sum(1 for s in spans if s.broken),
                          "unowned": counts.get("note-copy-unowned", 0),
+                         "wrongdoor": len(doors),
                          "by_kind": {k: counts[k] for k in KINDS if counts[k]},
                          "details": [asdict(s) for s in spans
-                                     if s.broken or s.kind == "note-copy-unowned"]})
+                                     if s.broken or s.kind == "note-copy-unowned"],
+                         "wrongdoor_details": [asdict(s) for s in doors]})
     return rows
 
 
@@ -287,17 +352,23 @@ def main(argv: list | None = None) -> int:
             base = r["meaningful"]
             rate = f"{100.0 * r['broken'] / base:.1f}%" if base else "—"
             print(f"{r['arm']:9} {r['case']:28} marks {r['spans']:3} (graded {r['graded']:2})"
-                  f"  broken {r['broken']:2} ({rate})  unowned {r['unowned']:2}  {r['by_kind']}")
+                  f"  broken {r['broken']:2} ({rate})  unowned {r['unowned']:2}"
+                  f"  wrongdoor {r['wrongdoor']:2}  {r['by_kind']}")
             for d in r["details"]:
                 print(f"    reply {d['reply']} [{d['kind']}] {d['span']!r}\n"
                       f"      {d['detail']}\n      {d['line'][:160]}")
+            for d in r["wrongdoor_details"]:
+                print(f"    reply {d['reply']} [wrong-door copy] {d['span']!r}\n"
+                      f"      {d['detail']}\n      {d['line'][:160]}")
     broken = sum(r["broken"] for r in rows)
     unowned = sum(r["unowned"] for r in rows)
+    doors = sum(r["wrongdoor"] for r in rows)
     base = sum(r["meaningful"] for r in rows)
     graded_fail = sum(r["by_kind"].get("claim-fail", 0) for r in rows)
     print(f"\n{broken} broken of {base} marks that carry a claim, across {len(rows)}"
           f" arm-cases: {graded_fail} graded by the gate, {broken - graded_fail} invisible"
-          f" to it. {unowned} more copy a note's line with no owner named.")
+          f" to it. {unowned} more copy a note's line with no owner named, and {doors}"
+          f" sit in `code`, where no grader looks at all.")
     return 1 if broken else 0
 
 

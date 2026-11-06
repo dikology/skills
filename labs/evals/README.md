@@ -196,7 +196,7 @@ machine text and not a note a mark may credit. It grades nothing and changes no
 verdict; `results/` is gitignored, so this is how a gate's evidence is re-read without spending it
 again. Costs 0 tokens.
 
-Two numbers, because a run fails the promise two ways:
+Three numbers, because a run fails the promise three ways:
 
 - **broken** — a real copy credited to a note that does not hold it (`claim-fail`), or marks that
   copy nothing at all: the model's own weighing phrase (`no-source`), its own earlier reply
@@ -204,14 +204,27 @@ Two numbers, because a run fails the promise two ways:
   text (`machine-copy`). The exit code says 1 when a run has any.
 - **unowned** — `note-copy-unowned`: a note's line in marks on a sentence naming no owner. True
   words, wrong place. Not broken by that definition, and reported beside it.
+- **wrongdoor** — a `code` span whose characters the Corpus holds: a copy that took the wrong door
+  (#28). Marks copy, `code` weighs, so these words are credited to no note and graded by no
+  grader — and the note never gets the quote line it owes. Not broken, not a mark, counted beside
+  the two above.
 
 A span too short to read as a claimed line is `label` and is left out of the denominator — the
 harness's own `MIN_QUOTE_WORDS` floor, counted by character rather than by word where the script has
-no spaces, because a 中文 span is graded but never exempted by a whitespace floor.
+no spaces, because a 中文 span is graded but never exempted by a whitespace floor. The same floor
+bounds `wrongdoor`, with one more exclusion: a code span that is only a note's **name**, a
+`# heading` or a `[[link]]` is pointing at a note, not copying its text — that is what `code` is
+*for*. `lang: zh`, `CLAUDE.md` and `this is raw` need no list of banned strings: the Corpus is built
+without the Overlay, the skip list or an `AI capture` callout, so the harness's own vocabulary is
+simply not in it.
 
 Before trusting a new classifier over a gate, check it reproduces the gate's own verdicts: run it
 with `--arm` and compare its `claim-fail` per case against `grade.json`. On the six runs audited so
 far it agrees with `quotes_verbatim` on every arm-case, and finds spans the gate never saw.
+`wrongdoor` was checked against the spans counted by hand in #28: 5 of 16 on `fix26d_pin2`, 1 of 7 on
+`fix26e_pin3`, and on `gate26_both` it adds 16 to the candidate arm without moving its published
+139 marks / 119 graded / 0 broken / 1 unowned. That 0-broken candidate arm is the hole #28 names:
+16 note lines sat in `code` where the bar cannot read them.
 
 ## Fixture vaults
 

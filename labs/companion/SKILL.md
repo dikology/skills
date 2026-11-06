@@ -116,23 +116,22 @@ a reversal, or re-points at a line quoted earlier. It takes the shape TENSION ha
 with a link, the clash said in your own words, and any line you want back copied on a quote line of
 its own above.
 
-**Pointing is not quoting.** When you hold a phrase up to weigh it, to name a framing, to ask about
-a word, that phrase is your object, not the note's evidence: it goes in `code`, the way this file
-writes `this is raw`, even when its words are verbatim someone else's. Most are phrases a quote line
-above already cited — pointing back at your own citation needs no marks and credits no note; the
-contradiction reply that asks the three-way question is the one that copies a line twice. The
-same for anything with nothing to copy it from: a take you hold or retract, a question you asked, a
-sentence you said earlier this session, a word you are handing the human to say. `decline`, not the
-same word in marks. And `code` is not where a note's line goes when your point needs its words:
-needing the words is needing a quote line.
+**Pointing is not quoting.** Marks copy; `code` weighs. Weigh a phrase — name a framing, ask about a
+word, say what you read in it — and it is your object, not evidence, so it takes `code`, the way this
+file writes `this is raw`, even when its words are verbatim someone else's. The same for what is yours
+alone: a take you hold or retract, a question you asked, a sentence you said earlier this session, the
+two-word name you mint for someone else's line (`fix or sell`, `用退乐队换三小时`), the word you are
+handing the human to say (`decline`). Most of what you weigh a quote line above has already copied —
+pointing back at your own citation credits no note; the contradiction reply that asks the three-way
+question is the one that copies a line twice.
 
 The human's words from this session are a copy too: give them a line of their own naming no note,
 `- You, today — "…"`. A summarised version of their words is not their words — including the shorter
 one you mint while weighing their line against a note. Copy their line above on its own line; the
-sentence that argues with it names the note with a link and holds no marks. Machine text is
-paraphrased, never copied into marks, whatever label stands in front of it. Only the Close menu's
-`[a]` line pairs marks with a link and means something else by it: there the marks hold the human's
-own sentence and the link names where that line will land.
+sentence that argues with it names the note with a link and holds no marks. Machine text is paraphrased,
+never copied into marks, whatever label stands in front of it. Only the Close menu's `[a]` line pairs
+marks with a link and means something else by it: there the marks hold the human's own sentence and the
+link names where that line will land.
 
 **Language.** Reply in the language of the human's latest turn, not the language of the notes. A
 `lang` pin overrides that for every reply, whatever the human writes in: with `lang: zh`, write in
@@ -151,11 +150,12 @@ say it unmarked: `[[дача]] 说卖掉它像是卖掉她的手`. The pointer s
 rendering of a line you never copied. Take the link and say your reading unmarked —
 `[[дача]] 那句已经过期` — or put the reading in the gloss, which is not only for a human who may not read the
 source: wherever your sentence needs the *content* of a line written in another language, that
-content goes in `（注：…）` or in your own unmarked words, never inside marks. A word or a phrase you
-are weighing, naming or reframing goes in `code`, and 中文 has no exception: `留`, `该不该退乐队`, not 「留」
-or 「该不该退乐队」. Add the gloss after the quote when the source may be unreadable: it sits beside a
-copy, and it never takes the place of the quote line a reply owes when it needs the line as
-evidence. The human's line under [a], and every note name, stay in their source language.
+content goes in `（注：…）` or in your own unmarked words, never inside marks. A 中文 reply that holds a
+word up is pointing, not quoting, so it takes the same home English uses — `code`, mid-sentence, inside
+an ordinary line: 你现在把 `人` 放在第一顺位，如果答案是 `没有`，那 [[the band]] 只记了出门，我那句
+`陶艺填同一个位置` 得重算. Add the gloss after the quote when the source may be unreadable: it sits beside
+a copy, and it never takes the place of the quote line a reply owes when it needs the line as evidence.
+The human's line under [a], and every note name, stay in their source language.
 
 ## Session shape
 

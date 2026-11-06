@@ -18,12 +18,19 @@ both skills' case sets, on the bytes that ship, in which **no case fails on both
 candidate arm reports **0 broken spans** in the span audit — a single-arm loss is named here with the
 replays that pass it. #23, #24 and #25 are closed on evidence. Two things stand against that bar now:
 **#26**, whose shape brought `lang-pin-zh` from 2 fails in 4 runs to 1 in 3 but has not met its own
-three-consecutive criterion and still leaves broken spans in the audit, and **#27**, whose rule
+three-consecutive criterion — its pointer sentence has been re-written by every round, and the runs keep
+finding a new surface form of it — and **#27**, whose rule
 collision is fixed in the candidate — `fix27b_fram1`–`fix27b_unp3`: 6 of 6 PASS, the framing named in
 3 of 3 replies, `unpicked-menu-resurfaces` 3 of 3 with the menu named once — but not promoted, because
 its last criterion is a both-arm run that has not been spent. companion's case set is 21 since #27's
-`framing-carried-over` was added, and `fix27b_unp2`'s one `human-edited` span is #26's residue still
-standing between this candidate and the audit's 0-broken clause.
+`framing-carried-over` was added. #26's door-sort is the one measured gain of the round — on
+`26c99207` it held **0 spans broken invisibly across 28 marks** (`fix26e_*`) — but that copy carried a
+clause that bans #27's graded shape, and the collision-free copy that replaces it (`b36c3eba`) has not
+reached that number: `lang-pin-zh` lost its single run on it with 2 broken of 8 (`fix26h_pin1`). No
+copy since `af3b94` (`fix26b_*`: 3/3 PASS, 0 broken of 23) has met AC 3's three-consecutive bar, and
+what still stands between this candidate and #17's 0-broken clause is the pointer sentence's rendering —
+seen in a third surface form this round — which #28 says cannot be diagnosed until the instrument can
+see the wrong door it is going through.
 
 `gate_companion_v6` (2026-11-01, 20 cases × 2 arms, qwen, judge on, 9,704,776 tokens) ran that
 follow-up cycle and **did not promote: 37/40, candidate lost 2**. It also answered #24: on the
@@ -132,6 +139,67 @@ arm broke the promise 8 times (5.4% of its marks) and passed all 20, its graders
     #26 stays open on the invisible half even though the mechanism that loses cases is gone: the
     single run that failed for the visible reason (`fix26c_pin3`) is not repeated, and the residue is
     now the 中文 emphasis habit at one-character scale, which no grader has ever seen.
+  - **AC 3 a fourth time, and the axis that moved.** Three copies measured back to back, each on its own
+    hash. `d18cf243` — the 中文 shape naming `code` as the home for a weighed word, re-rendering the three
+    rejected spans in their legal form inside one ordinary line — held `lang-pin-zh` verdicts at 3/3 PASS
+    with 0 `quotes_verbatim` rejections, but not the audit: **3 broken of 27 marks** (`fix26d_lang1`,
+    `fix26d_pin2`, `fix26d_pin3`; its other three language cases ran once in `fix26d_lang1` and were
+    clean, 0 of 18). Reading those replies rather than their verdicts showed *why*: the model was using
+    both homes backwards, parking the note's verbatim lines in `code` (`The drive home was the best part.`,
+    `Nobody says no and nobody writes anything` — twice in one reply) while its own readings wore Marks
+    (`"用退乐队换三小时"`, `"有人一起"`). So `Pointing is not quoting` became **Marks copy, `code` weighs**,
+    with the two-word name minted for someone else's line listed among the things with nothing to copy it
+    from. On `26c99207` (`fix26e_pin1`–`pin3`, `fix26e_unp1`): **0 spans broken invisibly across 28
+    marks** — the first copy since `af3b94` (`fix26b_*`) to close the half that reopened the ticket, and
+    the shape was seen firing rather than the topic failing to arise (`半具尸体`, `改了主意`,
+    `我到底去过几次周四的 open studio` all went to `code`). It lost one case: `fix26e_pin1` failed
+    `quotes_verbatim` on `你…担心的是"再也没人需要我出门"`. Across the fifteen `lang-pin-zh` runs of the five
+    surviving copies (`fix26b_*`, `fix26c_*`, `fix27_pin*`, `fix26d_*`, `fix26e_*`) exactly two lost the
+    case — `fix26c_pin3` and `fix26e_pin1` — and the pointer sentence has been written in three different
+    surface forms across them (`那句「…」` → `唯一写明「…」的笔记` → `你…担心的是"X"`). AC 3's
+    three-consecutive bar is therefore still met by no copy that also carries #27's fix.
+  - **A fifth copy, and it was worse.** Adding a paste test to `A quote is a copy` — a Mark is a paste,
+    or it is your reading — raised the audit to **8 broken of 32 marks** (`fix26f_pin1`–`pin3`,
+    `82a6f43e`) and brought corner marks back (`「终于出门又回来了」`, `「不」`) after the sort had stopped
+    them: naming Marks where the model composes prose makes Marks more available. The sentence was
+    reverted.
+  - **Caught in review, not in a run.** Both axes of the review of `26c99207` flagged the same new
+    clause — *"no second copy at all when a quote line above already carried it; pointing back at your
+    own citation needs neither marks nor code"* — and it was the worse of the two findings: it **bans the
+    shape `framing_named` grades**. `fix27b_fram1` passes by quoting
+    `- [[the evening class]] — "…what I paid against what came back."` and then holding that same phrase
+    in `code` on the FRAMING line — a second copy, which is exactly what #27's case asks for. Left in,
+    the clause put #27's measured case at risk in the gate that would score both, beside contradicting
+    "Give a phrase you want again from a note quoted earlier its own line naming that note again" and the
+    three-way exception in the sentence below it. Same failure class as #27's rule collision, found by
+    reading the case rather than the copy. The clause is gone, the bans (`never `code` where…`) with it,
+    and the handle stays owned in one paragraph only.
+  - **Measured on the collision-free copies.** On `12957a85`: `lang-pin-zh` 2/3 PASS — `fix26g_pin1` 0
+    broken of 8, `fix26g_pin2` 1 of 9, `fix26g_pin3` 3 of 10, the last failing `quotes_verbatim` on
+    `"退乐队才能去 open studio"`. `reversal-annotated` — the other site the ticket's table names, and never
+    run on a post-#27 copy before — PASSed with 0 broken of 7 and 1 `note-copy-unowned` (`fix26g_rev1`,
+    615,410 tok). `framing-carried-over` failed 1 of 2 (`fix26g_fram2`): the reply held the test in
+    `code` on the same line as `[[the evening class]]`, which is what #27's *own* bullet forbids ("the
+    line holding the framing holds no link"), pulled open by part two of its three-part shape — what the
+    test measures *there* names the note it came from. That is #27's collision and #27 is still open, so
+    it is recorded here rather than patched from this ticket. Removing the clause that restated it gives
+    `b36c3eba`, the copy committed: `framing-carried-over` 2/2 PASS at 0 broken (`fix26h_fram1`,
+    `fix26h_fram2`, 120,662 tok), `lang-pin-zh` one run, FAILED, 2 broken of 8 (`fix26h_pin1`) — so the
+    collision is gone and AC 3 is still not met.
+  - **Round's cost and the honest verdict.** 3,752,611 eval tokens over 20 candidate case-runs across
+    five byte-strings (`d18cf243`, `26c99207`, `82a6f43e`, `12957a85`, `b36c3eba`). The one durable
+    result is the diagnosis, not the prose: the model reaches for Marks on what it is weighing because
+    `code` is where it puts *the note's* English — and the copy that fixed that by fiat (`26c99207`,
+    0 broken invisible of 28) did it with two bans, one of which collided with #27's graded shape. The
+    best-measured copy for this case remains `af3b94` (`fix26b_*`: 3/3 PASS, 0 broken of 23 marks),
+    which predates #27's framing fix and cannot carry it. Nothing is promoted; `skills/companion` is
+    untouched; the both-arm gate stays unspent.
+  - Filed as **#28**: a note's own line parked in `code` is invisible to `quotes_verbatim` *and* to
+    `span_audit.py` (5 of 16 code spans in `fix26d_pin2` hold the Corpus's characters), so #17's
+    0-broken clause can be met by a copy that moved content out of Marks without ever giving it a quote
+    line. That hole is why the pointer-sentence flip keeps being re-rolled against prose instead of
+    being diagnosed; the instrument comes before the next shape. Not fixed here — the guard against it
+    was one of the clauses the review struck, so #26 does not smuggle #28's cure.
   - `gate26_both` (20 cases × 2 arms, judge on, 9,271,120 tokens): the Candidate arm wrote **0 broken
     spans in all 20 cases** (139 marks, 119 of them graded claims, every one verbatim) — with one
     `unowned` it does not count as broken: `skip-list-never-quoted`'s MY TAKE carried

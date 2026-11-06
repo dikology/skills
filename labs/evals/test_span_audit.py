@@ -208,7 +208,8 @@ class TheWrongDoor(unittest.TestCase):
     """#28: a code span holding the Corpus's own characters is a copy that took the wrong
     door — Marks copy, `code` weighs, so a note's line in `code` never gets a quote line and
     neither `quotes_verbatim` nor the mark audit can see it. Expected counts are worked by
-    hand against the band-or-pottery Fixture vault."""
+    hand against the Fixture vaults named in each test (band-or-pottery, the-kitchen-table,
+    the-sabbatical, the-studio-and-the-class), never recomputed from the code under test."""
 
     def test_a_note_s_line_in_code_is_counted_though_it_is_a_true_copy(self):
         # fix26d_pin2 reply 1: [[the band]]'s whole sentence, copied correctly two lines
@@ -241,13 +242,15 @@ class TheWrongDoor(unittest.TestCase):
         self.assertEqual(got, [])
 
     def test_machine_text_in_code_is_no_copy_because_the_corpus_holds_it_not(self):
-        # What SKILL.md itself writes in `code`: `this is raw`. It lives in an AI capture
-        # callout, and the digest line below on the Overlay's skip list, so neither is in
-        # the Corpus the number is read against — the exclusion the issue asks for comes
-        # from how the Corpus is built, not from a list of banned strings.
-        line = "Main motivation identified: recovering from burnout after the spring reorg"
-        reply = f'The file writes `this is raw`, the digest `"{line}"`.'
-        got = wrong_doors(evidence(reply, vault=SABBATICAL, human="should I take the sabbatical?",
+        # Both lines are real machine text in the-sabbatical: the callout body under
+        # `> [!quote]- AI capture` in sabbatical.md, and the generated digest on the
+        # Overlay's skip list. The Corpus is built without either, so a code span holding
+        # them matches no note — the exclusion comes from how the Corpus is built, not from
+        # a list of banned strings.
+        callout = "six uninterrupted months is exactly what a half-finished manuscript needs"
+        digest = "Main motivation identified: recovering from burnout after the spring reorg"
+        got = wrong_doors(evidence(f'The note argues `"{callout}"`, the digest `"{digest}"`.',
+                                   vault=SABBATICAL, human="should I take the sabbatical?",
                                    overlay="## Companion\n\n- index: [[home]]\n"
                                            "- skip list: `digests/`\n"))
         self.assertEqual(got, [])
@@ -255,12 +258,15 @@ class TheWrongDoor(unittest.TestCase):
     def test_naming_a_note_or_a_filing_target_in_code_is_not_a_copy(self):
         # The harness vocabulary that IS corpus-held: a note's own name appears in the index
         # and in its title line, so `working from home` matches the Corpus and clears the
-        # word floor. Pointing at a note by name is what SKILL.md prescribes ("every note
-        # name … stay in their source language"), so it is not a copy that took the wrong
-        # door. Same for the filing target `# Thursday evenings`.
-        reply = ('The index lists `working from home` and `the hybrid offer`, filed under '
-                 '`# Thursday evenings`.')
-        got = wrong_doors(evidence(reply, vault=KITCHEN, human="I want the office now."))
+        # word floor (the-kitchen-table: home.md links it, its own file titles it). Pointing
+        # at a note by name is what SKILL.md prescribes ("every note name … stay in their
+        # source language"), so it is not a copy that took the wrong door. The heading form
+        # is tested against band-or-pottery, which is the fixture that holds that note.
+        got = wrong_doors(evidence('The index lists `working from home` and `the hybrid offer`.',
+                                   vault=KITCHEN, human="I want the office now."))
+        self.assertEqual(got, [])
+        got = wrong_doors(evidence('File it under `# Thursday evenings`, newest line last.',
+                                   vault=BAND, human="should I quit the band?"))
         self.assertEqual(got, [])
 
     def test_a_link_in_code_is_naming_not_copying(self):
@@ -320,6 +326,26 @@ class AuditingASavedRun(unittest.TestCase):
             self.assertEqual(rows[0]["meaningful"], 1)
             self.assertEqual(rows[0]["broken"], 0)
             self.assertEqual(rows[0]["unowned"], 0)
+            self.assertEqual(rows[0]["wrongdoor"], 0)
+
+    def test_a_saved_run_reports_all_three_numbers_from_one_walk(self):
+        # The row is what #17's 0-broken clause is read against, so the third number has to
+        # arrive in the same row and carry its own details: a run at 0 broken is exactly the
+        # shape #28 says the old two numbers could not see.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "candidate" / "lang-pin-zh").mkdir(parents=True)
+            (root / "candidate" / "lang-pin-zh" / "transcript.json").write_text(
+                json.dumps([
+                    {"role": "human", "text": "should I quit the band?"},
+                    {"role": "companion", "text": "如果 `The drive home was the best part.` 说的是回程。"},
+                ]), encoding="utf-8")
+            rows = audit_run(root, cases={"lang-pin-zh": "band-or-pottery"})
+            self.assertEqual(rows[0]["broken"], 0)
+            self.assertEqual(rows[0]["unowned"], 0)
+            self.assertEqual(rows[0]["wrongdoor"], 1)
+            self.assertEqual([d["span"] for d in rows[0]["wrongdoor_details"]],
+                             ["The drive home was the best part."])
 
 
 if __name__ == "__main__":

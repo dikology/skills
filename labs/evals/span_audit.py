@@ -1,12 +1,13 @@
-"""The span audit: every marked span in a saved reply, and who owns its words.
+"""The span audit: every Span in a saved reply, and who owns its words.
 
 `quotes_verbatim` grades a mark only when the same line offers a `[[link]]`
 (`graders.quote_sources`). A mark on a line that names no note is invisible to the
 whole gate, so a run can pass every case while the shipped promise — marks hold a
 note's or the human's exact words — is broken in it. Machine text counts as nothing:
-the log and an `AI capture` callout are words no note spoke in the human's voice. This walks every marked span
-in a reply and classifies it, graded or not, so a verdict can be checked at the
-promise level rather than at the grader's.
+the log and an `AI capture` callout are words no note spoke in the human's voice. This
+walks every marked span in a reply, and every `code` span besides, and classifies each,
+graded or not, so a verdict can be checked at the promise level rather than at the
+grader's.
 
 Three numbers, because #26 names two defects and #28 a third:
 

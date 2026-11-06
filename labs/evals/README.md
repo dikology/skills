@@ -188,7 +188,7 @@ from a filed line that way, so those cases also grade `no_writes`.
 trimmed, self-coined or self-quoted phrase in marks on a line that names no note is invisible to
 every grader, so an arm-run can pass 20/20 with the shipped promise — marks hold a note's or the
 human's exact words — broken in it. `span_audit.py` walks every marked span in a saved run's
-transcripts and says who owns each one's words. A graded mark is put to the gate's own `quote_claim`,
+transcripts, and every `code` span besides, and says who owns each one's words. A graded mark is put to the gate's own `quote_claim`,
 unchanged, so the two can be checked against each other; an ungraded one is matched against the
 Corpus, the machine blocks, the human's turns and the reply's own earlier sentences — `human_text`,
 `machine_text` and `start_vault`, reading the Fixture vault through the case's Overlay, so the log is

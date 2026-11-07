@@ -4,8 +4,9 @@
 overwritten at each handoff; `README.md` is the user-facing entry point. Everything substantive lives in
 the artifacts linked below — this file only points, per the `handoff` skill.
 
-**Date:** 2026-11-06 · **Close of:** `/implement #26` · **Branch:** `main`
-**Next session is for:** deciding and running the v0.2.0 gate, and/or the next quoting-mechanism round.
+**Date:** 2026-11-07 · **Close of:** the voice round (0-token mining + one prose change, unmeasured) ·
+**Branch:** `main`
+**Next session is for:** measuring that change, then deciding and running the v0.2.0 gate.
 
 ## Read these first — do not re-derive them
 
@@ -23,8 +24,12 @@ the artifacts linked below — this file only points, per the `handoff` skill.
 ## State in five lines
 
 - `skills/companion` (Stable) = `e981bb4e`. **No promotion, no tag, no both-arm gate spent.** improve's arms are identical (`0e3cbd00f056`).
-- `labs/companion` (Candidate) = `6ad215ae` — carries #26's scan + script test **and** #27's framing shape and #28's door rule.
-- Last full-set measurement of that candidate: `fix26l_sweep1` → **20/21 PASS, 5,463,637 tok**, audit **3 broken / 127 claim-bearing marks, 1 unowned, 5 wrong-door**.
+- `labs/companion` (Candidate) = **`97bb5b6f`**, which no eval has ever scored — it is `6ad215ae` plus the
+  voice round's one paragraph in `Session shape`. `6ad215ae` carries #26's scan + script test **and** #27's
+  framing shape and #28's door rule; `97bb5b6f` carries all of that too.
+- Last full-set measurement of the *measured* candidate (`fix26l_sweep1`, bytes `6ad215ae`) →
+  **20/21 PASS, 5,463,637 tok**, audit **3 broken / 127 claim-bearing marks, 1 unowned, 5 wrong-door**.
+  The one loss, `lang-quote-stays-source`, is #26's rendering family and is untouched by this round.
 - Harness tests: `python3 -m unittest discover -s labs/evals` → 357 OK.
 - #26's pinned case on the corrected bytes is **2/3**, not 3/3; the 3/3 belongs to `b3e23878`, which review showed contained two false claims. Pooled across 16 candidate byte-strings the pinned case passes **0.76 per run**, and 3 of 12 three-run copies go 3/3 where chance predicts 5.2 — so a streak certifies nothing on its own.
 
@@ -37,7 +42,17 @@ One both-arm run of **26 cases / 52 rows** (companion 21 + improve 5) on post-pr
 The instrument already located the residue, scoped per case at 0 tokens rather than from the ticket's framing:
 
 - **4 of the sweep's 5 wrong-door copies are outside `lang-pin-zh`; 3 are in English replies.** One line repeats: `` `something else has to come off it` `` ← `[[thursday evenings]]` in **both** `first-run-declined` and `no-log-no-writes`; also `` `Nobody says no and nobody writes anything` `` ← `[[the band]]`.
-- **2 of the 3 broken marks are invisible spans the script test cannot reach**, because it is silent when the reply is in the notes' language: `пользуюсь ли я этим` (`lang-follows-human`), `有人等` (`lang-pin-zh`). Cheapest probe: `--arm candidate --case follows` ×2–3 (~0.3M).
+- **2 of the 3 broken marks are invisible to `quotes_verbatim`, and they leak through two different holes.**
+  `пользуюсь ли я этим` (`lang-follows-human`) is the one the script test genuinely cannot reach — reply,
+  Corpus and human turn all Russian. `有人等` (`lang-pin-zh`) is *not*: its notes and its single human turn are
+  English and the reply is pinned 中文, so the test names that Span and the model wrote it anyway, inside
+  `真正让你周四出门的是…` — an interpretation sentence, where the line is the reply's own guess at the human's
+  meaning. Pooled over every saved run, an interpretation lead-in sits in front of the model's own Spans
+  20.5% of the time when they wear Marks and 1.4% when they take `code` (161 vs 881, one pass).
+  `97bb5b6f` writes the shape for both holes and has never been scored. Cheapest probe:
+  `--arm candidate --case follows` ×2–3 (~0.3M); #26's AC 2 baseline (`--case lang` ×2 + `--case reversal` ×1,
+  ~0.9M) is the fair comparison, and the sweep's one loss `lang-quote-stays-source` is #26's rendering family,
+  which this round deliberately did not reach.
 - 1 `unowned`: `"I'd think about it"` in `raw-flag-softens`.
 
 **Two moves that must not be repeated:** writing another forbidden surface form of the pointer sentence (eight byte-strings did that; the one durable win came from mining the model's already-correct instances — 88 of 98 `那句`-type clauses were already unmarked), and naming Marks at the composition site (printed corner-mark examples made corner marks *more* available, not less).

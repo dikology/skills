@@ -46,7 +46,7 @@ What companion does to its own reply before sending it: read the sentences, find
 _Avoid_: lint, self-check, pre-send check
 
 **Script test**:
-The cheap half of the Two-shape scan, for a reply that is not in the Corpus's language: a Span written in the reply's own language is not a copy, because in that reply the only two voices are the note's characters and the human's. Naming a line (`那句`, `说的是`) hands nothing to the note — what follows is the reply's reading, and a reading wears no Mark. Silent where the reply is in the notes' language: there the script says nothing about who spoke.
+The cheap half of the Two-shape scan, for a reply that is not in the Corpus's language: a Span written in the reply's own language is not a copy, because in that reply the only two voices are the note's characters and the human's. Naming a line (`那句`, `说的是`) hands nothing to the note — what follows is the reply's reading, and a reading wears no Mark. Silent where the reply is in the notes' language: there the script says nothing about who spoke, and the exemption it leaves open is about the words, not the language — the human writing in a language makes no Span in it a copy, and the Span companion composed for the human's unspoken meaning has no speaker to be a copy of.
 _Avoid_: translation check, language guard
 
 **Wrong door**:

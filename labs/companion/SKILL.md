@@ -158,8 +158,12 @@ lines — your prose there names notes with links and holds no marks, not for a 
 a word of theirs you are weighing. Put your reading *after* the quote as a gloss —
 `（注：卖掉它像是卖掉她的手）` — or name the note and say it unmarked:
 `[[дача]] 说卖掉它像是卖掉她的手`. That unmarked saying is the scan's second shape, and a
-pinned reply owes it to the end of the sentence. So wherever your sentence needs the *content* of a
-line written in another language, that content is the gloss `（注：…）` or your own unmarked words — the
+pinned reply owes it to the end of the sentence. Your pointer forms already carry it bare: 那句, 说的是
+and 记的是 take your own words straight after them, with nothing around them. That bare shape is also the
+door when your sentence needs the content as its subject or object rather than as a clause —
+真正该重算的是 [[thursday evenings]] 那句加一样就得卸一样 — and the sentence goes on weighing it. So
+wherever your sentence needs the *content* of a line written in another language, that content is the
+gloss `（注：…）` or your own unmarked words — the
 gloss is not only for a human who may not read the source. A 中文 reply that holds a word up is
 pointing, not quoting, so it takes the same home English uses — `code`, mid-sentence, inside
 an ordinary line: 你现在把 `人` 放在第一顺位，如果答案是 `没有`，那 [[the band]] 只记了出门，我那句

@@ -267,8 +267,9 @@ strongest evidence yet: the Candidate arm wrote 0 broken spans across all 20 cas
 arm broke the promise 8 times (5.4% of its marks) and passed all 20, its graders seeing none of the
 8. No tag; `skills/companion` still `e981bb4e`.
 
-**The voice round — the discriminator was already in the saved transcripts, and 0 eval tokens found
-it.** #26 already named its residue as "two shapes, one rule"; this round found *which sentence* the rule
+**The who-spoke round — the discriminator was already in the saved transcripts, and 0 eval tokens found
+it.** (The commits above name it the "voice round"; this file uses the plain words.) #26 already named its
+residue as "two shapes, one rule"; this round found *which sentence* the rule
 gets argued past, and wrote the shape for it there. The sample is the model's own words sitting in Marks —
 the span audit's two ungraded kinds, `no-source` and `self-quote`, spans on lines that name no note (161
 of them, every saved companion run) — counted against the same content in `code` (881). Read the two arms
@@ -376,6 +377,42 @@ recorded. The estimate above came out low by 29%: the two `--case lang` passes c
   shipping bytes' candidate arm; these bytes report **5 broken of 68**. The Wrong-door column reading 0 in
   four runs against the baseline's 2 is #28's axis, which this change never targeted — one pass of four cases
   each, so it is a lead for #28, not its closure.
+
+**The rendering half, scoped from the instrument and written from the model's own correct habit.** The
+`fix26m_lang2` loss named the shape, so the first move was to count it everywhere, at 0 tokens: **17
+`claim-fail` Spans over all saved companion runs whose characters are in the reply's script while the Corpus
+is in another and no note holds them — 15 in `lang-pin-zh`, 2 in `lang-quote-stays-source`, all of them 中文
+over a Latin or Cyrillic Corpus.** That split says where the sentence belongs — in `Language`, which is the
+opposite of #28's door finding (12 of 16 doors sat in English replies, so that rule went into
+`Pointing is not quoting`).
+
+- **The correct form is already the model's habit.** The pointer forms (`那句`, `那条`, `说的是`, `写的是`,
+  `记的是`, `讲的是`, `提到过`) are followed by **plain 中文 words 151 times and by a Mark opener 12 times —
+  92.6% already bare.** This re-derives the "88 of 98" the handoff warned no longer reproduces, over the
+  117 run dirs now saved, with the filter stated: the counted stretch is the 2–26 characters after the
+  pointer, and "plain" means at least three CJK characters before any Mark.
+- **What separates the 12 from the 151 is grammar, not care.** The failures need the rendering as the
+  **subject or object** of the sentence — `撑不起"X"这个决定`, `是"X"这件事本身`, `那句「X」：它假设…`,
+  `说周四是"X"` — while the correct 151 are clauses. The file printed exactly one nominal door, and it was
+  `code` for the reply's own coinage — 我那句 `陶艺填同一个位置` 得重算 — and a run then wrote that very
+  sentence with Marks (`"陶艺填同一个位置"得重算`). So a note's content sitting in a noun slot had no legal
+  home on the page.
+- **The change** is one sentence in `Language`: the pointer forms carry your own words bare, and that bare
+  shape is also the door when the sentence needs the content as subject or object — the example printed is
+  `真正该重算的是 [[thursday evenings]] 那句加一样就得卸一样`. The example is the model's own failing sentence
+  with the Marks removed, not a new coinage, and no Mark example is printed: those are the two moves the
+  record says arm the failure.
+- **Proved legal, not proved used, at 0 tokens.** Replaying `fix26m_lang2`'s own reply through
+  `span_audit.audit()` with the shape applied takes that reply from **3 broken to 1**, clearing both
+  `claim-fail`s; the survivor is `少一件事`, the other mechanism; `wrongdoor` stays 0. The denominator moves
+  with it (10 claim-bearing Marks to 8), so any rate quoted beside these numbers must say which denominator
+  it uses. Nothing here shows the model will write the shape — only that writing it breaks no promise the
+  instrument reads.
+- **The guard this shape puts at risk, named before spending.** `quotes_stay_in_source_language`
+  (`graders.py:1324`) **requires** at least one verified copy whose language is not the reply's: a reply that
+  rendered every note's content into comfortable 中文 prose would fail it even though it would break no Mark
+  promise. So the measurement must include `lang-quote-stays-source`, not only the two losers — a rendering
+  shape that quietly replaced copying would show up there first.
 
 ### Added
 

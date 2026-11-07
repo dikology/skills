@@ -4,9 +4,10 @@
 overwritten at each handoff; `README.md` is the user-facing entry point. Everything substantive lives in
 the artifacts linked below — this file only points, per the `handoff` skill.
 
-**Date:** 2026-11-07 · **Close of:** the voice round — prose written, then measured on the maintainer's
-option 2 (2,098,054 tok, candidate arm) · **Branch:** `main`
-**Next session is for:** #26's rendering half (the `lang-pin-zh` loser), then the promotion run, then the gate.
+**Date:** 2026-11-07 · **Close of:** the who-spoke paragraph measured, then the rendering shape written (0
+tokens for the writing; 2,098,054 for the measurement the maintainer chose) · **Branch:** `main`
+**Next session is for:** score `ed4cc405` on `lang-pin-zh` *and* the `quotes_stay_in_source_language` guard
+case, then the promotion run, then the gate.
 
 ## Read these first — do not re-derive them
 
@@ -21,15 +22,22 @@ option 2 (2,098,054 tok, candidate arm) · **Branch:** `main`
 | Evidence archive | `~/Downloads/evals-results-2026-11-06.tar.gz` (2,321 entries verified against the disk listing, 113 run dirs); earlier `…-2026-11-03.tar.gz` |
 | The 0-token sweeps behind the tables | Method, not files: `python3 labs/evals/span_audit.py results/<run> --json` grouped by the tree-hash in `summary.json`. The ad-hoc scripts of this session sit in `.qwen/tmp/` and are not kept |
 
-## State in six lines
+## State in seven lines
 
 - `skills/companion` (Stable) = `e981bb4e`. **No promotion, no tag, no both-arm gate spent.** improve's arms are identical (`0e3cbd00f056`).
-- `labs/companion` (Candidate) = **`518d33de`** — `6ad215ae` plus one paragraph in `Session shape`, the round
-  this file calls the **voice round** (plain words: the round that asks *who spoke* before a Mark is used;
-  review retired the first two drafts, `7457aac1` and `97bb5b6f`, unscored). `6ad215ae` carries #26's scan +
-  script test **and** #27's framing shape and #28's door rule; `518d33de` carries all of that too.
-- **That copy is now measured: 2,098,054 tok, 10 case-runs, candidate arm, `--case` filtered, all on one
-  frozen hash.** `fix26m_lang1` 4/4 PASS · `fix26m_lang2` 3/4 · `fix26m_rev1` 1/1 · `fix26m_fram1` 1/1.
+- `labs/companion` (Candidate) = **`ed4cc405`** — `518d33de` plus one sentence in `Language`, and **unscored**:
+  no eval has run against it. `518d33de` = `6ad215ae` plus the who-spoke paragraph, and it *is* measured (next
+  bullet). `6ad215ae` carries #26's scan + script test **and** #27's framing shape and #28's door rule; every
+  copy since carries all of that too.
+- **`ed4cc405`'s sentence is the rendering shape, chosen from the instrument and from the model's own habit.**
+  17 `claim-fail` Spans across all saved runs are 中文 words that no note holds, on lines naming a note:
+  **15 in `lang-pin-zh`, 2 in `lang-quote-stays-source`, none anywhere else.** The pointer forms (那句,
+  说的是, 记的是…) already take plain 中文 words **151 times against 12 Mark openings — 92.6% already bare** —
+  so the file now prints that bare form for the *noun* slot the 12 all occupied. Proved legal at 0 tokens:
+  replaying `fix26m_lang2`'s own reply through `span_audit` with the Marks dropped takes it from **3 broken
+  to 1** and leaves `wrongdoor` at 0. Not proved used. Details and the guard in `CHANGELOG.md`.
+- **The who-spoke copy (`518d33de`) is measured: 2,098,054 tok, 10 case-runs, candidate arm, `--case`
+  filtered, all on one frozen hash.** `fix26m_lang1` 4/4 PASS · `fix26m_lang2` 3/4 · `fix26m_rev1` 1/1 · `fix26m_fram1` 1/1.
   Audit: **5 broken of 68 claim-bearing marks, 0 unowned, 0 wrongdoor**. The mechanism the paragraph targets
   went 2 → 0 and 1 across the two language passes; `framing_named` still passes (judge 5/5) and
   `reversal-annotated` still passes. Filtered runs buy no promotion, so #17's bar is untouched: these bytes
@@ -90,13 +98,19 @@ The instrument already located the residue, scoped per case at 0 tokens rather t
   reply wrote that phrase as its own prose one paragraph earlier. Both rounds published it without checking
   the bytes. Re-derive an inherited claim before repeating it, and name the run it came from.
 - **Check the sibling grader before writing "say it unmarked".** `framing_named` (`graders.py:821-847`)
-  *fails* a framing held in Marks and passes only the one in `code`. The voice round's first draft told the
+  *fails* a framing held in Marks and passes only the one in `code`. The who-spoke round's first draft told the
   model to say its own line unmarked with no scope guard, which competes with #27's graded shape — the exact
   class of defect that made `26c99207` unshippable. The paragraph now ends by moving nothing a note or the
   human spoke; do not trim that clause as redundant.
 - **`--case lang` is 4 cases, not one.** `run_evals.py` matches case ids *containing* the filter, so
   #26's AC 2 is nine case-runs (≈1.63M priced from saved per-case tokens), not the ≈0.9M its own Costs line
   gives for one pass of four.
+- **A shape that removes Marks can still break a copy promise's *other* half.**
+  `quotes_stay_in_source_language` (`graders.py:1324`) requires at least one verified copy whose language is
+  *not* the reply's. So a rendering shape that made bare 中文 comfortable everywhere would pass the
+  `quotes_verbatim` graders and fail that one. When you score a rendering fix, run
+  `--case lang-quote-stays-source` beside the two losers — the guard case is where a shape that replaced
+  copying would show up first.
 - **Chain eval runs with `;`, never `&&`.** `run_evals.py:737` returns 1 when any case fails, so an `&&` chain
   stops after a failing run and reports the whole task as *failed* — a planned later run silently never starts.
   That is what happened to `fix26m_rev1` here: the task notification said "failed, exited with code 1", but the

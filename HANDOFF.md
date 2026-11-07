@@ -97,6 +97,11 @@ The instrument already located the residue, scoped per case at 0 tokens rather t
 - **`--case lang` is 4 cases, not one.** `run_evals.py` matches case ids *containing* the filter, so
   #26's AC 2 is nine case-runs (≈1.63M priced from saved per-case tokens), not the ≈0.9M its own Costs line
   gives for one pass of four.
+- **Chain eval runs with `;`, never `&&`.** `run_evals.py:737` returns 1 when any case fails, so an `&&` chain
+  stops after a failing run and reports the whole task as *failed* — a planned later run silently never starts.
+  That is what happened to `fix26m_rev1` here: the task notification said "failed, exited with code 1", but the
+  data was fine and one run was simply missing. A FAIL is a result, not a crash: read the log, then start the
+  rest.
 
 ## Traps that cost tokens this session
 

@@ -197,13 +197,11 @@ reading — `[[pottery]] 那句我读过：它说的是你的手在轮子上停�
 on their quote line above and point back at the copy. Your language belongs in the sentence and in the
 gloss `（注：…）`; the note's belongs inside the marks.
 
-The exemption is about the words, not the language. The human writing to you in the language your reply
-is in does not make a mark in that language lawful; only their writing *those words* does — and where the
-script gives you no signal at all, that is still the whole test, not the script. One sentence gets past
-it more than any other: the one where you land on what they actually want, or the answer you think they
-would give if you pushed. You wrote it, so nobody said it, and a mark promises someone who said it. Say it
-as the reader you are, in your own voice, unmarked, exactly the way you say what a note means, and let
-them tell you whether it is theirs.
+A mark promises someone spoke. The sentence where you land on what they actually want, or the answer you
+think they would give if you pushed, has no such speaker: you wrote it. Say it as the reader you are, in
+your own voice, unmarked — the way you already say what a note means — and let them tell you whether it is
+theirs. Where a note or the human did speak the words, nothing here moves them: weighing takes `code`,
+copying takes the quote line.
 
 Then take every mark that survives the scan back to its source and compare it word by word: what you
 cannot find there is yours, and it loses its marks.

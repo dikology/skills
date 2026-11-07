@@ -268,14 +268,18 @@ arm broke the promise 8 times (5.4% of its marks) and passed all 20, its graders
 8. No tag; `skills/companion` still `e981bb4e`.
 
 **The voice round — the discriminator was already in the saved transcripts, and 0 eval tokens found
-it.** The sweep's 3 broken marks are one mechanism, not the three the tickets name: the reply composes a
-line and puts it through the Mark door, which promises that someone spoke it. Mining every saved
-companion run at 0 tokens — the model's own words in Marks (161 Spans) against the same class in `code`
-(881), one pass, one filter set, so the denominators are comparable:
+it.** #26 already named its residue as "two shapes, one rule"; this round found *which sentence* the rule
+gets argued past, and wrote the shape for it there. The sample is the model's own words sitting in Marks —
+the span audit's two ungraded kinds, `no-source` and `self-quote`, spans on lines that name no note (161
+of them, every saved companion run) — counted against the same content in `code` (881). Read the two arms
+asymmetically on purpose: the Marks arm is the audit's own classification, while the `code` arm is a
+residue with five filters on it (drop spans under 4 characters, note names, Corpus-held lines, the human's
+own words, and single-word labels), so this is not a matched control — it is the enrichment of one trigger,
+direction only, one pass:
 
 | what the Span and its line hold | own words in Marks | own words in `code` |
 |---|---|---|
-| an interpretation lead-in (`我猜你真正在优化的是`, `the honest answer is`, `it competes with`) | 33 (20.5%) | 12 (1.4%) |
+| the reply naming what the human *really* wants or would answer (`我猜你真正在优化的是`, `the honest answer is`, `it competes with`) | 33 (20.5%) | 12 (1.4%) |
 | a voice-word inside the Span (I / you / 我 / ты) | 50 (31.1%) | 33 (3.7%) |
 | a question mark inside the Span | 11 (6.8%) | 2 (0.2%) |
 
@@ -283,38 +287,54 @@ companion run at 0 tokens — the model's own words in Marks (161 Spans) against
   `哪个周四我不舍得缺席` through both doors in one run: reply 1 puts it in Marks under
   `我猜你真正在优化的是` — no note and no human line holds it — and reply 2 puts the identical phrase in
   `code` and says it was the model's own take, wrong, and retracted. The right door was available two
-  turns later, so this is a binding failure, not a missing capability, and the shape to take is the one
-  already in use — the same reason 88 of 98 pointer clauses were already unmarked.
-- **The two survivors are two different holes, and the paragraph closes them differently.**
-  `пользуюсь ли я этим` (`lang-follows-human`) is where the script test really is silent: reply, Corpus and
-  human turn are all Russian, so the script says nothing about who spoke and the file offered no second
-  test. `有人等` (`lang-pin-zh`) is *not* that case — checked, not assumed: in `fix26l_sweep1` the notes are
-  English, the human's one non-command turn is English ("I think I'd miss the people more than the music"),
-  the reply is pinned 中文, so the test names that Span exactly and the model wrote it anyway, from the
-  sentence `真正让你周四出门的是…`, where the line is the reply's own guess at the human's meaning and reads
-  like the human's. So the first half of the new paragraph (the exemption is about the words, not the
-  language) is the rule the file did not have; the second half (name the interpretation sentence, take the
-  shape you already take when retracting) is the shape that gets argued past. Both were invisible to
-  `quotes_verbatim`, which reads a Mark only where its own line offers a link.
-- **The change** is one paragraph at the scan site, immediately after the script test: the exemption is
-  about the words, not the language, and the sentence where you land on what the human actually wants —
-  or the answer you think they would give if you pushed — is one nobody said, so it is said as the
-  reader you are, in your own voice, unmarked, exactly the way a note's meaning is already said.
-  `GLOSSARY.md`'s **Script test** entry gained the clause that fills the silence it already declared.
-  Three moves this round did not make, because the record says they fail: no printed Mark example at the
+  turns later, so this is a binding failure, not a missing capability. That is also why the shape was
+  written as the retraction's own words rather than as a fourth statement of the ban.
+- **The two survivors are two different holes.** `пользуюсь ли я этим` (`lang-follows-human`) is where the
+  script test really is silent: reply, Corpus and human turn are all Russian, so the script says nothing
+  about who spoke and the file offered no second test. `有人等` (`lang-pin-zh`) is *not* that case — checked,
+  not assumed: in `fix26l_sweep1` the notes are English, the human's one non-command turn is English ("I
+  think I'd miss the people more than the music"), the reply is pinned 中文, so the test names that Span
+  exactly and the model wrote it anyway, from the sentence `真正让你周四出门的是…`. So one hole needs a test
+  the file never had where the script is mute; the other needs the shape at the sentence that gets argued
+  past. Both spans were invisible to `quotes_verbatim`, which reads a Mark only where its own line offers
+  a link.
+- **The change** is one paragraph at the scan site, immediately after the script test: a Mark promises
+  someone spoke, the sentence where you land on what the human actually wants (or the answer you think they
+  would give if you pushed) has no such speaker, and so it is said as the reader you are, in your own voice,
+  unmarked — the way the file already says what a note means — and the human is left to say whether it is
+  theirs. `GLOSSARY.md`'s **Script test** entry gained the clause that fills the silence it already
+  declared. Three moves avoided because the record says they fail: no printed Mark example at the
   composition site (corner-mark examples made corner marks *more* available), no new surface form of the
   pointer sentence (eight byte-strings tried that), and no touch to `verbatim()`, `quote_sources`,
   `span_audit.py`, the case sets or any grader.
-- **Covers 2 of the sweep's 3, deliberately.** The third broken mark — the one that actually cost the
-  case, `一年四次的抵达值不值二十四万加所有周六` in the Close menu's `[e]` line — is #26's *rendering*
-  family, not this mechanism. Widening this paragraph to reach it would have named a fourth forbidden
-  form to no purpose, and would have made the next run's number unattributable.
+- **Review caught a collision with #27 before it could be spent.** The first draft ended by telling the
+  model to say the line "in your own voice, unmarked". `graders.py:821-847` (`framing_named`) *fails* a
+  framing held in Marks and passes only the one in `code`, so an unqualified instruction to go unmarked
+  competes with the shape #27's case is graded on — the same class of defect as `26c99207`, whose clause
+  banned #27's graded shape and had to be retired. The paragraph now closes by moving nothing that a note
+  or the human did speak: weighing takes `code`, copying takes the quote line. Review also struck the
+  draft's opening restatement of the script test's own exemption, which made the file say one ban a
+  fourth time where `2316007` had just collapsed it from four to one.
+- **All three of the sweep's broken marks are this mechanism, including the graded one.** The first draft
+  of this note called `一年四次的抵达值不值二十四万加所有周六` (the Close menu's `[e]` line, the sweep's only
+  case loss) #26's *rendering* family and excluded it — repeating a claim the previous round published
+  without checking the transcript. It is not a rendering of a note's line: the same reply wrote
+  `花二十四万加所有周六，换一年四次的抵达` two paragraphs earlier and re-marked its own compression; the
+  arithmetic is the notes' (roof cost, four visits) but no note holds those words. It was outside this
+  round's table only because the sample's kind filter kept the two ungraded kinds and this one is graded
+  `claim-fail`. Whether the new paragraph reaches an `[e]` line is unmeasured — `[e]` proposes text to
+  file, so it has a shape question of its own, and #26's other half (a faithful copy credited to the
+  *wrong* note) is untouched here.
 - **Not measured, and not spent.** 0 eval tokens, on the maintainer's instruction.
   `python3 -m unittest discover -s labs/evals` is 357 OK, which reports the harness's state and nothing
-  about the prose: no scripted check reads `SKILL.md`. `labs/companion` is `97bb5b6f`, from `6ad215ae`;
-  `skills/companion` stays `e981bb4e`; no promotion, no gate, nothing pushed. The cheapest probe of this
-  shape is the one the handoff names — `--arm candidate --case follows` ×2–3, ≈0.3M — and #26's own AC 2
-  baseline (`--case lang` ×2 plus `--case reversal` ×1, ≈0.9M) is the fair comparison.
+  about the prose: no scripted check reads `SKILL.md`. `labs/companion` is **`518d33de`** — the copy whose
+  draft review retired as `7457aac1` and `97bb5b6f` mid-round, none of which any eval scored, since nothing
+  ran; it replaces `6ad215ae`, the last measured bytes. `skills/companion` stays `e981bb4e`: no promotion,
+  no gate, nothing pushed. The cheapest probe of this shape is the one the
+  handoff names — `--arm candidate --case follows` ×2–3, ≈0.3M. #26's AC 2 baseline is **9 case-runs**
+  (`--case lang` matches 4 cases ×2, plus `--case reversal` ×1); priced from `fix26l_sweep1`'s own
+  per-case tokens that is **1,628,643 tok**, not the ≈0.9M one pass costs — #26's own Costs line prices
+  four cases once, and the first draft of this note carried it onto a nine-run AC.
 
 ### Added
 

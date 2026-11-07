@@ -24,12 +24,14 @@ the artifacts linked below — this file only points, per the `handoff` skill.
 ## State in five lines
 
 - `skills/companion` (Stable) = `e981bb4e`. **No promotion, no tag, no both-arm gate spent.** improve's arms are identical (`0e3cbd00f056`).
-- `labs/companion` (Candidate) = **`97bb5b6f`**, which no eval has ever scored — it is `6ad215ae` plus the
-  voice round's one paragraph in `Session shape`. `6ad215ae` carries #26's scan + script test **and** #27's
-  framing shape and #28's door rule; `97bb5b6f` carries all of that too.
+- `labs/companion` (Candidate) = **`518d33de`**, which no eval has ever scored — it is `6ad215ae` plus the
+  voice round's one paragraph in `Session shape` (review retired the first two drafts, `7457aac1` and
+  `97bb5b6f`, before anything ran). `6ad215ae` carries #26's scan + script test **and** #27's framing shape
+  and #28's door rule; `518d33de` carries all of that too.
 - Last full-set measurement of the *measured* candidate (`fix26l_sweep1`, bytes `6ad215ae`) →
   **20/21 PASS, 5,463,637 tok**, audit **3 broken / 127 claim-bearing marks, 1 unowned, 5 wrong-door**.
-  The one loss, `lang-quote-stays-source`, is #26's rendering family and is untouched by this round.
+  The one loss is the graded broken mark, and it is the same mechanism as the other two — not a rendering;
+  see the voice-round note in `CHANGELOG.md`.
 - Harness tests: `python3 -m unittest discover -s labs/evals` → 357 OK.
 - #26's pinned case on the corrected bytes is **2/3**, not 3/3; the 3/3 belongs to `b3e23878`, which review showed contained two false claims. Pooled across 16 candidate byte-strings the pinned case passes **0.76 per run**, and 3 of 12 three-run copies go 3/3 where chance predicts 5.2 — so a streak certifies nothing on its own.
 
@@ -42,20 +44,38 @@ One both-arm run of **26 cases / 52 rows** (companion 21 + improve 5) on post-pr
 The instrument already located the residue, scoped per case at 0 tokens rather than from the ticket's framing:
 
 - **4 of the sweep's 5 wrong-door copies are outside `lang-pin-zh`; 3 are in English replies.** One line repeats: `` `something else has to come off it` `` ← `[[thursday evenings]]` in **both** `first-run-declined` and `no-log-no-writes`; also `` `Nobody says no and nobody writes anything` `` ← `[[the band]]`.
-- **2 of the 3 broken marks are invisible to `quotes_verbatim`, and they leak through two different holes.**
-  `пользуюсь ли я этим` (`lang-follows-human`) is the one the script test genuinely cannot reach — reply,
-  Corpus and human turn all Russian. `有人等` (`lang-pin-zh`) is *not*: its notes and its single human turn are
-  English and the reply is pinned 中文, so the test names that Span and the model wrote it anyway, inside
-  `真正让你周四出门的是…` — an interpretation sentence, where the line is the reply's own guess at the human's
-  meaning. Pooled over every saved run, an interpretation lead-in sits in front of the model's own Spans
-  20.5% of the time when they wear Marks and 1.4% when they take `code` (161 vs 881, one pass).
-  `97bb5b6f` writes the shape for both holes and has never been scored. Cheapest probe:
-  `--arm candidate --case follows` ×2–3 (~0.3M); #26's AC 2 baseline (`--case lang` ×2 + `--case reversal` ×1,
-  ~0.9M) is the fair comparison, and the sweep's one loss `lang-quote-stays-source` is #26's rendering family,
-  which this round deliberately did not reach.
+- **All 3 of the sweep's broken marks are one mechanism: the reply's own line wearing Marks.** Two are
+  invisible to `quotes_verbatim` and leak through different holes — `пользуюсь ли я этим`
+  (`lang-follows-human`) is where the script test genuinely cannot reach (reply, Corpus and human turn all
+  Russian); `有人等` (`lang-pin-zh`) is not, since its notes and its single human turn are English under a
+  pinned 中文 reply, so the test names that Span and the model wrote it anyway, inside
+  `真正让你周四出门的是…`. The third is the graded one and cost the case: `一年四次的抵达值不值二十四万加所有周六`
+  in the Close menu's `[e]` line, which the same reply had just written as its own prose — *not* the
+  rendering the previous release note called it. What the trigger is, pooled over every saved run: the reply
+  naming what the human really wants sits in front of the model's own Spans 20.5% of the time when they wear
+  Marks and 1.4% when they take `code` (161 vs 881 — a kind-filtered sample, not a matched control: read the
+  caveats in the `CHANGELOG.md` voice-round note). `518d33de` writes the shape and has never been scored.
+  Cheapest probe: `--arm candidate --case follows` ×2–3 (~0.3M). #26's AC 2 baseline is **9 case-runs**
+  (`--case lang` matches 4 cases ×2, plus `--case reversal` ×1) ≈ **1.63M** priced from the sweep's own
+  per-case tokens, not the ≈0.9M one pass costs.
 - 1 `unowned`: `"I'd think about it"` in `raw-flag-softens`.
 
-**Two moves that must not be repeated:** writing another forbidden surface form of the pointer sentence (eight byte-strings did that; the one durable win came from mining the model's already-correct instances — 88 of 98 `那句`-type clauses were already unmarked), and naming Marks at the composition site (printed corner-mark examples made corner marks *more* available, not less).
+**Two moves that must not be repeated:** writing another forbidden surface form of the pointer sentence (eight byte-strings did that; the one durable win came from mining the model's already-correct instances — 88 of 98 `那句`-type clauses were already unmarked, that being `f29d156`'s count over the 98 run dirs then saved, and results/ now holds 113, so re-derive before quoting it), and naming Marks at the composition site (printed corner-mark examples made corner marks *more* available, not less).
+
+## Traps this round added
+
+- **A claim inherited from the last round's release note was false.** The previous note called the sweep's
+  graded broken mark "a 中文 rendering of a Russian note's arithmetic"; reading the transcript shows the same
+  reply wrote that phrase as its own prose one paragraph earlier. Both rounds published it without checking
+  the bytes. Re-derive an inherited claim before repeating it, and name the run it came from.
+- **Check the sibling grader before writing "say it unmarked".** `framing_named` (`graders.py:821-847`)
+  *fails* a framing held in Marks and passes only the one in `code`. The voice round's first draft told the
+  model to say its own line unmarked with no scope guard, which competes with #27's graded shape — the exact
+  class of defect that made `26c99207` unshippable. The paragraph now ends by moving nothing a note or the
+  human spoke; do not trim that clause as redundant.
+- **`--case lang` is 4 cases, not one.** `run_evals.py` matches case ids *containing* the filter, so
+  #26's AC 2 is nine case-runs (≈1.63M priced from saved per-case tokens), not the ≈0.9M its own Costs line
+  gives for one pass of four.
 
 ## Traps that cost tokens this session
 

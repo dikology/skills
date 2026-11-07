@@ -325,16 +325,57 @@ direction only, one pass:
   `claim-fail`. Whether the new paragraph reaches an `[e]` line is unmeasured — `[e]` proposes text to
   file, so it has a shape question of its own, and #26's other half (a faithful copy credited to the
   *wrong* note) is untouched here.
-- **Not measured, and not spent.** 0 eval tokens, on the maintainer's instruction.
+- **Written unmeasured; measured later in the same session.** At the first commit this round spent 0 eval
+  tokens, on the maintainer's instruction.
   `python3 -m unittest discover -s labs/evals` is 357 OK, which reports the harness's state and nothing
   about the prose: no scripted check reads `SKILL.md`. `labs/companion` is **`518d33de`** — the copy whose
-  draft review retired as `7457aac1` and `97bb5b6f` mid-round, none of which any eval scored, since nothing
-  ran; it replaces `6ad215ae`, the last measured bytes. `skills/companion` stays `e981bb4e`: no promotion,
-  no gate, nothing pushed. The cheapest probe of this shape is the one the
+  first two drafts review retired as `7457aac1` and `97bb5b6f`, none of which any eval scored; it replaces
+  `6ad215ae`, the last measured bytes, and **is now measured below**, on the maintainer's choice of this
+  round's own option 2. `skills/companion` stays `e981bb4e`: no promotion, no gate, nothing pushed. The
+  cheapest probe of this shape is the one the
   handoff names — `--arm candidate --case follows` ×2–3, ≈0.3M. #26's AC 2 baseline is **9 case-runs**
   (`--case lang` matches 4 cases ×2, plus `--case reversal` ×1); priced from `fix26l_sweep1`'s own
   per-case tokens that is **1,628,643 tok**, not the ≈0.9M one pass costs — #26's own Costs line prices
   four cases once, and the first draft of this note carried it onto a nine-run AC.
+
+**Measured: 2,098,054 eval tokens over 10 case-runs on `518d33de`, candidate arm only, judge on.** Every
+run's `summary.json` carries the same tree-hash, so the arm was frozen throughout — the trap the last round
+recorded. The estimate above came out low by 29%: the two `--case lang` passes cost 625,885 and 636,139, and
+`reversal-annotated` alone cost 754,013.
+
+| arm-run (candidate) | cases | verdicts | claim-bearing marks | broken | this mechanism | unowned | wrongdoor |
+|---|---|---|---|---|---|---|---|
+| `fix26l_sweep1` (`6ad215ae`, baseline, same 6 cases) | 6 | 5/6 | 35 | 3 | 2 | 0 | 2 |
+| **`fix26m_lang1`** | 4 | **4/4** | 30 | 2 | **0** | 0 | **0** |
+| **`fix26m_lang2`** | 4 | 3/4 | 26 | 3 | **1** | 0 | **0** |
+| **`fix26m_rev1`** | 1 | 1/1 | 8 | 0 | 0 | 0 | 0 |
+| **`fix26m_fram1`** | 1 | 1/1 | 4 | 0 | 0 | 0 | 0 |
+| **this copy, all 10 rows** | 6 | 9/10 | 68 | 5 (7.4%) | 1 | 0 | 0 |
+
+- **What the change was for, and what it did to it.** The mechanism — the reply's own line inside Marks —
+  appeared 2 times in one baseline pass of the four language cases, and 0 and 1 times in the two passes of
+  these bytes. The survivor is `少一件事` (`fix26m_lang2/lang-pin-zh`). Two runs is not a cure and the
+  ticket's three-consecutive criterion is not met; the direction is what these rows support.
+- **The pinned case still flips, and now through #26's original door.** `lang-pin-zh` passed `fix26m_lang1`
+  and failed `fix26m_lang2` at 0.80 on two `claim-fail`s: `加一样就得卸一样` and `每周有个地方要去` — a 中文
+  compression of [[thursday evenings]]'s add-one-take-one line and of [[the band]]'s line, credited to notes
+  that hold no such characters. That is row 1 of #26's own table, the rendering half, which this round's
+  paragraph does not speak to. On the pinned case these bytes are **2 of 3** runs with one loss, the same
+  coin the pooled history predicts (0.76 per run).
+- **A defect the thinning exposed.** `fix26m_lang1` passed 4/4 while `lang-follows-human` carried **two
+  `human-edited` marks** — `раз в год что-то чиню` and `чиню то, что само сломалось за полгода`, the human's
+  own line recalled and tightened rather than copied. Neither is graded: they sit on lines that name no note.
+  This is #23's family, not #26's, and #17's clause is what makes it visible.
+- **The guards held.** `framing-carried-over` PASS at 1.00 with judge **5/5** on these bytes; the same
+  case's guard run on record earlier reported 4/5, and its pass on `6ad215ae` is in `fix26l_sweep1` with
+  0 broken across 3 marks. So the paragraph's closing clause did not pull #27's Framing out of `code` — the
+  collision review caught before any token was spent. `reversal-annotated` PASS at 1.00 with 0 broken, so
+  #24's annotation template and #25's placement are intact on these bytes.
+- **What this does NOT buy.** All four runs were `--case` filtered, so `--promote` refuses every one of them:
+  this is candidate-side evidence, not promotion evidence, and not the tag's run. #17's bar is 0 broken on the
+  shipping bytes' candidate arm; these bytes report **5 broken of 68**. The Wrong-door column reading 0 in
+  four runs against the baseline's 2 is #28's axis, which this change never targeted — one pass of four cases
+  each, so it is a lead for #28, not its closure.
 
 ### Added
 

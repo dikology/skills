@@ -4,9 +4,9 @@
 overwritten at each handoff; `README.md` is the user-facing entry point. Everything substantive lives in
 the artifacts linked below — this file only points, per the `handoff` skill.
 
-**Date:** 2026-11-07 · **Close of:** the voice round (0-token mining + one prose change, unmeasured) ·
-**Branch:** `main`
-**Next session is for:** measuring that change, then deciding and running the v0.2.0 gate.
+**Date:** 2026-11-07 · **Close of:** the voice round — prose written, then measured on the maintainer's
+option 2 (2,098,054 tok, candidate arm) · **Branch:** `main`
+**Next session is for:** #26's rendering half (the `lang-pin-zh` loser), then the promotion run, then the gate.
 
 ## Read these first — do not re-derive them
 
@@ -21,23 +21,44 @@ the artifacts linked below — this file only points, per the `handoff` skill.
 | Evidence archive | `~/Downloads/evals-results-2026-11-06.tar.gz` (2,321 entries verified against the disk listing, 113 run dirs); earlier `…-2026-11-03.tar.gz` |
 | The 0-token sweeps behind the tables | Method, not files: `python3 labs/evals/span_audit.py results/<run> --json` grouped by the tree-hash in `summary.json`. The ad-hoc scripts of this session sit in `.qwen/tmp/` and are not kept |
 
-## State in five lines
+## State in six lines
 
 - `skills/companion` (Stable) = `e981bb4e`. **No promotion, no tag, no both-arm gate spent.** improve's arms are identical (`0e3cbd00f056`).
-- `labs/companion` (Candidate) = **`518d33de`**, which no eval has ever scored — it is `6ad215ae` plus the
-  voice round's one paragraph in `Session shape` (review retired the first two drafts, `7457aac1` and
-  `97bb5b6f`, before anything ran). `6ad215ae` carries #26's scan + script test **and** #27's framing shape
-  and #28's door rule; `518d33de` carries all of that too.
-- Last full-set measurement of the *measured* candidate (`fix26l_sweep1`, bytes `6ad215ae`) →
+- `labs/companion` (Candidate) = **`518d33de`** — `6ad215ae` plus one paragraph in `Session shape`, the round
+  this file calls the **voice round** (plain words: the round that asks *who spoke* before a Mark is used;
+  review retired the first two drafts, `7457aac1` and `97bb5b6f`, unscored). `6ad215ae` carries #26's scan +
+  script test **and** #27's framing shape and #28's door rule; `518d33de` carries all of that too.
+- **That copy is now measured: 2,098,054 tok, 10 case-runs, candidate arm, `--case` filtered, all on one
+  frozen hash.** `fix26m_lang1` 4/4 PASS · `fix26m_lang2` 3/4 · `fix26m_rev1` 1/1 · `fix26m_fram1` 1/1.
+  Audit: **5 broken of 68 claim-bearing marks, 0 unowned, 0 wrongdoor**. The mechanism the paragraph targets
+  went 2 → 0 and 1 across the two language passes; `framing_named` still passes (judge 5/5) and
+  `reversal-annotated` still passes. Filtered runs buy no promotion, so #17's bar is untouched: these bytes
+  report broken marks, not 0. Full table in `CHANGELOG.md`.
+- Last full-set measurement of any candidate is still `fix26l_sweep1` (`6ad215ae`) →
   **20/21 PASS, 5,463,637 tok**, audit **3 broken / 127 claim-bearing marks, 1 unowned, 5 wrong-door**.
   The one loss is the graded broken mark, and it is the same mechanism as the other two — not a rendering;
-  see the voice-round note in `CHANGELOG.md`.
+  see the note above in `CHANGELOG.md`.
 - Harness tests: `python3 -m unittest discover -s labs/evals` → 357 OK.
-- #26's pinned case on the corrected bytes is **2/3**, not 3/3; the 3/3 belongs to `b3e23878`, which review showed contained two false claims. Pooled across 16 candidate byte-strings the pinned case passes **0.76 per run**, and 3 of 12 three-run copies go 3/3 where chance predicts 5.2 — so a streak certifies nothing on its own.
+- #26's pinned case is still a coin on every copy measured: `518d33de` went PASS then FAIL on
+  `lang-pin-zh`, and the failure is #26's **own row 1** — `加一样就得卸一样`, `每周有个地方要去`, a 中文
+  compression of a note's line inside Marks — the rendering half this paragraph does not speak to. The 3/3
+  on record belongs to `b3e23878`, which review showed contained two false claims. Pooled across 16 candidate
+  byte-strings the pinned case passes **0.76 per run**, and 3 of 12 three-run copies go 3/3 where chance
+  predicts 5.2 — so a streak certifies nothing on its own.
 
 ## Decision pending from the maintainer (this blocks the release)
 
 One both-arm run of **26 cases / 52 rows** (companion 21 + improve 5) on post-promotion bytes ≈ **12M tokens**; companion-only 21×2 ≈ **9.7M** is the promotion evidence. Prior spend for scale: `gate_companion_v6` 9.70M, `gate26_both` 9.27M. Gate odds are already computed in #17's comments — read them before recomputing.
+
+Two things this round's measurement changed in that decision, and one it did not:
+
+- **`--promote` is still blocked on a run, not on prose.** All four `518d33de` runs used `--case`, which the
+  promotion guard refuses by design. The promotion evidence is one unfiltered `--arm both` companion run (≈9.7M).
+- **The rendering half of #26 is now the live blocker**, because `518d33de` lost `lang-pin-zh` through it and
+  the `human-edited` pair showed up in the pass that had no other broken mark. Both are cases where the words
+  are not a note's, on lines the gate reads or ignores in different ways.
+- **What did not move:** #17's 0-broken clause still needs a *full-set* candidate arm at 0 broken. The 5-of-68
+  figure here is over filtered runs, so it is not that bar and does not replace it.
 
 ## If the next session is a prose round, start here
 

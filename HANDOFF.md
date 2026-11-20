@@ -7,7 +7,7 @@ the artifacts linked below — this file only points, per the `handoff` skill.
 **Date:** 2026-11-20 · **Close of:** `ed4cc405` scored on both pinned language cases (313,630 tok, 2
 case-runs), and the pointer door landed as the span audit's fourth number (0 tok) · **Branch:** `main`
 **Next session is for:** score the who-spoke half on `ed4cc405` (`--arm candidate --case follows` ×2–3,
-≈0.3M), then the promotion run, then the gate.
+**0.56M–0.84M** — that filter is 2 cases, 279,001 tok a pass), then the promotion run, then the gate.
 
 ## Read these first — do not re-derive them
 
@@ -76,9 +76,12 @@ One both-arm run of **26 cases / 52 rows** (companion 21 + improve 5) on post-pr
   consecutive replays. Best full-set measurement on record remains `fix26l_sweep1` (`6ad215ae`): 20/21
   PASS, 5,463,637 tok, **3 broken of 127 (2.4%)**, 1 unowned, 5 wrong-door. The two filtered runs above
   (3 broken of 13) are not that bar and buy nothing.
-- **The path from here, and where the money goes.** Promotion needs an unfiltered `companion --arm both`
-  run (21×2 ≈9.7M) where the candidate loses no case; the tag needs a **separate** 52-row run on the
-  post-promotion bytes (≈12M), because a pre-promotion run is not measured on the shipping bytes. #17's
+- **The path from here, and where the money goes — priced from `summary.json`, not inherited.**
+  Promotion needs an unfiltered `companion --arm both` run: **42 rows, ≈9.58M** at the per-case candidate
+  medians (21-case pass = 4,788,062; worst case from saved per-case maxima = 13.56M). The tag needs a
+  **separate** 52-row run on the post-promotion bytes: **≈12.2M** (companion 9.58M + improve's 10 rows
+  2,626,477 — the latter verified against `gate_improve_shipped_v2`, which spent exactly that), because a
+  pre-promotion run is not measured on the shipping bytes. #17's
   own text allows one economy: where the only candidate loss is a case **stable also fails** — a shared
   flip, not a regression — `--promote` still refuses, and the AC says the maintainer then copies `labs/`
   over `skills/` deliberately with the flip and its rates named in the release note. That collapses two
@@ -97,7 +100,10 @@ One both-arm run of **26 cases / 52 rows** (companion 21 + improve 5) on post-pr
   who-spoke one from `518d33de`, the noun-slot one added since) and left 3 broken of 13 marks, all of
   them "the reply's own line wearing Marks". The case where that mechanism showed up invisible before —
   `lang-follows-human`, 2 `human-edited` marks in `fix26m_lang1` — **has never run against these bytes**.
-  Cheapest probe: `--arm candidate --case follows` ×2–3 (≈0.3M). For #26's own AC 2 the price was
+  Cheapest probe: `--arm candidate --case follows` ×2–3 = **0.56M–0.84M** (one pass is 2 case-runs,
+  279,001 tok at the saved medians: `lang-follows-human` 141,948 + `lang-follows-human-en` 137,053 —
+  the ≈0.3M this note carried priced a single pass of the filter, not the ×2–3, which is the same
+  mistake in the other direction as #26's AC-2 line below). For #26's own AC 2 the price was
   **9 case-runs ≈1.63M** (`--case lang` = 4 cases ×2, plus `--case reversal` ×1), not the ≈0.9M one pass
   of four costs.
 - **Check the sibling grader before writing "say it unmarked".** `framing_named`

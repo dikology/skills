@@ -9,7 +9,8 @@ walks every marked span in a reply, and every `code` span besides, and classifie
 graded or not, so a verdict can be checked at the promise level rather than at the
 grader's.
 
-Three numbers, because #26 names two defects and #28 a third:
+Four numbers, because #26 names two defects, #28 a third, and #26's rendering half leaves a
+shape that only a fourth number can count:
 
 - **broken** — its own definition: *a real copy credited to a note that does not
   hold it, or marks that copy nothing at all*. Kinds `claim-fail`, `machine-copy`,
@@ -25,6 +26,14 @@ Three numbers, because #26 names two defects and #28 a third:
   — `fix26d_pin2`: 9 marks, 0 of them unowned, 5 of 16 code spans the Corpus's own words.
   Not broken by #26's definition (a note does hold these words) and not a mark, so it is
   counted beside them and changes no verdict.
+- **pointer** — `pointer_doors`: which door a pointer form (那句, 说的是, 记的是…) filled —
+  `bare`, `marked`, `weighed`, `other`. The only one of the four that counts a *shape* rather
+  than a defect, and the only way to know whether a candidate writes the door #26's rendering
+  half asks for: a bare run of the reply's own words promises nothing, so no grader reads it and
+  `broken` cannot see it taken. `marked` is the door that breaks the promise when its Span is in
+  the reply's script; `weighed` is the shape #27's `framing_named` passes, and `wrongdoor`
+  already counts it when the Corpus holds those characters. Also no verdict: the exit code is
+  still only ever about `broken`.
 
 `label` (a span too short to read as a claimed line, by the gate's own
 `MIN_QUOTE_WORDS`, and by character rather than word where the script has no spaces)
@@ -57,7 +66,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import vaultdiff  # noqa: E402
 from graders import (CODE_SPAN, MIN_QUOTE_WORDS, OVERLAY_FILES, Evidence, _QUOTED,  # noqa: E402
-                    _norm, _split_callouts, claim_lines, human_turns,  # noqa: E402
+                    _SENTENCE_END, _norm, _split_callouts, claim_lines, human_turns,  # noqa: E402
                     machine_text, outside_menu, path_key, quote_claim,  # noqa: E402
                     quote_sources, quoted_from_note, replies, said_by_human,  # noqa: E402
                     skipped, start_vault)  # noqa: E402
@@ -286,6 +295,118 @@ def wrong_doors(ev: Evidence, case: str = "") -> list:
     return out
 
 
+# The words a 中文 reply uses to name a note's line before supplying its content. companion
+# prints three of them by name (那句, 说的是, 记的是); the other three are the same family
+# found in the saved replies. A pointer form points; it does not quote — so what sits in
+# front of it is the door the reply chose, and the one shape no Span audit can read: bare
+# words are not a Span, carry no promise, and are graded by nothing.
+POINTER_FORMS = ("那句", "那条", "说的是", "记的是", "写的是", "讲的是")
+POINTER_DOORS = ("bare", "marked", "weighed", "other")
+_POINTER_FORM = re.compile("|".join(POINTER_FORMS))
+_CJK_RANGE = r"\u3400-\u4dbf\u4e00-\u9fff"
+_CJK_RUN = re.compile(f"[{_CJK_RANGE}]+")
+# A pointer form is followed by its content past the punctuation that joins the clauses:
+# `说的是：砍掉的是这圈人`, `那句——它假设只有一个周四`. The sentence itself is the bound, and
+# the harness's own `_SENTENCE_END` draws it.
+_POINTER_LEAD = re.compile(r"^[\s，、：:；;—–\-]+")
+# The reply's own script ends an unmarked run: `那句 Of course it is 说明这…` carries the note's
+# English up to the first 中文 character, and that stretch is what the Corpus is asked about.
+_UNMARKED_RUN = re.compile(f"^[^{_CJK_RANGE}]+")
+
+
+@dataclass
+class PointerDoor:
+    """One pointer form in one companion reply, and which door its content took."""
+    case: str
+    reply: int
+    line: str
+    form: str     # the pointer form that was found
+    door: str     # bare | marked | weighed | other
+    content: str  # what the pointer form points at, as far as this walk reads it
+    detail: str = ""
+
+
+def pointer_doors(ev: Evidence, case: str = "") -> list:
+    """Every pointer form in every reply of one arm's run, and the door its content took.
+
+    This counts a *shape*, not a defect: `broken` and `unowned` read Marks, `wrongdoor` reads
+    `code`, and the cure #26's rendering half asks for puts a note's content in the reply's own
+    words with nothing around them, which none of the three can see. So the adoption of the
+    shape — whether a candidate writes it at all — is only knowable here.
+
+    The four doors, in the order the walk reads them:
+
+    - `bare` — two or more characters of the reply's own script immediately after the form
+      (`记的是加一样就得卸一样`). One character is not a rendering but the noun the determiner
+      governs (`是那条手`), so it falls to `other` with that said: the adoption count is the one
+      number here that a false positive would quietly inflate.
+    - `marked` — the content opens in Marks. What the promise is worth is `broken`'s question,
+      not this one; the Span inside is reported so the two can be read side by side.
+    - `weighed` — the content opens in `code`: the shape #27's `framing_named` passes. When the
+      Corpus holds those characters, `wrong_doors` already counts it.
+    - `other` — the form filled no slot: it points at a note by name, or the sentence stops, or
+      the run after it is in another script. The last of those is asked of the Corpus, not
+      assumed: above the mark audit's own claim floor and held by a note, it is that note's
+      characters left unmarked, which promises nothing and credits nothing; below the floor it is
+      a term, and if no note holds it the walk says so.
+
+    A form inside someone else's characters is not the reply pointing: a note's own line, or the
+    human's, may hold 那句, and the words after it belong to that speaker. Marked spans and `code`
+    spans are masked before the walk for that reason. Close-menu option lines are skipped whole,
+    as the mark audit skips them — `[e]` proposes text for a note rather than pointing at one."""
+    out = []
+    view = VaultView.of(ev)
+    for n, text in enumerate(replies(ev), 1):
+        for line in claim_lines(outside_menu(text)):
+            # Whose words the form sits inside: a 那句 that is part of a copied span or a
+            # weighed span was not written by the reply pointing at anything.
+            hidden = ([s.span() for s in re.finditer(_QUOTED, line)]
+                      + [s.span() for s in CODE_SPAN.finditer(line)])
+            for m in _POINTER_FORM.finditer(line):
+                if any(a <= m.start() < b for a, b in hidden):
+                    continue
+                window = _SENTENCE_END.split(line[m.end():], 1)[0]
+                tail = _POINTER_LEAD.sub("", window)
+                cjk = _CJK_RUN.match(tail)
+                marked = re.match(_QUOTED, tail)
+                weighed = CODE_SPAN.match(tail)
+                if cjk and len(cjk.group(0)) >= 2:
+                    out.append(PointerDoor(case, n, line, m.group(0), "bare", cjk.group(0),
+                                           "the content sits bare, so no Mark promises a voice"))
+                elif marked:
+                    out.append(PointerDoor(case, n, line, m.group(0), "marked", marked.group(1),
+                                           "the content is in Marks, so the line promises a voice"))
+                elif weighed:
+                    out.append(PointerDoor(case, n, line, m.group(0), "weighed", weighed.group(1),
+                                           "the content is in `code`: weighed, not claimed — and"
+                                           " `wrong_doors` counts it when the Corpus holds it"))
+                elif tail.startswith("[["):
+                    out.append(PointerDoor(case, n, line, m.group(0), "other", tail[:40],
+                                           "points at a note by name, which fills no slot"))
+                elif cjk:
+                    out.append(PointerDoor(case, n, line, m.group(0), "other", cjk.group(0),
+                                           "one character after the form: the determiner governs a"
+                                           " noun (那条手), it points at no line and renders nothing"))
+                elif not tail:
+                    out.append(PointerDoor(case, n, line, m.group(0), "other", "",
+                                           "the sentence stops at the pointer form: no content"))
+                else:
+                    run = _UNMARKED_RUN.match(tail).group(0).strip().rstrip("，,、；;：:")
+                    if not carries_a_claim(run):
+                        why = (f"a term, not a line: {run!r} is below the floor the mark audit "
+                               "uses, so no note's characters are claimed either way")
+                    elif view.holders(run):
+                        why = ("the note's characters left unmarked — "
+                               + " or ".join(f"[[{h}]]" for h in view.holders(run))
+                               + " holds them; no Mark, so the line promises nothing and the note"
+                                 " gets no quote line")
+                    else:
+                        why = ("characters no note holds, left unmarked: no Mark, so the line"
+                               " promises nothing")
+                    out.append(PointerDoor(case, n, line, m.group(0), "other", run, why))
+    return out
+
+
 ARMS = ("stable", "candidate")
 FIXTURE_VAULTS = Path(__file__).parent / "fixtures" / "vaults"
 CASES_DIR = Path(__file__).parent / "cases"
@@ -325,7 +446,9 @@ def audit_run(root, cases: dict, arms: list | None = None) -> list:
                           snapshots=[vault_view(name, overlay)])
             spans = audit(ev, case)
             doors = wrong_doors(ev, case)
+            pforms = pointer_doors(ev, case)
             counts = Counter(s.kind for s in spans)
+            pcounts = Counter(d.door for d in pforms)
             meaningful = [s for s in spans if s.kind != "label"]
             rows.append({"arm": arm, "case": case, "spans": len(spans),
                          "meaningful": len(meaningful),
@@ -333,10 +456,12 @@ def audit_run(root, cases: dict, arms: list | None = None) -> list:
                          "broken": sum(1 for s in spans if s.broken),
                          "unowned": counts.get("note-copy-unowned", 0),
                          "wrongdoor": len(doors),
+                         "pointer": {k: pcounts.get(k, 0) for k in POINTER_DOORS},
                          "by_kind": {k: counts[k] for k in KINDS if counts[k]},
                          "details": [asdict(s) for s in spans
                                      if s.broken or s.kind == "note-copy-unowned"],
-                         "wrongdoor_details": [asdict(s) for s in doors]})
+                         "wrongdoor_details": [asdict(s) for s in doors],
+                         "pointer_details": [asdict(d) for d in pforms]})
     return rows
 
 
@@ -364,13 +489,18 @@ def main(argv: list | None = None) -> int:
             rate = f"{100.0 * r['broken'] / base:.1f}%" if base else "—"
             print(f"{r['arm']:9} {r['case']:28} marks {r['spans']:3} (graded {r['graded']:2})"
                   f"  broken {r['broken']:2} ({rate})  unowned {r['unowned']:2}"
-                  f"  wrongdoor {r['wrongdoor']:2}  {r['by_kind']}")
+                  f"  wrongdoor {r['wrongdoor']:2}  pointer {r['pointer']}  {r['by_kind']}")
             for d in r["details"]:
                 print(f"    reply {d['reply']} [{d['kind']}] {d['span']!r}\n"
                       f"      {d['detail']}\n      {d['line'][:160]}")
             for d in r["wrongdoor_details"]:
                 print(f"    reply {d['reply']} [wrong-door copy] {d['span']!r}\n"
                       f"      {d['detail']}\n      {d['line'][:160]}")
+            for d in r["pointer_details"]:
+                if d["door"] == "bare":
+                    continue  # the adoption count is in the row; a bare door has nothing to read
+                print(f"    reply {d['reply']} [pointer {d['door']}] {d['form']} → {d['content']!r}"
+                      f"\n      {d['detail']}\n      {d['line'][:160]}")
     broken = sum(r["broken"] for r in rows)
     unowned = sum(r["unowned"] for r in rows)
     doors = sum(r["wrongdoor"] for r in rows)
@@ -380,6 +510,17 @@ def main(argv: list | None = None) -> int:
           f" arm-cases: {graded_fail} graded by the gate, {broken - graded_fail} invisible"
           f" to it. {unowned} more copy a note's line with no owner named, and {doors}"
           f" sit in `code`, where no grader looks at all.")
+    p = Counter()
+    for r in rows:
+        p.update(r["pointer"])
+    slot = p["bare"] + p["marked"]
+    print(f"\n{sum(p.values())} pointer forms: {p['bare']} bare, {p['marked']} in Marks,"
+          f" {p['weighed']} in `code`, {p['other']} filling nothing (a name, a term, a"
+          f" single noun, or the sentence stopping)")
+    if slot:
+        print(f"{100.0 * p['bare'] / slot:.1f}% filled the slot bare — the denominator is"
+              f" bare+Marks ({slot}), not all {sum(p.values())} forms. A door is a shape, not"
+              " a verdict: the three defect numbers above still grade the copy.")
     return 1 if broken else 0
 
 

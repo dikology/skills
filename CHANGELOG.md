@@ -414,6 +414,89 @@ opposite of #28's door finding (12 of 16 doors sat in English replies, so that r
   promise. So the measurement must include `lang-quote-stays-source`, not only the two losers — a rendering
   shape that quietly replaced copying would show up there first.
 
+**`ed4cc405` scored, and the door it prints is now counted at 0 tokens: 313,630 eval tokens over
+2 case-runs, candidate arm only.** Both on one frozen hash, verified before and after the chain
+(`labs/companion` = `ed4cc405…`, `skills/companion` still `e981bb4e…`), each its own `--case` run so
+the guard sat beside the loser, chained with `;` after the last round's `&&` trap. Priced from the
+saved per-case medians before launch at ≈220K; it came in at **231,801 + 81,829 = 313,630**, inside
+the 422K the saved maxima predict.
+
+| run | case | verdict | tok | seconds | audit |
+|---|---|---|---|---|---|
+| `fix26n_pin1` | `lang-pin-zh` | **PASS** 1.00 | 231,801 | 118.0 | 8 claim-bearing marks, **1 broken** (`self-quote`), 0 unowned, 0 wrongdoor |
+| `fix26n_guard1` | `lang-quote-stays-source` | **PASS** 1.00 | 81,829 | 30.9 | 5 claim-bearing marks, **2 broken** (both `no-source`), 0 unowned, **2 wrongdoor** |
+
+- **The rendering half is not in either run, on a sample that cannot say more than that.** **0
+  `claim-fail`** over the 13 claim-bearing marks, against 2 in `fix26m_lang2` on `518d33de` — and the
+  three survivors are all the *other* mechanism, the reply's own line wearing Marks: `出门的理由`
+  (`self-quote`, in the reply that passed the pinned case) and `留不起` / `不想` (`no-source`, in the
+  guard case's MY TAKE). Scoped to these two cases over every saved run, so the denominators are the
+  same kind of thing: `6ad215ae` 3 broken of 34 marks (2 `claim-fail`), `518d33de` 3 of 28 (2
+  `claim-fail`, 1 `no-source`), **`ed4cc405` 3 of 13 (0 `claim-fail`, 3 in the who-spoke family)**.
+  Read "0 `claim-fail` of 13" for its size: `b3e23878` reports 0 of 24 on the same two cases, and the
+  handoff that praised it says review found two false claims in *that* note — so a clean rendering
+  count on a 2-run sample is not new. What is new is that the door was counted being taken beside it.
+  Two runs against four is a lead, not a rate, and the lead the next round should chase is the
+  who-spoke family: `lang-follows-human`, where `518d33de` wrote 2 `human-edited` marks, never ran
+  against these bytes.
+- **Proved used, this time, for the rendering half — 0 tokens.** The new `pointer` number counts the
+  door each pointer form filled. On `ed4cc405`: **4 forms — 3 bare, 0 marked, and 1 that filled
+  nothing** (`是那条手`, where 那条 is the determiner of 手 and not a pointer at a line at all). The
+  three bare ones are the construction the sentence prints — `[[thursday evenings]] 记的是加一样就得卸一样`,
+  `[[the band]] 记的是开车回家那一刻`. The same two cases on `518d33de` read 7 bare / 1 marked, and that
+  one marked instance *is* the `fix26m_lang2` loss (`那句「加一样就得卸一样」`). Two runs is a signal,
+  not a certification — `lang-pin-zh` passes 0.76 per run pooled over 16 byte-strings — but the file's
+  own claim now has a counter behind it instead of a replay.
+- **The guard held.** `quotes_stay_in_source_language` passed, and the reply still copied: three
+  `claim-ok` Cyrillic copies on quote lines before any 中文 rendering. The risk named before spending
+  — a rendering shape quietly replacing copying — did not show at this sample size. The guard case is
+  where #28's door still leaks: 2 wrong-door copies (`продать её руки`, `от субботы остаётся вечер`)
+  in one TENSION line, in a case the gate scores 1.00.
+- **What the instrument said about the figure this sentence was written from.** Run through the
+  committed CLI alone (`span_audit.py results/<run> --skill companion --json` over every saved
+  **companion** run dir — 118 of the 119 on disk, the other is improve's; 375 arm-case transcripts),
+  summed by the tree-hash each `summary.json` records, it finds **178 pointer forms: 133 bare,
+  12 marked, 16 weighed, 17 other**. Over the corpus the previous note actually had — the same walk
+  with this round's two runs removed — it finds **174 forms: 130 bare, 12 marked, 16 weighed,
+  16 other**. So the **12 Mark openings reproduce exactly**, and the **151 "plain 中文 words" do
+  not**: 130 is what the definition now printed in the code counts, and no definition that also
+  yields 12 yields 151. The published 92.6% (= 151/163) matches nothing the instrument reports; the
+  same ratio read correctly is **130 of 142 = 91.5%**, whose denominator is the forms whose content
+  was bare words or Marks — `weighed` and `other` sit outside it, which is why the CLI prints it
+  rather than leaving it to be guessed. The conclusion the sentence was written from (the bare form
+  is overwhelmingly already the model's habit) survives; the arithmetic that carried it does not.
+  The per-byte-string table shows the instrument discriminating where it matters: `bc200906` at
+  2 bare / 5 marked and `3e9afc10` at 0 / 2, against **17 of the 24 byte-strings that write the form
+  at all sitting at 0 marked**. The script left in `.qwen/tmp/` reproduces neither number (it prints
+  2 vs 31), which is why the rule is now code, README'd, glossaried and tested rather than a
+  one-session probe.
+- **A check that passed for the wrong reason, recorded because it is the round's own trap.** The
+  first version of the bullet above claimed **139 + 12 = the 151**, an identity that looked exactly
+  like the reproduction the README demands of a new classifier. It was two accidents stacked: the walk
+  then had no length floor, so 6 single-character nouns (`真正撑着不卖的不是钱，是那条手`, where 那条
+  governs 手) were being counted bare, and this round's own 3 bare forms had already joined the corpus
+  it was checked against. With the floor in and this round's runs removed, the number is 130 and the
+  identity is gone. Reproduce a published figure against the corpus it was computed from, name the
+  definition, and say so when the two differ.
+- **What landed, and what it costs.** `pointer_doors` in `span_audit.py` with 8 tests in
+  `test_span_audit.py` (365 OK, was 357), a fourth number in every row and in `--json`, a printed
+  door line in the CLI summary with its denominator named, and `GLOSSARY.md` / `labs/evals/README.md`
+  naming **Pointer form** and **Pointer door**. It grades nothing: the exit code is still only about
+  `broken`, and no verdict in either run moved. 0 eval tokens for all of it. It was not in the
+  handoff's "next session is for" line — that line asked for the two runs, and this is the counter
+  those runs needed to mean anything; the review axis called it scope, and the label is fair.
+- **Not met, not spent, unchanged.** Both runs are `--case` filtered, so `--promote` still refuses
+  them; the promotion evidence remains one unfiltered `--arm both` companion run (≈9.7M), and #17's
+  clause still wants a *full-set* candidate arm at 0 broken. `skills/companion` is untouched, nothing
+  is promoted, nothing pushed. The English wrong-door lead (4 of the sweep's 5 doors outside
+  `lang-pin-zh`) was not touched this round.
+- **And the ticket moved while this was in flight.** #26 was **closed as COMPLETED by the maintainer
+  on 2026-11-20T06:06Z**, before these two runs, with no comment after the 2026-11-06 one — so the
+  closure is a decision on the record, not an artifact of this evidence. What the evidence says
+  beside it: no `claim-fail` appeared in these 13 marks, and the who-spoke family still writes 3 of
+  them, in the mechanism that ticket named. Recorded here rather than acted on: reopening,
+  commenting and closing issues are the maintainer's, and nothing in this round asks for them.
+
 ### Added
 
 - `improve` skill: a structural review of one note. It reads the note and the notes
@@ -667,6 +750,19 @@ opposite of #28's door finding (12 of 16 doors sat in English replies, so that r
   finds what they missed: 13 broken marks in `gate25_candidate` where the gate failed 3, and 44 in
   `gate_companion_v5`/stable (21.3% of its marks) where its graders failed 10. `GLOSSARY.md` names
   Span and Span audit.
+- Evals: the span audit's fourth number, **pointer** (`span_audit.pointer_doors`). #26's rendering
+  cure is a door — a pinned reply that needs a note's content says it after a pointer form
+  (`那句`, `说的是`, `记的是`), bare rather than in Marks — and a bare run of words makes no promise,
+  so `broken`, `unowned` and `wrongdoor` all read 0 whether the model took the door or not, which is
+  how a release note came to say a shape was "proved legal, not proved used" with no way to finish
+  the sentence. `pointer_doors` walks every pointer form outside the Close-menu options, masks the
+  ones that sit inside someone else's Marks or `code`, and says which door the content took: `bare`,
+  `marked`, `weighed`, or `other` (a note's characters left unmarked, a link, or nothing). It counts
+  a shape and grades nothing — the exit code stays about `broken`, and no verdict in any run moved —
+  and 8 tests in `test_span_audit.py` pin each door against a Fixture vault (the unmarked-run detail
+  is checked against the Corpus, not asserted from the shape), with the row and `--json` carrying the
+  counts. `GLOSSARY.md` names Pointer form and Pointer door; the README's reproduction check now says
+  plainly that the 151 the previous note printed does not reproduce.
 
 ### Changed
 

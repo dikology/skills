@@ -4,136 +4,163 @@
 overwritten at each handoff; `README.md` is the user-facing entry point. Everything substantive lives in
 the artifacts linked below — this file only points, per the `handoff` skill.
 
-**Date:** 2026-11-07 · **Close of:** the who-spoke paragraph measured, then the rendering shape written (0
-tokens for the writing; 2,098,054 for the measurement the maintainer chose) · **Branch:** `main`
-**Next session is for:** score `ed4cc405` on `lang-pin-zh` *and* the `quotes_stay_in_source_language` guard
-case, then the promotion run, then the gate.
+**Date:** 2026-11-20 · **Close of:** `ed4cc405` scored on both pinned language cases (313,630 tok, 2
+case-runs), and the pointer door landed as the span audit's fourth number (0 tok) · **Branch:** `main`
+**Next session is for:** score the who-spoke half on `ed4cc405` (`--arm candidate --case follows` ×2–3,
+≈0.3M), then the promotion run, then the gate.
 
 ## Read these first — do not re-derive them
 
 | What | Where |
 |---|---|
 | The run bar as amended, and why | #17 body → [issue #17](https://github.com/dikology/skills/issues/17); the gate argument in [comment 6691486468](https://github.com/dikology/skills/issues/17#issuecomment-6691486468); the draft clause I withdrew in [comment 6691743157](https://github.com/dikology/skills/issues/17#issuecomment-6691743157) |
-| The prose change and its measurement | commits `f29d156` (two-shape scan + script test) and `2316007` (review corrections + full sweep); narrative in `CHANGELOG.md`, `## [0.2.0]` |
-| Term definitions (Mark, Span, Two-shape scan, Script test, Wrong door, Corpus, Overlay, Stable/Candidate) | `GLOSSARY.md` |
-| Ticket history, per-copy verdicts, AC status | #26 (its comments), #27, #28 — all open |
-| Harness behaviour, graders, the span audit | `labs/evals/README.md` |
+| The rendering round and its measurement | commits `f29d156`, `2316007`, `3b9a98e`, `4d73da8`, `3c1c6e9`, `1a04d9a` + this one; narrative in `CHANGELOG.md`, `## [0.2.0]` |
+| Term definitions (Mark, Span, Two-shape scan, Script test, Wrong door, **Pointer form, Pointer door**, Corpus, Overlay, Stable/Candidate) | `GLOSSARY.md` |
+| The four numbers the audit reports, how each was checked against the gate, and what `pointer`'s denominator is | `labs/evals/README.md` → "The span audit" |
+| Ticket history, per-copy verdicts, AC status | **#26 is CLOSED (COMPLETED) since 2026-11-20T06:06Z** — the maintainer closed it, no comment after the 11-06 one. Open: #17, #24, #25, #27, #28. No #29 exists |
 | Every run's verdicts + the byte-string it scored | `labs/evals/results/<run>/summary.json` — gitignored, **the only copy**; archived as below |
-| Evidence archive | `~/Downloads/evals-results-2026-11-06.tar.gz` (2,321 entries verified against the disk listing, 113 run dirs); earlier `…-2026-11-03.tar.gz` |
-| The 0-token sweeps behind the tables | Method, not files: `python3 labs/evals/span_audit.py results/<run> --json` grouped by the tree-hash in `summary.json`. The ad-hoc scripts of this session sit in `.qwen/tmp/` and are not kept |
+| Evidence archive | `~/Downloads/evals-results-2026-11-06.tar.gz` (2,321 entries verified against the disk listing, 113 run dirs); earlier `…-2026-11-03.tar.gz`. **Re-archive: results/ is now 119 run dirs** |
+| The 0-token sweeps behind the tables | Method, not files: `python3 labs/evals/span_audit.py results/<run> --skill companion --json` (needs `raw_decode` — the CLI prints prose after the JSON), summed by the tree-hash in `summary.json`, **skipping run dirs whose `summary.json` says `skill: improve`** (118 of the 119 are companion's; an improve dir exits 2) |
 
 ## State in seven lines
 
-- `skills/companion` (Stable) = `e981bb4e`. **No promotion, no tag, no both-arm gate spent.** improve's arms are identical (`0e3cbd00f056`).
-- `labs/companion` (Candidate) = **`ed4cc405`** — `518d33de` plus one sentence in `Language`, and **unscored**:
-  no eval has run against it. `518d33de` = `6ad215ae` plus the who-spoke paragraph, and it *is* measured (next
-  bullet). `6ad215ae` carries #26's scan + script test **and** #27's framing shape and #28's door rule; every
-  copy since carries all of that too.
-- **`ed4cc405`'s sentence is the rendering shape, chosen from the instrument and from the model's own habit.**
-  17 `claim-fail` Spans across all saved runs are 中文 words that no note holds, on lines naming a note:
-  **15 in `lang-pin-zh`, 2 in `lang-quote-stays-source`, none anywhere else.** The pointer forms (那句,
-  说的是, 记的是…) already take plain 中文 words **151 times against 12 Mark openings — 92.6% already bare** —
-  so the file now prints that bare form for the *noun* slot the 12 all occupied. Proved legal at 0 tokens:
-  replaying `fix26m_lang2`'s own reply through `span_audit` with the Marks dropped takes it from **3 broken
-  to 1** and leaves `wrongdoor` at 0. Not proved used. Details and the guard in `CHANGELOG.md`.
-- **The who-spoke copy (`518d33de`) is measured: 2,098,054 tok, 10 case-runs, candidate arm, `--case`
-  filtered, all on one frozen hash.** `fix26m_lang1` 4/4 PASS · `fix26m_lang2` 3/4 · `fix26m_rev1` 1/1 · `fix26m_fram1` 1/1.
-  Audit: **5 broken of 68 claim-bearing marks, 0 unowned, 0 wrongdoor**. The mechanism the paragraph targets
-  went 2 → 0 and 1 across the two language passes; `framing_named` still passes (judge 5/5) and
-  `reversal-annotated` still passes. Filtered runs buy no promotion, so #17's bar is untouched: these bytes
-  report broken marks, not 0. Full table in `CHANGELOG.md`.
-- Last full-set measurement of any candidate is still `fix26l_sweep1` (`6ad215ae`) →
-  **20/21 PASS, 5,463,637 tok**, audit **3 broken / 127 claim-bearing marks, 1 unowned, 5 wrong-door**.
-  The one loss is the graded broken mark, and it is the same mechanism as the other two — not a rendering;
-  see the note above in `CHANGELOG.md`.
-- Harness tests: `python3 -m unittest discover -s labs/evals` → 357 OK.
-- #26's pinned case is still a coin on every copy measured: `518d33de` went PASS then FAIL on
-  `lang-pin-zh`, and the failure is #26's **own row 1** — `加一样就得卸一样`, `每周有个地方要去`, a 中文
-  compression of a note's line inside Marks — the rendering half this paragraph does not speak to. The 3/3
-  on record belongs to `b3e23878`, which review showed contained two false claims. Pooled across 16 candidate
-  byte-strings the pinned case passes **0.76 per run**, and 3 of 12 three-run copies go 3/3 where chance
-  predicts 5.2 — so a streak certifies nothing on its own.
+- `skills/companion` (Stable) = `e981bb4e`. **No promotion, no tag, no both-arm gate spent.** improve's
+  arms are identical (`0e3cbd00f056`). HEAD was `1a04d9a` == `origin/main` when this round started — the
+  four commits the last handoff called unpushed **are pushed**.
+- `labs/companion` (Candidate) = **`ed4cc405`**, and it is **now measured**: `fix26n_pin1`
+  (`lang-pin-zh`) PASS 1.00 at 231,801 tok / 118.0s, `fix26n_guard1` (`lang-quote-stays-source`) PASS
+  1.00 at 81,829 tok / 30.9s — 2 case-runs, candidate arm only, `--case` filtered, one frozen hash
+  verified before and after. Priced at ≈220K from saved medians before launch; landed 313,630, inside
+  the 422K the saved maxima predict. **No other case has ever scored these bytes.**
+- **Audit of those two runs:** 13 claim-bearing marks, **3 broken, 0 `claim-fail`**, 0 unowned, and
+  **2 wrongdoor** — `продать её руки`, `от субботы остаётся вечер`, in the guard case's TENSION line, in
+  a case the gate scores 1.00. The 3 broken are all one mechanism, the reply's own line wearing Marks:
+  `出门的理由` (`self-quote`), `留不起`, `不想` (`no-source`). Scoped the same way across every saved run
+  of these two cases: `6ad215ae` 3 of 34 (2 `claim-fail`), `518d33de` 3 of 28 (2 `claim-fail`,
+  1 `no-source`), `ed4cc405` 3 of 13 (0 `claim-fail`).
+- **The rendering count is clean on 13 marks, which is not the same as cured:** `b3e23878` also reports
+  0 `claim-fail` on these two cases (of 24 marks), and review had already found two false claims in the
+  note that praised it. What is new is that the *door* was counted being taken beside the clean number.
+- **Proved used, at 0 tokens, by the new fourth number.** `ed4cc405`: **4 pointer forms — 3 bare,
+  0 marked, 1 that filled nothing** (`是那条手`, where 那条 governs a noun). The three bare ones are the
+  construction the `Language` sentence prints (`[[thursday evenings]] 记的是加一样就得卸一样`,
+  `[[the band]] 记的是开车回家那一刻`). `518d33de` on the same two cases: 7 bare / 1 marked, and that 1
+  *is* the `fix26m_lang2` loss (`那句「加一样就得卸一样」`). Two runs, so it is a lead.
+- **The instrument landed.** `pointer_doors` in `span_audit.py` — the audit's fourth number
+  (`bare`/`marked`/`weighed`/`other`), in the row, the CLI line and `--json`; 8 tests; harness
+  **365 OK** (was 357); README + GLOSSARY name **Pointer form** / **Pointer door**. It counts a shape,
+  grades nothing, changes no verdict, and the exit code is still only about `broken`.
+- **The figure the rendering sentence was written from does not reproduce.** Over the corpus that note
+  had (every saved companion arm-case except this round's two runs): **174 forms = 130 bare, 12 marked,
+  16 weighed, 16 other**. Its **12 marks reproduce; its 151 "plain" do not**, and its 92.6% matches
+  nothing — the honest ratio is **130 of 142 = 91.5%**, denominator = bare+Marks, printed by the CLI.
+  The conclusion (bare is already the model's habit; 17 of the 24 byte-strings that write the form write
+  it with 0 marked) stands; the arithmetic in `CHANGELOG.md` at `1a04d9a` does not. `lang-pin-zh` is
+  still a coin — 0.76 PASS/run pooled over 16 byte-strings, and `ed4cc405` is 1 of 1 on it.
 
 ## Decision pending from the maintainer (this blocks the release)
 
 One both-arm run of **26 cases / 52 rows** (companion 21 + improve 5) on post-promotion bytes ≈ **12M tokens**; companion-only 21×2 ≈ **9.7M** is the promotion evidence. Prior spend for scale: `gate_companion_v6` 9.70M, `gate26_both` 9.27M. Gate odds are already computed in #17's comments — read them before recomputing.
 
-Two things this round's measurement changed in that decision, and one it did not:
-
-- **`--promote` is still blocked on a run, not on prose.** All four `518d33de` runs used `--case`, which the
-  promotion guard refuses by design. The promotion evidence is one unfiltered `--arm both` companion run (≈9.7M).
-- **The rendering half of #26 is now the live blocker**, because `518d33de` lost `lang-pin-zh` through it and
-  the `human-edited` pair showed up in the pass that had no other broken mark. Both are cases where the words
-  are not a note's, on lines the gate reads or ignores in different ways.
-- **What did not move:** #17's 0-broken clause still needs a *full-set* candidate arm at 0 broken. The 5-of-68
-  figure here is over filtered runs, so it is not that bar and does not replace it.
+- **`--promote` is still blocked on a run, not on prose.** Every run of `ed4cc405` used `--case`, which
+  the promotion guard refuses by design. The promotion evidence is one unfiltered `--arm both`
+  companion run (≈9.7M).
+- **#17's 0-broken clause still needs a full-set candidate arm at 0 broken.** The best full-set
+  measurement on record remains `fix26l_sweep1` (`6ad215ae`): 20/21 PASS, 5,463,637 tok, **3 broken of
+  127**, 1 unowned, 5 wrong-door. The two filtered runs above report 3 broken of 13 and are not that bar.
+- **#26's closure is not this round's to reopen.** The tracker says COMPLETED as of 2026-11-20; these
+  bytes still write 3 broken marks in the family that ticket named. That is recorded in
+  `CHANGELOG.md`; commenting, closing or reopening issues stays with the maintainer.
 
 ## If the next session is a prose round, start here
 
-The instrument already located the residue, scoped per case at 0 tokens rather than from the ticket's framing:
-
-- **4 of the sweep's 5 wrong-door copies are outside `lang-pin-zh`; 3 are in English replies.** One line repeats: `` `something else has to come off it` `` ← `[[thursday evenings]]` in **both** `first-run-declined` and `no-log-no-writes`; also `` `Nobody says no and nobody writes anything` `` ← `[[the band]]`.
-- **All 3 of the sweep's broken marks are one mechanism: the reply's own line wearing Marks.** Two are
-  invisible to `quotes_verbatim` and leak through different holes — `пользуюсь ли я этим`
-  (`lang-follows-human`) is where the script test genuinely cannot reach (reply, Corpus and human turn all
-  Russian); `有人等` (`lang-pin-zh`) is not, since its notes and its single human turn are English under a
-  pinned 中文 reply, so the test names that Span and the model wrote it anyway, inside
-  `真正让你周四出门的是…`. The third is the graded one and cost the case: `一年四次的抵达值不值二十四万加所有周六`
-  in the Close menu's `[e]` line, which the same reply had just written as its own prose — *not* the
-  rendering the previous release note called it. What the trigger is, pooled over every saved run: the reply
-  naming what the human really wants sits in front of the model's own Spans 20.5% of the time when they wear
-  Marks and 1.4% when they take `code` (161 vs 881 — a kind-filtered sample, not a matched control: read the
-  caveats in the `CHANGELOG.md` voice-round note). `518d33de` writes the shape and has never been scored.
-  Cheapest probe: `--arm candidate --case follows` ×2–3 (~0.3M). #26's AC 2 baseline is **9 case-runs**
-  (`--case lang` matches 4 cases ×2, plus `--case reversal` ×1) ≈ **1.63M** priced from the sweep's own
-  per-case tokens, not the ≈0.9M one pass costs.
-- 1 `unowned`: `"I'd think about it"` in `raw-flag-softens`.
-
-**Two moves that must not be repeated:** writing another forbidden surface form of the pointer sentence (eight byte-strings did that; the one durable win came from mining the model's already-correct instances — 88 of 98 `那句`-type clauses were already unmarked, that being `f29d156`'s count over the 98 run dirs then saved, and results/ now holds 113, so re-derive before quoting it), and naming Marks at the composition site (printed corner-mark examples made corner marks *more* available, not less).
+- **The residue is the who-spoke family, and it is scoped.** `ed4cc405` carries both paragraphs (the
+  who-spoke one from `518d33de`, the noun-slot one added since) and left 3 broken of 13 marks, all of
+  them "the reply's own line wearing Marks". The case where that mechanism showed up invisible before —
+  `lang-follows-human`, 2 `human-edited` marks in `fix26m_lang1` — **has never run against these bytes**.
+  Cheapest probe: `--arm candidate --case follows` ×2–3 (≈0.3M). For #26's own AC 2 the price was
+  **9 case-runs ≈1.63M** (`--case lang` = 4 cases ×2, plus `--case reversal` ×1), not the ≈0.9M one pass
+  of four costs.
+- **Check the sibling grader before writing "say it unmarked".** `framing_named`
+  (`graders.py:821-847`) *fails* a framing held in Marks and passes only the one held in `code`. A
+  who-spoke clause with no scope guard competes with #27's graded shape — the defect class that made
+  `26c99207` unshippable. The paragraph already in the file ends by moving nothing a note or the human
+  spoke; **do not trim that clause as redundant.** The `pointer` number cannot see that collision: it
+  counts doors, and `weighed` is the door #27 rewards.
+- **What the trigger is, pooled over every saved run** (unchanged, and untested against these bytes):
+  the reply naming what the human really wants sits in front of the model's own Spans **20.5%** of the
+  time when they wear Marks and **1.4%** when they take `code` (161 vs 881 — a kind-filtered sample, not
+  a matched control; read the caveats in the `CHANGELOG.md` voice-round note).
+- **#28's door is still open in a case that scores 1.00:** 2 wrong-door copies in the guard case's
+  TENSION line, plus the sweep's 4-of-5 doors outside `lang-pin-zh` (one line repeats in
+  `first-run-declined` and `no-log-no-writes`: `` `something else has to come off it` `` ←
+  `[[thursday evenings]]`; also `` `Nobody says no and nobody writes anything` `` ← `[[the band]]`).
+  Nothing was filed; #29 does not exist. 1 `unowned` from the sweep (`"I'd think about it"` in
+  `raw-flag-softens`) is also still there.
+- **Two moves that must not be repeated:** writing another forbidden surface form of the pointer
+  sentence (eight byte-strings did that — mine the already-correct instances instead, and `pointer_doors`
+  is now the committed way to do it at 0 tokens), and naming Marks at the composition site (printed
+  corner-mark examples made corner marks *more* available). Add a third: quoting "151 / 92.6%" — it is
+  corrected above, and the corrected figure has a denominator attached to it.
 
 ## Traps this round added
 
-- **A claim inherited from the last round's release note was false.** The previous note called the sweep's
-  graded broken mark "a 中文 rendering of a Russian note's arithmetic"; reading the transcript shows the same
-  reply wrote that phrase as its own prose one paragraph earlier. Both rounds published it without checking
-  the bytes. Re-derive an inherited claim before repeating it, and name the run it came from.
-- **Check the sibling grader before writing "say it unmarked".** `framing_named` (`graders.py:821-847`)
-  *fails* a framing held in Marks and passes only the one in `code`. The who-spoke round's first draft told the
-  model to say its own line unmarked with no scope guard, which competes with #27's graded shape — the exact
-  class of defect that made `26c99207` unshippable. The paragraph now ends by moving nothing a note or the
-  human spoke; do not trim that clause as redundant.
-- **`--case lang` is 4 cases, not one.** `run_evals.py` matches case ids *containing* the filter, so
-  #26's AC 2 is nine case-runs (≈1.63M priced from saved per-case tokens), not the ≈0.9M its own Costs line
-  gives for one pass of four.
-- **A shape that removes Marks can still break a copy promise's *other* half.**
-  `quotes_stay_in_source_language` (`graders.py:1324`) requires at least one verified copy whose language is
-  *not* the reply's. So a rendering shape that made bare 中文 comfortable everywhere would pass the
-  `quotes_verbatim` graders and fail that one. When you score a rendering fix, run
-  `--case lang-quote-stays-source` beside the two losers — the guard case is where a shape that replaced
-  copying would show up first.
-- **Chain eval runs with `;`, never `&&`.** `run_evals.py:737` returns 1 when any case fails, so an `&&` chain
-  stops after a failing run and reports the whole task as *failed* — a planned later run silently never starts.
-  That is what happened to `fix26m_rev1` here: the task notification said "failed, exited with code 1", but the
-  data was fine and one run was simply missing. A FAIL is a result, not a crash: read the log, then start the
-  rest.
+- **A check can pass for the wrong reason.** The first reading of the 151 was **139 + 12 = 151**, an
+  identity that looked like exactly the reproduction the README demands. It was two accidents: the walk
+  had no length floor (6 single-character nouns like `是那条手` counted bare) and this round's own 3 bare
+  forms had already joined the corpus. Reproduce against the corpus the claim was made from, name the
+  definition, and print the denominator.
+- **A published aggregate can be self-inconsistent and still point the right way.** 12 marks reproduced;
+  151 did not. Correct the arithmetic, and leave the decision it supported alone unless the corrected
+  number argues differently.
+- **The `.qwen/tmp` script left behind is not the script that made the number.** That probe now prints
+  2 bare vs 31 marked — neither figure is the published pair. Any number meant to survive a session goes
+  into `span_audit.py` with a test, not into a one-session probe.
+- **Detail strings are claims.** The first `other` branch said "the note's characters left unmarked"
+  without reading the Corpus; the review axis caught it. A classifier that names an owner must call
+  `VaultView.holders`, the way `wrong_doors` does.
+- **Tracker and remote state move between sessions.** `main` == `origin/main` (the last handoff's "4
+  unpushed commits" are pushed) and #26 is closed. Read `git status -sb` and `gh issue list` before
+  restating either.
+- **`--case <full case id>` runs one case; `--case lang` runs four.** These two runs were deliberately
+  separate so the guard case sat beside the loser. Filtered runs can never promote, whatever they show.
+- **Say which denominator before comparing rates.** 3 broken of 13 marks (2 runs) is neither better nor
+  worse than 3 of 28 (4 runs) without the case split beside it.
+- **`span_audit.py results/<run>` on an improve run dir exits 2** ("no transcripts for companion") —
+  group by `summary.json`'s `skill` field, not by the presence of a directory.
 
-## Traps that cost tokens this session
+## Traps that cost tokens in earlier rounds (still live)
 
-- **Freeze the arm before measuring.** The runner installs the skill per case, so editing `labs/companion` mid-chain means each run scores different bytes. Two chains died that way today. `summary.json`'s tree-hash is the truth, and `--promote` refuses an arm edited after its run.
-- **Do not launch runs with `nohup … &` inside a background shell** — the wrapper exits at once, no completion notification fires, and you are left polling. Run the harness as a plain background command.
-- **Re-derive every trend or superlative in the order it needs.** Two published claims were wrong: sorting an audit table by count and calling it a trend (in date order the broken counts are 20, 6, 19, 13, 4, 0, 3), and a "lowest door count" two earlier runs already beat.
-- **Recompute every aggregate from `summary.json` in the same session** — hand-carried token totals have been wrong in pushed commits more than once, including this round's first draft.
-- **`grep_search` can answer "No matches" for text that exists here** — confirm with a direct read before concluding absence.
-- Prove things by re-scoring saved transcripts (0 tokens), not by re-running: `results/` is gitignored and is the only copy.
-- **Three tickets still write "20 cases"** (#24, #25, #26) while `cases/companion.json` holds 21; and `CHANGELOG.md` line 19 plus #17's 11-03 line carry a stale "closed on evidence" claim — only #23 is closed, while #24, #25, #26, #27 and #28 are open. Both flagged on #17 and **deliberately not edited**: closing the issues versus rewording the line is the maintainer's call.
+- **Freeze the arm before measuring.** The runner installs the skill per case, so editing
+  `labs/companion` mid-chain means each run scores different bytes. `summary.json`'s tree-hash is the
+  truth, and `--promote` refuses an arm edited after its run.
+- **Do not launch runs with `nohup … &` inside a background shell** — the wrapper exits at once and no
+  completion notification fires. Run the harness as a plain background command.
+- **Chain eval runs with `;`, never `&&`.** `run_evals.py` returns 1 when any case fails; a FAIL is a
+  result, not a crash.
+- **Recompute every aggregate from `summary.json` in the same session**, and re-derive every trend or
+  superlative in the order it needs before publishing it.
+- **`grep_search` can answer "No matches" for text that exists here** — confirm with a direct read.
+- Prove things by re-scoring saved transcripts (0 tokens), not by re-running: `results/` is gitignored
+  and is the only copy.
+- **Three tickets still write "20 cases"** (#24, #25, #26 — the last one closed) while
+  `cases/companion.json` holds 21, and `CHANGELOG.md` line 19 plus #17's 11-03 line carry a stale
+  "closed on evidence" claim. Deliberately not edited: rewording those lines is the maintainer's call.
 
 ## Suggested skills for the next agent
 
-- **`tdd`** — any change to `graders.py` / `span_audit.py` goes test-first in `test_graders.py` / `test_span_audit.py`, with a mutant reply that must fail it; the README requires this of a new classifier.
-- **`code-review`** — the two-axis (Standards / Spec) review is what caught both false claims this session; run it against the previous commit before spending eval tokens on what it finds.
-- **`diagnosing-bugs`** — if chasing the wrong-door split or the same-language blind spot instead of re-rolling prose.
-- **`domain-modeling`** — before coining any new term; `GLOSSARY.md` is the repo's convention, and every coined name needs a plain gloss there.
-- **`research`** — only if a primary source is genuinely needed; this repo's questions are answered by its own saved transcripts.
-- Also: **`implement`** with a ticket ref (fetches the issue, runs the TDD → review → commit loop), and **`triage`** if the English-case doors get filed as #29.
+- **`tdd`** — any change to `graders.py` / `span_audit.py` goes test-first in `test_graders.py` /
+  `test_span_audit.py`, with a reply that must fail it; the README requires this of a new classifier.
+- **`code-review`** — the two-axis review is what caught both false claims last round and three this
+  one; run it against the previous commit **before** the findings are written into the record.
+- **`diagnosing-bugs`** — if chasing the who-spoke family or the wrong-door split instead of re-rolling
+  prose.
+- **`domain-modeling`** — before coining any new term. `Pointer form` and `Pointer door` landed this
+  round, glossed in plain words; the repo's convention is that a coined name is not usable until it is.
+- **`research`** — only if a primary source is genuinely needed; this repo's questions are answered by
+  its own saved transcripts.
+- Also: **`implement`** with a ticket ref, and **`triage`** if the English doors finally get filed.
 
-**Nothing outward without the maintainer's explicit go-ahead** — GitHub comments/closes, pushes, `--promote`, any both-arm gate. Single-arm candidate runs, with a token figure attached, are pre-approved; the gate and promotion are not.
+**Nothing outward without the maintainer's explicit go-ahead** — GitHub comments/closes, pushes,
+`--promote`, any both-arm gate. Single-arm candidate runs, with a token figure attached, are
+pre-approved; the gate and promotion are not.

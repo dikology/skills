@@ -196,7 +196,8 @@ machine text and not a note a mark may credit. It grades nothing and changes no
 verdict; `results/` is gitignored, so this is how a gate's evidence is re-read without spending it
 again. Costs 0 tokens.
 
-Three numbers, because a run fails the promise three ways:
+Three numbers, because a run fails the promise three ways — and a fourth, because #26's
+rendering cure is a shape, and a shape that promises nothing is invisible to all three:
 
 - **broken** — a real copy credited to a note that does not hold it (`claim-fail`), or marks that
   copy nothing at all: the model's own weighing phrase (`no-source`), its own earlier reply
@@ -208,6 +209,16 @@ Three numbers, because a run fails the promise three ways:
   (#28). Marks copy, `code` weighs, so these words are credited to no note and graded by no
   grader — and the note never gets the quote line it owes. Not broken, not a mark, counted beside
   the two above.
+- **pointer** — which door a pointer form (那句, 那条, 说的是, 记的是, 写的是, 讲的是) filled in a
+  pinned or otherwise cross-language reply: `bare` (the reply's own words, nothing around them),
+  `marked`, `weighed` (`code`), or `other` (a note's characters left unmarked, a link, or the
+  sentence stopping at the form). A run's *adoption* number, not its defect number: the bare door
+  makes no promise, so `broken` stays silent whether the model writes it or not, and a release
+  note that says a cure "is now in the file" has proved only that. `marked` is where #26's
+  rendering lives when the Span inside is the reply's own script; the audit's own `claim-fail`
+  count is what grades it, unchanged. Forms inside someone else's characters are not the reply
+  pointing, so marks and `code` spans are masked before the walk, and the Close-menu option lines
+  are skipped as they are everywhere else here.
 
 A span too short to read as a claimed line is `label` and is left out of the denominator — the
 harness's own `MIN_QUOTE_WORDS` floor, counted by character rather than by word where the script has
@@ -224,7 +235,18 @@ far it agrees with `quotes_verbatim` on every arm-case, and finds spans the gate
 `wrongdoor` was checked against the spans counted by hand in #28: 5 of 16 on `fix26d_pin2`, 1 of 7 on
 `fix26e_pin3`, and on `gate26_both` it adds 16 to the candidate arm without moving its published
 139 marks / 119 graded / 0 broken / 1 unowned. That 0-broken candidate arm is the hole #28 names:
-16 note lines sat in `code` where the bar cannot read them.
+16 note lines sat in `code` where the bar cannot read them. `pointer` was checked the same way
+against the count #26's rendering sentence was written from — over the corpus that note had, which is
+every saved companion arm-case except this round's two runs: **174 forms, 130 bare, 12 marked,
+16 weighed, 16 other**. Its **12 Mark openings reproduce**; its **151 plain do not**, and no definition
+that also yields 12 yields 151. Its "92.6% already bare" (= 151/163) matches nothing this classifier
+reports — the same ratio, with its denominator named, is **130 of 142 = 91.5%** — so the decision that
+figure supported stands and the arithmetic does not. Note the trap this check nearly missed: the first
+version of this paragraph read **139 + 12 = 151** and called that a reproduction, which was two
+accidents stacked — the walk then had no length floor, so 6 single-character nouns (`是那条手`) were
+being counted bare, and this round's own 3 bare forms had already joined the corpus. With the floor in,
+over the corpus the claim was made from, it is 130. Reproduce a figure against the corpus it was
+computed from, and say which definition you used.
 
 ## Fixture vaults
 

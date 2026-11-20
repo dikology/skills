@@ -53,6 +53,14 @@ _Avoid_: translation check, language guard
 A note's own characters put in `code` instead of in a Mark. Not a Span — `code` makes no promise that someone spoke — and so invisible to every grader: the copy is true, the owner is named nowhere, and the quote line it owes is never written. The third number the Span audit reports, beside broken and unowned.
 _Avoid_: code span, misquoted, invisible copy
 
+**Pointer form**:
+The 中文 words companion uses to name one of a note's lines before saying what that line holds — `那句`, `说的是`, `记的是`. Pointing is not quoting: the form itself credits no voice, so what follows it is the reply's own reading unless something wraps it. Only a reply whose language is not the notes' has this need; an English reply names the line with its link instead.
+_Avoid_: citation, reference, anaphora
+
+**Pointer door**:
+Which shape the content of a Pointer form takes. **Bare**: the reply's own words with nothing around them, which is a rendering that promises nothing. **Marked**: inside a Mark, which promises that someone spoke those words. **Weighed**: in `code`, which weighs a phrase and credits no note. Or no door at all, when the form points at a note's name, or the sentence stops there. A Mark and a bare run can hold the same 中文 characters and only the first claims a note said them, which is where the rendering defect lives: the Span audit counts the doors beside its three defect numbers, because the bare one makes no promise for those three to test.
+_Avoid_: quote style, formatting, bracket
+
 **Framing**:
 The test a note applies to a thing — the question it answers with `worth it`, `a failure`, `enough`. companion carries a Framing from one note to another by naming the Framing in `code`, not by naming the note that taught it: a Framing is a sentence and a note is a file, and only the file can belong to a session the human already left unpicked.
 _Avoid_: pattern, lens, mental model

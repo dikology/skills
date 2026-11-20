@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from graders import Evidence  # noqa: E402
-from span_audit import audit, audit_run, wrong_doors  # noqa: E402
+from span_audit import audit, audit_run, pointer_doors, wrong_doors  # noqa: E402
 
 VAULTS = Path(__file__).parent / "fixtures" / "vaults"
 DACHA = VAULTS / "the-dacha"
@@ -307,6 +307,91 @@ class TheWrongDoor(unittest.TestCase):
                                                   human="should I quit the band?"))), 1)
 
 
+class ThePointerDoor(unittest.TestCase):
+    """#26's rendering half is a *door*: a 中文 reply that needs a note's content says it
+    after a pointer form (那句, 说的是, 记的是…), and the content goes bare, in Marks, or in
+    `code`. ed4cc405 prints the bare door, and the Span audit cannot tell whether the model
+    took it — bare words are no Span, so no classifier looks at them. Expected doors are
+    worked by hand against the Fixture vault named in each test."""
+
+    def test_a_pointer_form_inside_someone_else_s_characters_is_not_the_reply_pointing(self):
+        # The human said this line and the reply hands it back verbatim, so the 那句 inside it
+        # is theirs — counting it would read a copy as an unfilled noun slot. A phrase the
+        # reply weighed in `code` is the same case: the whole span is the object, and its
+        # inner words point at nothing. `quote_sources` masks spans for this reason too.
+        got = pointer_doors(evidence('- You, today — "那句出门的理由一直在替我说谎"',
+                                     vault=BAND, human="那句出门的理由一直在替我说谎"))
+        self.assertEqual(got, [])
+        got = pointer_doors(evidence('我把这件事说成 `那句还没有答案` 的位置。',
+                                     vault=BAND, human="should I quit the band?"))
+        self.assertEqual(got, [])
+
+    def test_the_weighed_door_is_the_one_code_span_the_file_prints(self):
+        # labs/companion's own example for a 中文 reply holding a phrase up: 我那句
+        # `陶艺填同一个位置` 得重算. `code` weighs and claims no voice, so this door breaks
+        # nothing — and when its characters are the Corpus's own, `wrong_doors` already
+        # counts it. Both numbers read the same span from different sides.
+        got = pointer_doors(evidence('我那句 `陶艺填同一个位置` 得重算。',
+                                     vault=BAND, human="should I quit the band?"))
+        self.assertEqual([d.door for d in got], ["weighed"])
+        self.assertEqual([d.content for d in got], ["陶艺填同一个位置"])
+
+    def test_a_one_character_completion_is_the_noun_the_form_governs_not_a_rendering(self):
+        # fix26n_guard1: 真正撑着不卖的不是钱，是那条手 — there 那条 is the determiner of 手, and one
+        # character is no rendering of a note's line. Without this floor the walk hands the
+        # adoption count a false positive, which is the error the door was introduced to avoid.
+        got = pointer_doors(evidence('真正撑着不卖的不是钱，是那条手。', vault=DACHA,
+                                     human="should I sell the dacha?"))
+        self.assertEqual([d.door for d in got], ["other"])
+        self.assertIn("one character", got[0].detail)
+
+    def test_an_unmarked_run_is_called_the_note_s_characters_only_when_a_note_holds_it(self):
+        # The claim has to be checked, not assumed: pottery.md's last line is "Of course it is.",
+        # so 那句 Of course it is 说明… is the note's own characters left unmarked, and the detail
+        # must name the holder. The same shape over characters no note holds says that instead —
+        # the walk reads the Corpus for both, the way `wrong_doors` does.
+        got = pointer_doors(evidence('那句 Of course it is 说明这不只是排期。\n'
+                                     '那句 never said a thing that is in any note。',
+                                     vault=BAND, human="should I quit the band?"))
+        self.assertEqual([d.door for d in got], ["other", "other"])
+        self.assertIn("[[pottery]]", got[0].detail)
+        self.assertNotIn("[[", got[1].detail)
+
+    def test_the_other_door_is_a_link_or_the_note_s_own_characters_left_unmarked(self):
+        # Two shapes that fill no noun slot: 那条 [[the band]]，… points at a note by name, and
+        # fix28_shape2's 那句 Of course it is… pastes the note's English into the reply's 中文
+        # with no Marks at all. Neither claims a voice, so neither is broken — and neither is
+        # the bare door, whose content is the reply's own words. `other` is where they land.
+        got = pointer_doors(evidence('那句 Of course it is 说明这不只是排期。\n'
+                                     '那条 [[the band]]，是四篇笔记里唯一提到人的。',
+                                     vault=BAND, human="should I quit the band?"))
+        self.assertEqual([d.door for d in got], ["other", "other"])
+        self.assertIn("the note's characters", got[0].detail)
+        self.assertIn("by name", got[1].detail)
+
+    def test_the_marked_door_is_counted_whatever_script_the_span_is_in(self):
+        # Both halves of the same construction from the saved bytes: fix26m_lang2's 那句
+        # 「加一样就得卸一样」, the rendering that cost that case #26, and the same pointer
+        # form followed by the note's own English in Marks. This walk counts the door, not
+        # who owns the words — the Span audit's `broken` is what separates those two.
+        reply = ('那句「加一样就得卸一样」假设周四只有一个晚上，'
+                 '那句 "The drive home was the best part." 是乐队的原话。')
+        got = pointer_doors(evidence(reply, vault=BAND, human="should I quit the band?"))
+        self.assertEqual([d.door for d in got], ["marked", "marked"])
+        self.assertEqual([d.content for d in got],
+                         ["加一样就得卸一样", "The drive home was the best part."])
+
+    def test_the_bare_door_is_counted_with_the_content_it_carries(self):
+        # fix26n_pin1 reply 1: [[thursday evenings]]'s "If I add one more thing to Thursday,
+        # something else has to come off it" rendered in the reply's own 中文, with nothing
+        # around it. Legal — it claims nobody spoke — and the shape the new line prints.
+        got = pointer_doors(evidence('[[thursday evenings]] 记的是加一样就得卸一样，所以周四只剩一个晚上。',
+                                     vault=BAND, human="should I quit the band?"))
+        self.assertEqual([d.form for d in got], ["记的是"])
+        self.assertEqual([d.door for d in got], ["bare"])
+        self.assertEqual([d.content for d in got], ["加一样就得卸一样"])
+
+
 class AuditingASavedRun(unittest.TestCase):
     def test_a_saved_case_is_audited_from_its_transcript_and_fixture_vault(self):
         # The transcripts themselves are gitignored, so this checks the walk over a run
@@ -346,6 +431,25 @@ class AuditingASavedRun(unittest.TestCase):
             self.assertEqual(rows[0]["wrongdoor"], 1)
             self.assertEqual([d["span"] for d in rows[0]["wrongdoor_details"]],
                              ["The drive home was the best part."])
+
+    def test_a_saved_run_reports_the_pointer_door_beside_the_three_numbers(self):
+        # The fourth number is the one that answers whether a candidate took the shape its own
+        # file prints: bare words are no Span, so `broken`, `unowned` and `wrongdoor` cannot see
+        # them at all. Worked by hand: one 记的是 followed by the reply's own 中文, one 那句
+        # followed by Marks.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "candidate" / "lang-pin-zh").mkdir(parents=True)
+            (root / "candidate" / "lang-pin-zh" / "transcript.json").write_text(
+                json.dumps([
+                    {"role": "human", "text": "should I quit the band?"},
+                    {"role": "companion", "text": "[[thursday evenings]] 记的是加一样就得卸一样，"
+                                                  "所以那句「每周有个地方要去」不是它。"},
+                ]), encoding="utf-8")
+            rows = audit_run(root, cases={"lang-pin-zh": "band-or-pottery"})
+            self.assertEqual(rows[0]["pointer"],
+                             {"bare": 1, "marked": 1, "weighed": 0, "other": 0})
+            self.assertEqual([d["door"] for d in rows[0]["pointer_details"]], ["bare", "marked"])
 
 
 if __name__ == "__main__":

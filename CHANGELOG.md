@@ -486,10 +486,13 @@ the 422K the saved maxima predict.
   handoff's "next session is for" line — that line asked for the two runs, and this is the counter
   those runs needed to mean anything; the review axis called it scope, and the label is fair.
 - **Not met, not spent, unchanged.** Both runs are `--case` filtered, so `--promote` still refuses
-  them; the promotion evidence remains one unfiltered `--arm both` companion run (≈9.7M), and #17's
-  clause still wants a *full-set* candidate arm at 0 broken. `skills/companion` is untouched, nothing
-  is promoted, nothing pushed. The English wrong-door lead (4 of the sweep's 5 doors outside
-  `lang-pin-zh`) was not touched this round.
+  them; the promotion evidence remains one unfiltered `--arm both` companion run (≈9.7M), and the tag
+  still wants its **52-row run on the bytes that ship** with the candidate arm's **broken rate printed
+  beside its denominator**, `unowned` and `wrongdoor` next to it — #17 re-amended that clause on
+  2026-11-06 from "0 broken spans" to a rate at or below the best one measured on the shipping bytes,
+  and the sentence this bullet replaces repeated the old wording from the inherited handoff.
+  `skills/companion` is untouched, nothing is promoted, nothing pushed. The English wrong-door lead
+  (4 of the sweep's 5 doors outside `lang-pin-zh`) was not touched this round.
 - **And the ticket moved while this was in flight.** #26 was **closed as COMPLETED by the maintainer
   on 2026-11-20T06:06Z**, before these two runs, with no comment after the 2026-11-06 one — so the
   closure is a decision on the record, not an artifact of this evidence. What the evidence says

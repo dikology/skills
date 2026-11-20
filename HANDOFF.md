@@ -65,9 +65,28 @@ One both-arm run of **26 cases / 52 rows** (companion 21 + improve 5) on post-pr
 - **`--promote` is still blocked on a run, not on prose.** Every run of `ed4cc405` used `--case`, which
   the promotion guard refuses by design. The promotion evidence is one unfiltered `--arm both`
   companion run (≈9.7M).
-- **#17's 0-broken clause still needs a full-set candidate arm at 0 broken.** The best full-set
-  measurement on record remains `fix26l_sweep1` (`6ad215ae`): 20/21 PASS, 5,463,637 tok, **3 broken of
-  127**, 1 unowned, 5 wrong-door. The two filtered runs above report 3 broken of 13 and are not that bar.
+- **#17's broken-span clause is a RATE, not "0 broken" — the note this round inherited had it wrong.**
+  As amended on 2026-11-06 (read the issue body, not any handoff): the tag needs one full two-arm run of
+  both skills' case sets (**26 cases, 52 rows**) on **the bytes that ship** (after `--promote`, so both
+  arms are identical) in which **no case fails on both arms**, and the release note prints the candidate
+  arm's **broken rate with its denominator** (`3 broken of 127 claim-bearing marks` is the shape),
+  **at or below the best rate measured on the shipping bytes**, with **`unowned` and `wrongdoor` beside
+  it** so a low count cannot be bought by moving copies into `code`. Any rise over the last shipping
+  number must be explained; a case that fails one arm and passes the other is named and shown passing 3
+  consecutive replays. Best full-set measurement on record remains `fix26l_sweep1` (`6ad215ae`): 20/21
+  PASS, 5,463,637 tok, **3 broken of 127 (2.4%)**, 1 unowned, 5 wrong-door. The two filtered runs above
+  (3 broken of 13) are not that bar and buy nothing.
+- **The path from here, and where the money goes.** Promotion needs an unfiltered `companion --arm both`
+  run (21×2 ≈9.7M) where the candidate loses no case; the tag needs a **separate** 52-row run on the
+  post-promotion bytes (≈12M), because a pre-promotion run is not measured on the shipping bytes. #17's
+  own text allows one economy: where the only candidate loss is a case **stable also fails** — a shared
+  flip, not a regression — `--promote` still refuses, and the AC says the maintainer then copies `labs/`
+  over `skills/` deliberately with the flip and its rates named in the release note. That collapses two
+  events into one 52-row spend. It is a maintainer decision, never an agent's.
+- **Four open companion defects stand between the bar and the tag, not the two the old note named**
+  (#24, #25, #27, #28 — #26 closed 2026-11-20). #17's 11-03 paragraph still reads "#23, #24, #25 and #26
+  are all closed on skill-text fixes", and #24/#25/#26 each write their gate as "20 cases at 20/20" while
+  `cases/companion.json` holds 21. Both are already flagged on #17 and deliberately untouched here.
 - **#26's closure is not this round's to reopen.** The tracker says COMPLETED as of 2026-11-20; these
   bytes still write 3 broken marks in the family that ticket named. That is recorded in
   `CHANGELOG.md`; commenting, closing or reopening issues stays with the maintainer.
@@ -119,9 +138,13 @@ One both-arm run of **26 cases / 52 rows** (companion 21 + improve 5) on post-pr
 - **Detail strings are claims.** The first `other` branch said "the note's characters left unmarked"
   without reading the Corpus; the review axis caught it. A classifier that names an owner must call
   `VaultView.holders`, the way `wrong_doors` does.
-- **Tracker and remote state move between sessions.** `main` == `origin/main` (the last handoff's "4
-  unpushed commits" are pushed) and #26 is closed. Read `git status -sb` and `gh issue list` before
-  restating either.
+- **Tracker and remote state move between sessions — and so does a criterion's wording.** `main` ==
+  `origin/main` (the last handoff's "4 unpushed commits" are pushed) and #26 is closed. Read
+  `git status -sb` and `gh issue list` before restating either. The same round caught this note
+  paraphrasing #17's run bar as **"0 broken spans"** three days after `1a04d9a` — the issue had been
+  re-amended on 2026-11-06 to a *rate with its denominator*, at or below the best one on the shipping
+  bytes, with `unowned`/`wrongdoor` printed beside it. A handoff is a pointer, not the authority: when
+  it states an acceptance criterion, open the issue and read the latest amendment before repeating it.
 - **`--case <full case id>` runs one case; `--case lang` runs four.** These two runs were deliberately
   separate so the guard case sat beside the loser. Filtered runs can never promote, whatever they show.
 - **Say which denominator before comparing rates.** 3 broken of 13 marks (2 runs) is neither better nor

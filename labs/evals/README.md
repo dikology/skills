@@ -117,10 +117,15 @@ case turns it on with `"judge": true`, which uses `judge-rubric.md` and only
 reports: the score is printed next to the verdict and never changes it. Or the
 case names a rubric and a pass mark,
 `"judge": {"rubric": "soft-posture", "pass_at": 3}`, which reads
-`judge-soft-posture.md`. Then a lower score, or a judge that fails to answer, fails
-the case. Use a pass mark only where posture is the behaviour under test and no
-regex can see it. `--no-judge` skips the judge, pass marks included; such a case prints
-`judge error: skipped`, because its posture went ungraded.
+`judge-soft-posture.md`. Then a lower score fails the case. Use a pass mark only where posture is
+the behaviour under test and no regex can see it.
+
+A judge that answers with nothing readable graded the pipe, not the reply, so it is asked once
+more — the rule a session that reached no model already gets (`run_with_retry`). Two asks with no
+score do not fail the case: the row carries `judge_ungraded` and prints `judge ungraded: <why>`, and
+the comparison table names the arm whose posture went ungraded. A skip is reported, never read as a
+pass. `--no-judge` skips the judge, pass marks included, and prints the same line with the reason
+`skipped by --no-judge`; a run made that way cannot promote.
 
 A quoted fragment is a claim about the notes the same line offers beside it: every
 `[[link]]` reachable from it without crossing another quote, a loose bracket or a

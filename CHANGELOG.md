@@ -4,7 +4,72 @@ All notable changes to this Library. Versions follow [semver](https://semver.org
 the Library stays on 0.x until companion has run about ten real sessions with no
 workaround and its evals pass.
 
-## [0.2.0] — in preparation, not tagged
+## [0.2.0] — 2026-11-21, tagged
+
+**improve joins the Library.** `skills/.claude-plugin/plugin.json` and
+`.claude-plugin/marketplace.json` both read `0.2.0` and list both skills, so one install
+gives companion and improve and the version can be pinned at the tag. Both READMEs carry
+improve's row and its Overlay fields. companion ships at tree `ed4cc405`, improve at
+`0e3cbd00f056`, both with Stable and Candidate byte-identical.
+
+**How companion got shipped.** Not by `--promote`: the maintainer copied `labs/companion`
+over `skills/companion` deliberately, on a single-arm sweep plus three replays, which is the
+move #17's loss clause reserves for exactly that. #17's bar was re-amended as
+[ADR-0002](docs/adr/0002-tickets-carry-evidence-releases-carry-criteria.md): a Ticket closes
+on evidence about its own mechanism, a release gates on its own criteria, and neither borrows
+the other. The all-green verdict half of the tag bar became a named rate, finishing the
+direction #17's 2026-11-06 amendment took for the span audit.
+
+**Measured on the bytes that ship** — the first time this Library's numbers described the
+copy users get. `rel17_sweep2`: all 21 cases, unfiltered, judge on, **20 of 21 pass**,
+5,708,528 tokens. The span audit of those same replies reports **5 broken of 120
+claim-bearing marks (4.2%), with 3 unowned and 2 wrong-door printed beside it**; one of the 5
+was graded by the gate, 4 were invisible to every grader. The best rate measured on a copy
+carrying all three open tickets' rules is `6ad215ae`'s 3 broken of 127 (2.4%), 1 unowned,
+5 wrong-door (`fix26l_sweep1`). It is not the lowest full-set number on record: re-auditing all
+13 saved full-set arm-runs at 0 tokens, `af3b94f0`'s candidate arm reads **0 broken of 138** —
+and that is the copy predating #27's framing shape, #28's door rule and #26's scan, which
+carried **16 wrong-door copies** beside its zero. That pairing is why #17's 2026-11-06
+amendment retired "0 broken spans" for a rate with its denominator and two invisible numbers
+printed next to it. This copy's rate is higher than `6ad215ae`'s and its wrong-door count is
+lower; the rise is 2 marks on a 120-mark draw, P(≥5 of 120 | 2.4%) = 0.16, so one sweep cannot
+separate a worse copy from a worse day, and we say that instead of re-rolling until the number
+flatters us.
+Four of the five are one mechanism: the reply's own line wearing Marks (`no-source`), 2 in
+`lang-follows-human-en` and 2 in `log-one-line-per-session` — the residue #26 was closed
+carrying, now visible in English replies as well as 中文 ones.
+
+**The one failing case.** `lang-pin-zh` failed the sweep at 0.80 (`quotes_verbatim` on
+`"退不退"` credited to `[[the band]]`). It passes 3 consecutive replays on the shipping bytes
+(`rel17_pin_r1/r2/r3`, 151,379 / 151,929 / 153,607 tok; 456,915 total), making the case 4/5 on
+this copy and 46/61 (0.754 per-run) pooled over every saved candidate run. The replays
+certify the verdict, not the promise: the middle one scored 1.00 while writing 1 broken mark
+of 8 in its own spans.
+
+**improve.** **10 of 10 rows**, both arms identical on the shipping bytes
+(`gate_improve_shipped_v2`, 2,626,477 tok). No defect open against it.
+
+**Known defects in what ships.** The who-spoke family above (4 of 5 broken marks, seen by no
+grader). `lang-pin-zh` is a coin at 0.754 a draw. 2 wrong-door copies survive outside the
+pinned case (`line-filed-under-target`, `skip-list-never-quoted`), down from 5, with the
+instrument now seeing them at all. `framing-carried-over` failed once on a hard
+`framing_named` in an unfinished both-arm run (`rel17_promote1`, 30 of 42 rows, no summary,
+no hash) where the then-shipped copy passed it — the full sweep on these bytes took the case
+at 1.00, so it is a shape risk seen once, on evidence that cannot name its own bytes. #24,
+#25, #27 and #28 are closed on their mechanisms as measured here; their gate clauses were
+release criteria and ADR-0002 moved those to #17.
+
+**Harness, this release.** Two defects that had been eating verdicts, fixed test-first, 370
+tests OK. `summary.json` is written after every row through a side file and a rename, so an
+interrupted run still records which bytes it scored and how far it got, and `--promote`
+refuses such a run by naming the cases it skipped. A judge that answers with nothing readable
+is asked once more; two asks with no score no longer fail a case the hard graders passed — the
+row carries `judge_ungraded` and both the report line and the comparison table print it, so a
+skip is never read as a pass. New vocabulary for all of this is in `GLOSSARY.md`.
+
+*The paragraphs below are the preparation log, written before the tag existed; where they say
+"no `v0.2.0` tag exists yet", "0 broken spans" or that a ticket is "closed on evidence", read
+the block above as current and these as history.*
 
 #23 is fixed and promoted, so companion's case set now passes under qwen on the quoting
 failures that held the release: `gate_companion_v5` scored the Candidate at 19/20 against

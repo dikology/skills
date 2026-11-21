@@ -59,8 +59,15 @@ class JudgeVerdict(unittest.TestCase):
     def test_a_score_at_the_pass_mark_passes(self):
         self.assertTrue(run_evals.apply_judge(scored(), {"score": 4}, pass_at=4)["passed"])
 
-    def test_a_judge_error_fails_a_gating_case(self):
-        self.assertFalse(run_evals.apply_judge(scored(), {"error": "timeout"}, pass_at=4)["passed"])
+    def test_a_judge_that_would_not_answer_leaves_the_verdict_to_the_hard_graders(self):
+        """A judge that returned no score after two asks graded the pipe, not the reply, so
+        it cannot fail a case every hard grader passed. It is not a pass either: the row
+        carries that posture went ungraded."""
+        out = run_evals.apply_judge(scored(), {"error": "no JSON in reply", "asks": 2},
+                                    pass_at=4)
+        self.assertTrue(out["passed"])
+        self.assertNotIn("judge", out["hard_fail"])
+        self.assertTrue(out["judge_ungraded"])
 
     def test_without_a_pass_mark_the_judge_only_reports(self):
         out = run_evals.apply_judge(scored(), {"score": 1}, pass_at=None)
@@ -354,6 +361,39 @@ class JudgeTurn(unittest.TestCase):
         self.assertEqual(argv[argv.index("-m") + 1], "deepseek-v4-pro")
 
 
+class JudgeRetried(unittest.TestCase):
+    """A judge whose reply holds no score graded the pipe, not the transcript: the same
+    class of transport event an empty turn is, so it is asked again before its answer is
+    believed. No API calls."""
+
+    def event(self, text):
+        return json.dumps([{"type": "system", "subtype": "init", "session_id": "j-1",
+                            "mcp_servers": []},
+                           {"type": "result", "session_id": "j-1", "is_error": False,
+                            "result": text,
+                            "usage": {"input_tokens": 900, "output_tokens": 10}}])
+
+    def ask(self, *replies):
+        calls = []
+
+        def fake_run(argv, **kwargs):
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0, self.event(replies[len(calls) - 1]), "")
+
+        with mock.patch.object(run_evals.subprocess, "run", side_effect=fake_run):
+            verdict = run_evals.judge([{"role": "human", "text": "hi", "session": 0}],
+                                      run_evals.HERE / "judge-soft-posture.md", None, 60, {})
+        return verdict, len(calls)
+
+    def test_a_judge_that_answered_with_nothing_to_read_is_asked_again(self):
+        # The escapes are the reply, not a style choice: a tool-argument parser reads a
+        # literal tag here as a call and truncates the line.
+        blob = "\u003cfunctions>\n\u003cfunction name=\"report_findings\">\n\u003c/functions>"
+        verdict, asks = self.ask(blob, '{"score": 4, "why": "holds a position"}')
+        self.assertEqual(asks, 2, "no JSON was believed on one ask")
+        self.assertEqual(verdict.get("score"), 4)
+
+
 class ReadTurn(unittest.TestCase):
     """`qwen -o json` prints an array of events whose last one is the turn's result.
     fixtures/qwen-turns.json is that shape as qwen 0.26.3 printed it on this machine,
@@ -442,6 +482,16 @@ class ReportLine(unittest.TestCase):
             self.assertEqual(grade["tokens"], 1234)
             self.assertEqual(grade["session_ids"], ["9d21"])
             self.assertNotIn("cost_usd", grade)
+
+    def test_an_ungraded_judge_is_printed_beside_the_verdict(self):
+        """A PASS whose posture never got graded says so on its own line, so the skip
+        cannot be read as a clean pass by whoever reads the log later."""
+        line = run_evals.report_line(self.row(judge_ungraded=True,
+                                              judge={"error": "no JSON in reply", "asks": 2}))
+        self.assertIn("PASS", line)
+        self.assertIn("judge ungraded", line)
+        self.assertIn("(asked 2 times)", line)
+        self.assertNotIn("judge 5/5", line)
 
 
 def row(case: str, passed: bool, score: float) -> dict:
@@ -535,6 +585,60 @@ class CompareArms(unittest.TestCase):
         [c] = run_evals.compare([row("voice", True, 1.0)], [])
         self.assertTrue(c["lost"])
         self.assertIsNone(c["candidate"])
+
+    def test_the_table_names_the_arm_whose_judge_never_answered(self):
+        table = run_evals.comparison_table(
+            run_evals.compare([row("push", True, 1.0)],
+                              [{**row("push", True, 1.0), "judge_ungraded": True}]))
+        self.assertIn("judge ungraded: candidate", table)
+        self.assertNotIn("judge ungraded: stable", table)
+
+
+class SummaryAsItGoes(unittest.TestCase):
+    """summary.json is the artifact a later session reads: to price a run, to audit it, to
+    promote from it. Written only after the last row, a run interrupted at row 30 of 42
+    left loose grade.json files, no arm hash to say which bytes they scored, and nothing
+    --promote could read. No API calls."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        self.out = root / "run"
+        self.out.mkdir()
+        self.stable, self.candidate = root / "stable", root / "candidate"
+        self.stable.mkdir()
+        self.candidate.mkdir()
+        (self.stable / "SKILL.md").write_text("old\n")
+        (self.candidate / "SKILL.md").write_text("new\n")
+
+    def summary(self, stable_rows, candidate_rows):
+        return {"skill": "companion", "agent": run_evals.BINARY, "case_filter": None,
+                "judge": True,
+                "arms": {"stable": {"skill": str(self.stable),
+                                    "hash": run_evals.tree_hash(self.stable),
+                                    "cases": stable_rows},
+                         "candidate": {"skill": str(self.candidate),
+                                       "hash": run_evals.tree_hash(self.candidate),
+                                       "cases": candidate_rows}}}
+
+    def test_every_row_scored_is_on_disk_before_the_next_one_starts(self):
+        s = self.summary([], [])
+        run_evals.save_summary(self.out, s)
+        s["arms"]["candidate"]["cases"].append(row("orient", True, 1.0))
+        run_evals.save_summary(self.out, s)
+        saved = json.loads((self.out / "summary.json").read_text())
+        self.assertEqual([r["case"] for r in saved["arms"]["candidate"]["cases"]], ["orient"])
+        self.assertEqual(saved["arms"]["stable"]["hash"], run_evals.tree_hash(self.stable))
+
+    def test_an_interrupted_run_refuses_promotion_by_naming_the_cases_it_skipped(self):
+        s = self.summary([row("orient", True, 0.5)], [row("orient", True, 1.0)])
+        run_evals.save_summary(self.out, s)
+        saved = json.loads((self.out / "summary.json").read_text())
+        problem = run_evals.promote(saved, self.stable, self.candidate, ["orient", "voice"],
+                                    "companion")
+        self.assertIn("voice", problem)
+        self.assertEqual([p.name for p in self.out.iterdir()], ["summary.json"])
 
 
 class Promote(unittest.TestCase):

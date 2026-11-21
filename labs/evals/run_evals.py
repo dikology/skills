@@ -354,18 +354,40 @@ def judge_spec(case: dict):
 
 
 def apply_judge(scored: dict, verdict: dict, pass_at) -> dict:
-    """Record the judge's verdict. With a pass mark, a lower score or a broken judge
-    fails the case; without one, the score is reported and never changes the verdict."""
+    """Record the judge's verdict. With a pass mark, a score under it fails the case;
+    without one, the score is reported and never changes the verdict.
+
+    A judge that never gave a score graded the pipe, not the reply, so it cannot fail a
+    case every hard grader passed. It is recorded as `judge_ungraded`, which the report
+    line and the comparison table print beside the verdict: a skip is never a pass."""
     scored["judge"] = verdict
-    if pass_at is not None and ("score" not in verdict or verdict["score"] < pass_at):
+    if pass_at is None:
+        return scored
+    if "score" not in verdict:
+        scored["judge_ungraded"] = True
+        return scored
+    if verdict["score"] < pass_at:
         scored["passed"] = False
         scored["hard_fail"].append("judge")
     return scored
 
 
 def judge(transcript: list, rubric: Path, model: str | None, timeout: int, env: dict) -> dict:
-    """The part a regex can't decide, such as whether a reply takes a position. On
-    failure returns {"error": ...} so a broken judge shows up in the report.
+    """The part a regex can't decide, such as whether a reply takes a position.
+
+    A reply with nothing to read graded the pipe rather than the transcript, so the judge
+    is asked once more before its answer is believed — the rule an empty turn already gets
+    (`run_with_retry`). Two broken asks is a real event: the verdict says `asks: 2`."""
+    verdict = ask_judge(transcript, rubric, model, timeout, env)
+    if "score" in verdict:
+        return verdict
+    second = ask_judge(transcript, rubric, model, timeout, env)
+    return second if "score" in second else {**second, "asks": 2}
+
+
+def ask_judge(transcript: list, rubric: Path, model: str | None, timeout: int,
+              env: dict) -> dict:
+    """One ask. On failure returns {"error": ...} so a broken judge shows up in the report.
 
     The transcript arrives in the prompt, so the judge needs no tools: `judge_argv`
     runs it read-only, and a judge that could edit the vault would grade its own work."""
@@ -410,6 +432,15 @@ def keep(outdir: Path, case: dict, session: dict, d: dict, scored: dict) -> None
          "tokens": session["tokens"], "seconds": session["seconds"],
          "skills_invoked": session["skills_invoked"], "mcp_servers": session["mcp_servers"]},
         indent=2, ensure_ascii=False))
+
+
+def save_summary(outdir: Path, summary: dict) -> None:
+    """Write the run's summary through a side file and a rename, after every row. A run
+    that is interrupted then still says which bytes it scored and how far it got, which is
+    what a killed 42-row gate could not say when the file came only at the end."""
+    side = outdir / "summary.json.tmp"
+    side.write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+    os.replace(side, outdir / "summary.json")
 
 
 def run_case(case: dict, skill: Path, args, tmp: Path, outdir: Path, env: dict) -> dict:
@@ -473,8 +504,14 @@ def run_with_retry(run_at_attempt: Callable[[int], dict]) -> dict:
 def report_line(row: dict) -> str:
     verdict = "PASS" if row["passed"] else "FAIL"
     j = row.get("judge") or {}
-    judged = (f"  judge {j['score']}/5" if "score" in j else
-              f"  judge error: {j['error'][:80]}" if "error" in j else "")
+    if "score" in j:
+        judged = f"  judge {j['score']}/5"
+    elif row.get("judge_ungraded") or "error" in j:
+        judged = f"  judge ungraded: {(j.get('error') or 'no score in the verdict')[:80]}"
+        if j.get("asks", 1) > 1:
+            judged += f" (asked {j['asks']} times)"
+    else:
+        judged = ""
     line = (f"{verdict}  {row['case']:<28} score {row['score']:.2f}{judged}"
             f"  {row['tokens']} tok  {row['seconds']}s")
     if row["error"]:
@@ -593,8 +630,12 @@ def comparison_table(rows: list) -> str:
     lines = [f"{'case':<30}{'stable':<12}{'candidate':<12}delta"]
     for c in rows:
         delta = "" if c["delta"] is None else f"{c['delta']:+.2f}"
+        ungraded = [n for n in ("stable", "candidate") if (c[n] or {}).get("judge_ungraded")]
+        tail = "  LOST" if c["lost"] else ""
+        if ungraded:
+            tail += "  judge ungraded: " + ", ".join(ungraded)
         lines.append(f"{c['case']:<30}{cell(c['stable']):<12}{cell(c['candidate']):<12}"
-                     f"{delta:<7}{'  LOST' if c['lost'] else ''}".rstrip())
+                     f"{delta:<7}{tail}".rstrip())
     lost = [c["case"] for c in rows if c["lost"]]
     lines.append(f"\ncandidate lost {len(lost)}: {', '.join(lost)}; do not promote" if lost
                  else "\ncandidate lost no case")
@@ -712,6 +753,8 @@ def main() -> int:
             print(f"\n{name}: {where}")
             # Hashed before the run, so an edit made while it runs reads as a change.
             entry = {"skill": str(skill), "hash": tree_hash(skill), "cases": []}
+            summary["arms"][name] = entry
+            save_summary(outdir, summary)
             for case in cases:
                 def attempt(n, case=case):
                     return run_case(case, skill, args,
@@ -724,9 +767,9 @@ def main() -> int:
                           f"({row['discarded_error']})", flush=True)
                 print(report_line(row), flush=True)
                 entry["cases"].append(row)
-            summary["arms"][name] = entry
+                save_summary(outdir, summary)
 
-    (outdir / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+    save_summary(outdir, summary)
     rows = [r for a in summary["arms"].values() for r in a["cases"]]
     failed = sum(not r["passed"] for r in rows)
     if set(arms) == {"stable", "candidate"}:

@@ -64,3 +64,43 @@ _Avoid_: quote style, formatting, bracket
 **Framing**:
 The test a note applies to a thing — the question it answers with `worth it`, `a failure`, `enough`. companion carries a Framing from one note to another by naming the Framing in `code`, not by naming the note that taught it: a Framing is a sentence and a note is a file, and only the file can belong to a session the human already left unpicked.
 _Avoid_: pattern, lens, mental model
+
+**Case**:
+One scripted conversation with a Fixture vault, beside the checks its replies must satisfy. The unit a skill is measured on; a skill's whole set of them is what a Gate spends.
+_Avoid_: test, scenario, fixture
+
+**Draw**:
+One execution of one Case by one arm. Two draws of the same bytes can disagree, so a verdict from one draw says what came out, not what the copy is.
+_Avoid_: run, retry, sample
+
+**Flip**:
+A Case passing on one draw of a copy and failing on another. A property of a probabilistic subject, not a defect found and re-found.
+_Avoid_: flake, intermittence, noise
+
+**Regression**:
+The Candidate failing a Case that Stable passed — the only loss that answers "did I make anything worse?".
+_Avoid_: flip, failure
+
+**Shared flip**:
+A Case both arms fail in the same Gate. Not a regression: the subject moved, and the change is blameless.
+_Avoid_: regression, common defect
+
+**Gate**:
+The whole set of Draws spent to decide a release rather than to learn something. It is worth what its Draws are worth, so a Gate of one Draw per Case is a coin and a Gate of a rate is a measurement.
+_Avoid_: checkpoint, suite, green build
+
+**Shape-tight check**:
+A check that passes only one way of building a sentence, so a reply that answers the Case well in another shape fails it. It may grade only a shape some copy of the skill teaches in prose; where it grades an untaught one it tests the harness's taste, not the skill.
+_Avoid_: strict grader, hard test
+
+**Broken rate**:
+A Span audit's broken Spans beside the claim-bearing Marks they were drawn from, both printed. The number that says how well a copy keeps the quoting promise; a count with no denominator is a Draw, not a rate.
+_Avoid_: zero broken, clean run
+
+**Ticket**:
+A numbered record in the Library's tracker that names one defect and carries the evidence about it. A Ticket is not a release criterion (ADR-0002).
+_Avoid_: blocker, gate, milestone
+
+**Closing criterion**:
+The measurement that resolves a Ticket, stated about the mechanism the Ticket names and never about a release. A Ticket stays open while its mechanism is unfixed and closes when the fix is measured, whatever a tag is waiting for.
+_Avoid_: gate, blocker, acceptance run

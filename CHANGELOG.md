@@ -12,9 +12,17 @@ gives companion and improve and the version can be pinned at the tag. Both READM
 improve's row and its Overlay fields. companion ships at tree `ed4cc405`, improve at
 `0e3cbd00f056`, both with Stable and Candidate byte-identical.
 
-**How companion got shipped.** Not by `--promote`: the maintainer copied `labs/companion`
-over `skills/companion` deliberately, on a single-arm sweep plus three replays, which is the
-move #17's loss clause reserves for exactly that. #17's bar was re-amended as
+**How companion got shipped.** Not by `--promote`. The maintainer copied `labs/companion` over
+`skills/companion` deliberately, on a single-arm sweep plus three replays of the one failing case.
+That is **outside #17's letter**: the clause reserving a manual copy for the maintainer describes a
+*shared flip* — a case the stable arm also fails — and the only both-arm run of these bytes
+(`rel17_promote1`, interrupted at 30 of 42 rows, no `summary.json`) has `framing-carried-over` failing
+on the candidate at 0.75 where stable passed it at 1.00. A plain loss, not a shared flip. The copy was
+made on the maintainer's instruction, on the evidence in hand, and #17's promotion box is recorded as
+**not met** rather than reinterpreted. The `v0.2.0` tag annotation said "the move #17's loss clause
+reserves for exactly that case"; it was wrong, and this paragraph plus the closure comment on #17 are
+the correction — the tag object is public, so it is not rewritten or force-moved here. #17's bar was
+re-amended as
 [ADR-0002](docs/adr/0002-tickets-carry-evidence-releases-carry-criteria.md): a Ticket closes
 on evidence about its own mechanism, a release gates on its own criteria, and neither borrows
 the other. The all-green verdict half of the tag bar became a named rate, finishing the

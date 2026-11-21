@@ -4,13 +4,13 @@
 overwritten at each handoff; `README.md` is the user-facing entry point. Everything substantive lives in
 the artifacts linked below — this file only points, per the `handoff` skill.
 
-**Date:** 2026-11-21 · **Close of:** the maintainer's deliberate copy — `skills/companion` is now
-`ed4cc405`, byte-identical to `labs/companion` and to the bytes `rel17_sweep2` scored (20/21 PASS,
-5,708,528 tok). For the first time the measured copy is the shipping copy. · **Branch:** `main` ==
-`origin/main` at `7f85ef9`, with the copy and this round's harness/docs work **uncommitted**.
-**Next session is for:** the release note and #17's remaining boxes — CHANGELOG 0.2.0, the version in
-both manifests, improve rows in both READMEs, ADR-0001's Overlay amendment, then tag and push. Nothing
-is owed to improve's evals, and companion's full set plus the flip's three replays are spent.
+**Date:** 2026-11-21 · **Close of:** **v0.2.0 released.** Tag `v0.2.0` (`3e274a1` → `2a7c327`) pushed;
+`skills/companion` == `labs/companion` == `ed4cc405`, the bytes `rel17_sweep2` scored (20/21 PASS,
+5,708,528 tok). #24, #25, #27, #28 closed on their mechanisms and #17 closed with its promotion box
+recorded as **not met**. · **Branch:** `main` == `origin/main`.
+**Next session is for:** the post-release queue — #18, #19, #20 — and the who-spoke family, which is
+the residue this release shipped with its eyes open (4 of 5 broken marks, invisible to every grader).
+Optional if anyone wants #17's original bar: one 52-row two-arm run on the shipping bytes, ≈11.7M.
 
 ## Read these first — do not re-derive them
 
@@ -95,6 +95,26 @@ is owed to improve's evals, and companion's full set plus the flip's three repla
 4. Then the boxes #17 still owes that nobody has touched: CHANGELOG 0.2.0, version 0.2.0 in both
    manifests, improve rows in both READMEs, ADR-0001's one-line Overlay amendment, the generalized
    Overlay glossary entry, then tag and push.
+
+## What was actually done on 2026-11-21 (steps 1–4 above are closed)
+
+- The four prose boxes were **already** satisfied before this session opened: `plugin.json` and
+  `marketplace.json` both at `0.2.0` with both skills listed, improve rows and Overlay fields in both
+  READMEs, ADR-0001's amendment at `:22`, the generalized Overlay entry at `GLOSSARY.md:13`. Verified
+  rather than assumed, because #17's boxes read as one undifferentiated list.
+- CHANGELOG's `## \[0.2.0] — in preparation, not tagged` heading is now `## [0.2.0] — 2026-11-21,
+  tagged`, with the release record above the older paragraphs, which are marked as history. The stray
+  backslash that would have printed literally is gone.
+- Tag `v0.2.0` pushed: annotated object `3e274a1` peeling to `2a7c327`.
+- #24, #25, #27, #28 closed on their mechanisms with each unmet box written in the comment; #17 closed
+  with its promotion box recorded as **not met**.
+- **One claim in the pushed tag annotation was wrong and was corrected forward, not rewritten.** It
+  called the deliberate copy "the move #17's loss clause reserves for exactly that case" — the shared
+  flip branch. The only both-arm run of these bytes has the candidate losing
+  `framing-carried-over` (0.75, hard `framing_named`) where stable **passed** (1.00): a plain loss, so
+  that branch did not apply. `v0.2.0` is public, so the tag was not force-moved; the correction is in
+  the CHANGELOG and on #17. **Lesson for the next agent: do not describe a maintainer-directed
+  exception as a documented branch you qualified for.**
 
 ## Traps this round added
 

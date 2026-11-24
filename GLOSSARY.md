@@ -1,7 +1,8 @@
 # skills
 
-A public library of agent skills, shipped as a Claude Code plugin marketplace. Each
-skill is generic; everything specific to one vault lives in that vault's Overlay.
+A public library of agent skills, shipped as a Claude Code plugin marketplace. A
+skill may be vault-based or work across projects; vault specifics live in an Overlay,
+and agent-runtime specifics live in an Agent adapter.
 
 ## Language
 
@@ -12,6 +13,30 @@ _Avoid_: vault, wiki
 **Overlay**:
 A section named after one skill (`## Companion`, `## Improve`) in a Consuming vault's `CLAUDE.md` or `AGENTS.md` that tells that skill where things are. Each skill lists its own fields in its `Requires from the consuming vault` section. Read by the agent as prose; there is no parser, so one section may point at another ("as in `## Companion`"). Every field has a stated fallback. Free-form instructions may follow the fields.
 _Avoid_: config, settings, profile
+
+**Agent adapter**:
+The agent-specific part of a skill that connects a shared workflow to one agent runtime, such as Claude, Qwen, or Kimi. It is distinct from an Overlay, which configures a Consuming vault.
+_Avoid_: agent overlay, runtime overlay
+
+**Retrospective / retro**:
+A review of agent session transcripts that produces cross-session Insights and Retro candidates. It is not reflection, which interviews the human rather than reviewing sessions.
+_Avoid_: reflection, postmortem
+
+**Retro note**:
+One explicit note filed during a session for a later multi-session Retrospective. Notes are never captured by a hook.
+_Avoid_: automatic note, reflection
+
+**Retro inbox**:
+The global, cross-project collection of Retro notes shared by Agent adapters. A Retrospective clears the notes it handled.
+_Avoid_: project inbox, message queue
+
+**Insight**:
+A narrative pattern across sessions in a Retro window, supported by citations to the projects and sessions where it appeared.
+_Avoid_: summary, observation
+
+**Retro window**:
+The span of sessions selected for a multi-session Retrospective.
+_Avoid_: date range
 
 **Corpus**:
 The human's own notes in a vault, the material companion reads and quotes. Excludes everything on the skip list, including folded `AI capture` callouts. A vault with no corpus runs companion chat-only.
@@ -28,6 +53,10 @@ _Avoid_: test vault, sample data
 **Stable / Candidate**:
 Stable is the published copy of a skill under `skills/`; it changes only by promotion. Candidate is the working copy under `labs/`, scored against Stable on the same Fixture vaults before it may replace it. The two are the eval runner's arms.
 _Avoid_: prod/dev, v1/v2
+
+**Retro candidate**:
+One concrete change proposed by a retrospective for a human to approve or decline. It is not a Candidate eval arm.
+_Avoid_: candidate, fix, recommendation
 
 **Mark**:
 The quotation marks themselves in a companion reply — `"`, `«»`, `“”`, `「」`, in any script. A mark is a promise that the words inside are someone's exact words; the **Span** is what sits inside them.

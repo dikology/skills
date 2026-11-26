@@ -3,7 +3,14 @@ from pathlib import Path
 
 CAPABILITIES = {
     "adapter": "claude",
-    "operations": ["capabilities", "current-session", "note"],
+    "operations": [
+        "capabilities",
+        "current-session",
+        "note",
+        "reviewed",
+        "declined",
+        "clear",
+    ],
     "signals": ["current_session_identity"],
     "destinations": ["retro_inbox"],
 }

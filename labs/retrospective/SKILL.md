@@ -11,7 +11,7 @@ say that multi-session analysis is not implemented yet.
 ## Shared entrypoint
 
 Resolve `<entrypoint>` to `scripts/retrospective.py` inside this skill folder. Run
-every capability, current-session, and note operation through
+every capability, current-session, note, and state operation through
 `python3 <entrypoint>`; adapter implementation details stay behind that boundary.
 
 When the human explicitly selects an adapter, pass `--adapter <name>` to every
@@ -83,4 +83,31 @@ searching another agent's directories.
 The shared Retro inbox is `~/.retrospective/inbox.jsonl`. Set
 `RETROSPECTIVE_STATE_DIR` to use a different parent directory. Each saved JSON
 record carries the note, context, adapter, optional session ID, project, and UTC
-timestamp.
+timestamp. Adapters share this inbox; an adapter without native current-session
+lookup saves `null` for the session ID.
+
+Reviewed and declined state use `reviewed.txt` and `declined.txt` in the same
+state directory. Reviewed lines are `<adapter>:<complete opaque session ID>`;
+legacy bare UUID lines mean Claude and need no migration. Declined Retro candidate
+keys are shared by every adapter. Check or record state with:
+
+```bash
+python3 <entrypoint> reviewed [--adapter <name>] \
+  --session-id '<opaque ID>' [--session-id ...] [--check]
+python3 <entrypoint> declined [--adapter <name>] \
+  --retro-candidate '<Retro candidate key>' [--retro-candidate ...] [--check]
+```
+
+Without `--check`, these commands record the supplied entries. With `--check`,
+they only report whether each entry is already present. The optional adapter on
+`declined` does not namespace its shared ledger.
+
+After handling notes, clear only their IDs:
+
+```bash
+python3 <entrypoint> clear [--adapter <name>] \
+  --note-id '<note ID>' [--note-id ...]
+```
+
+State mutations serialize through a lock in the state directory and replace
+state files atomically. Unknown and hand-edited lines are retained.

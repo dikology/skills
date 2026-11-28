@@ -5,15 +5,15 @@ The skill is named on the command line (default: companion). Its cases are
 cases/<skill>.json. A case is a Fixture vault, an optional Overlay and scripted
 human turns, in one session (`turns`) or several (`sessions`). For each case the
 runner copies the vault to a temp directory, appends the Overlay to its CLAUDE.md,
-installs the skill under .qwen/skills/<skill> unmodified (as a Consuming vault
-would), and plays each session in headless `qwen`, resuming it for each later
-turn and starting fresh for the next session. It snapshots the vault after every
-turn, grades the transcript and the vault diff, and keeps both under results/.
+installs the skill in the selected agent's native project Skill folder, and plays each
+session through that agent's native headless mode, resuming it for each later turn and
+starting fresh for the next session. It snapshots the vault after every turn, grades the
+transcript and the vault diff, and keeps both under results/.
 
-Every turn runs against a qwen home of the run's own, seeded with nothing but how
-to reach a model, so user settings, hooks, extensions, user skills and MCP servers
-stay out. A turn that loaded an MCP server, or never invoked the skill at all, is
-reported and fails: neither is a test of the skill, whatever the reply looks like.
+Every turn runs against isolated native and OS homes, seeded only with model access, so user
+settings, hooks, extensions, user Skills, generic agent resources and MCP servers stay out.
+A turn that loaded an MCP server, or never invoked the skill at all, is reported and fails:
+neither is a test of the skill, whatever the reply looks like.
 
 Each skill has two arms: stable (skills/<skill>, what the plugin ships) and
 candidate (labs/<skill>, what you edit). Scoring both on the same cases prints a
@@ -22,6 +22,7 @@ unless it lost a case.
 
     python3 labs/evals/run_evals.py                          # companion, all cases, stable arm
     python3 labs/evals/run_evals.py improve                  # another skill, by name
+    python3 labs/evals/run_evals.py companion --agent kimi   # native Kimi print mode
     python3 labs/evals/run_evals.py --arm candidate          # iterate on the candidate
     python3 labs/evals/run_evals.py --arm both               # compare, case by case
     python3 labs/evals/run_evals.py --promote                # candidate -> stable, gated
@@ -67,10 +68,9 @@ RESULTS = HERE / "results"
 # this string, so it lives here once rather than at each exit path.
 NO_OUTPUT = "no output"
 
-# --- the process adapter -------------------------------------------------------
-# One place holds the agent binary and every flag this harness passes it. Moving the
-# harness to another CLI means changing this section, `read_turn` below, and
-# SKILL_FOLDER; nothing else in the file names an agent.
+# --- the Qwen defaults ---------------------------------------------------------
+# These aliases and helpers preserve the original Qwen-facing seam. Process adapters below
+# own agent selection; Kimi has native implementations of the same operations.
 BINARY = "qwen"
 
 # Where a Consuming vault installs a skill so the agent finds it. The folder the
@@ -113,7 +113,7 @@ def session_argv(prompt: str, resume: str | None = None,
     return argv
 
 
-def judge_argv(prompt: str, model: str | None = None) -> list:
+def judge_argv(prompt: str, model: str | None = None, env: dict | None = None) -> list:
     """The rubric and the transcript, in a directory that is nobody's vault, read-only:
     a judge that can edit the thing it is grading grades its own work."""
     argv = [BINARY, prompt, *OUTPUT, "--approval-mode", "plan",
@@ -186,7 +186,7 @@ def login_found(from_home: Path, env: dict) -> bool:
     return bool(seeded.get("security") or seeded.get("env"))
 
 
-def read_turn(stdout: str) -> dict:
+def read_turn(stdout: str, env: dict | None = None) -> dict:
     """One headless run's output, read as the harness uses it.
 
     `qwen -o json` prints an array of events, not one object: the last is the turn's
@@ -222,6 +222,185 @@ def read_turn(stdout: str) -> dict:
             "mcp_servers": (init or {}).get("mcp_servers") or []}
 
 
+class QwenProcessAdapter:
+    name = "qwen"
+    binary = "qwen"
+    skill_folder = ".qwen"
+    session_argv = staticmethod(session_argv)
+    judge_argv = staticmethod(judge_argv)
+    agent_env = staticmethod(agent_env)
+    real_home = staticmethod(real_home)
+    make_isolated_home = staticmethod(make_isolated_home)
+    login_found = staticmethod(login_found)
+    read_turn = staticmethod(read_turn)
+
+
+def seed_kimi_config(text):
+    """Keep model/provider configuration, including its credentials, and nothing that loads tools.
+
+    The selected TOML sections are copied without printing them. User Skills, extra resource
+    directories, hooks, MCP declarations and display settings stay out of the isolated home.
+    """
+    kept = []
+    selected = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("["):
+            section = stripped.strip("[]")
+            selected = section == "providers" or section.startswith("providers.")
+            selected = selected or section == "models" or section.startswith("models.")
+        if selected or re.match(r"^default_model\s*=", stripped):
+            kept.append(line)
+    return "\n".join(kept) + ("\n" if kept else "")
+
+
+class KimiProcessAdapter:
+    name = "kimi"
+    binary = "kimi"
+    skill_folder = ".kimi-code"
+
+    def session_argv(self, prompt, resume=None, model=None):
+        argv = [self.binary, "-p", prompt, "--output-format", "stream-json"]
+        if resume:
+            argv += ["-S", resume]
+        if model:
+            argv += ["-m", model]
+        return argv
+
+    def judge_argv(self, prompt, model=None, env=None):
+        home = Path((env or {}).get("KIMI_CODE_HOME") or self.real_home())
+        argv = [self.binary, "-p", prompt, "--output-format", "stream-json",
+                "--agent-file", str(home / "judge-agent.md")]
+        if model:
+            argv += ["-m", model]
+        return argv
+
+    def real_home(self):
+        return Path(os.environ.get("KIMI_CODE_HOME") or Path.home() / ".kimi-code")
+
+    def make_isolated_home(self, root, from_home):
+        home = root / "agent-home"
+        home.mkdir(parents=True, exist_ok=True)
+        (root / "os-home").mkdir(parents=True, exist_ok=True)
+        config = from_home / "config.toml"
+        (home / "config.toml").write_text(
+            seed_kimi_config(config.read_text(encoding="utf-8")) if config.is_file() else "",
+            encoding="utf-8",
+        )
+        credentials = from_home / "credentials"
+        if credentials.is_dir():
+            shutil.copytree(credentials, home / "credentials", dirs_exist_ok=True)
+        (home / "mcp.json").write_text('{"mcpServers": {}}\n', encoding="utf-8")
+        (home / "judge-agent.md").write_text(
+            "---\nname: eval-judge\ndescription: Read-only eval judge\ntools: []\n---\n\n"
+            "Judge only the transcript in the prompt. You have no tools.\n",
+            encoding="utf-8",
+        )
+        return home
+
+    def agent_env(self, home):
+        env = dict(os.environ)
+        env.pop("KIMI_CODE_SESSION_ID", None)
+        env.pop("KIMI_CODE_WORKSPACE_ID", None)
+        root = Path(home).parent
+        env.update({
+            "HOME": str(root / "os-home"),
+            "KIMI_CODE_HOME": str(home),
+            "KIMI_DISABLE_TELEMETRY": "1",
+            "KIMI_CODE_NO_AUTO_UPDATE": "1",
+            "KIMI_CODE_BUILTIN_PRODUCT_SKILLS": "0",
+        })
+        return env
+
+    def login_found(self, from_home, env):
+        if env.get("KIMI_MODEL_NAME") and env.get("KIMI_MODEL_API_KEY"):
+            return True
+        credentials = from_home / "credentials"
+        return (from_home / "config.toml").is_file() or any(credentials.glob("*.json"))
+
+    def isolation_evidence(self, env):
+        if not env:
+            return False, []
+        home = Path(env.get("KIMI_CODE_HOME") or "")
+        expected_os_home = home.parent / "os-home"
+        controlled = (
+            home.is_absolute()
+            and env.get("HOME") == str(expected_os_home)
+            and env.get("KIMI_DISABLE_TELEMETRY") == "1"
+            and env.get("KIMI_CODE_NO_AUTO_UPDATE") == "1"
+            and env.get("KIMI_CODE_BUILTIN_PRODUCT_SKILLS") == "0"
+        )
+        if not controlled:
+            return False, []
+        try:
+            config = json.loads((home / "mcp.json").read_text(encoding="utf-8"))
+            servers = config.get("mcpServers") if isinstance(config, dict) else None
+            if not isinstance(servers, dict):
+                return False, []
+        except (OSError, json.JSONDecodeError):
+            return False, []
+        return True, sorted(servers)
+
+    def read_turn(self, stdout, env=None):
+        events = []
+        for line in stdout.splitlines():
+            if not line.strip():
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise ValueError(f"kimi printed malformed stream-json: {error}") from error
+            if not isinstance(event, dict):
+                raise ValueError("kimi printed a non-object stream event")
+            events.append(event)
+        if not events:
+            raise ValueError("kimi printed no stream events")
+        hint = next((event for event in reversed(events)
+                     if event.get("type") == "session.resume_hint"), None)
+        if hint is None or not hint.get("session_id"):
+            raise ValueError("kimi printed no session.resume_hint event")
+        texts, skills = [], set()
+        errors = []
+        for event in events:
+            if event.get("role") == "assistant":
+                if isinstance(event.get("content"), str) and event["content"]:
+                    texts.append(event["content"])
+                for call in event.get("tool_calls") or []:
+                    function = call.get("function") if isinstance(call, dict) else None
+                    if not isinstance(function, dict) or function.get("name") != "Skill":
+                        continue
+                    try:
+                        args = json.loads(function.get("arguments") or "{}")
+                    except json.JSONDecodeError:
+                        continue
+                    name = args.get("skill") or args.get("name")
+                    if isinstance(name, str):
+                        skills.add(name)
+            if event.get("type") == "error" or event.get("is_error") is True:
+                errors.append(str(event.get("message") or event.get("error") or "Kimi turn failed"))
+        isolated, mcp_servers = self.isolation_evidence(env)
+        version_reported = any(event.get("type") == "system.version" for event in events)
+        return {
+            "text": "\n".join(texts), "session_id": hint["session_id"],
+            "is_error": bool(errors), "error": "; ".join(errors), "tokens": 0,
+            "skills": sorted(skills),
+            "init_reported": version_reported and isolated,
+            "mcp_servers": mcp_servers,
+        }
+
+
+QWEN = QwenProcessAdapter()
+KIMI = KimiProcessAdapter()
+PROCESS_ADAPTERS = {adapter.name: adapter for adapter in (QWEN, KIMI)}
+
+
+def process_adapter(name):
+    try:
+        return PROCESS_ADAPTERS[name or QWEN.name]
+    except KeyError as error:
+        raise ValueError(f"unknown process adapter: {name}") from error
+
+
 # --- a skill by name ----------------------------------------------------------
 
 def arms_for(name: str) -> dict:
@@ -244,17 +423,17 @@ def load_cases(name: str, folder: Path = CASES) -> list:
 
 # --- the temp Consuming vault -------------------------------------------------
 
-def build_vault(root: Path, case: dict, skill: Path, name: str) -> Path:
+def build_vault(root: Path, case: dict, skill: Path, name: str, adapter=None) -> Path:
     """A temp Consuming vault: the case's Fixture vault, its Overlay, and the skill
-    folder installed unmodified as SKILL_FOLDER/skills/<name>, whatever the folder is
-    called."""
+    installed unmodified under the selected agent's native project Skill folder."""
+    adapter = adapter or QWEN
     ws = root / case["id"]
     shutil.copytree(VAULTS / case["vault"], ws)
     if case.get("overlay"):
         md = ws / "CLAUDE.md"
         existing = md.read_text() if md.exists() else ""
         md.write_text(existing.rstrip() + "\n\n" + case["overlay"].strip() + "\n")
-    shutil.copytree(skill, ws / SKILL_FOLDER / "skills" / name)
+    shutil.copytree(skill, ws / adapter.skill_folder / "skills" / name)
     return ws
 
 
@@ -264,10 +443,11 @@ def check_run(name: str, session: dict):
     All three ways this goes wrong are invisible in a transcript. A skill nothing looked
     for leaves a model that improvises from the prompt and answers much like the skill; a
     session that loaded the developer's MCP servers was never the bare Consuming vault the
-    case describes; and a run that reported no init event proved neither of those things,
-    so it cannot claim them. The skill is looked for across the whole run rather than turn
-    by turn: turn 1 invokes it, and "1, 2" or "yes, write it" are follow-ups in the same
-    session that need not invoke it again."""
+    case describes; and a run without trusted setup evidence proved neither of those things,
+    so it cannot claim them. Qwen reports native init; Kimi pairs its native version/resume
+    events with the harness's verified isolated, empty MCP configuration. The skill is looked
+    for across the whole run rather than turn by turn: turn 1 invokes it, and "1, 2" or
+    "yes, write it" are follow-ups in the same session that need not invoke it again."""
     if not session["init_reported"]:
         return ("a turn printed no init event, so nothing shows what the session was "
                 "given — isolation not proven")
@@ -286,7 +466,7 @@ def case_sessions(case: dict) -> list:
     return case.get("sessions") or [case["turns"]]
 
 
-def play(ws: Path, sessions: list, model: str | None, timeout: int, env: dict) -> dict:
+def play(ws: Path, sessions: list, model: str | None, timeout: int, env: dict, adapter=None) -> dict:
     """Play each session's human turns, snapshotting the vault before the first turn
     and after each one. Stops at the first failed turn.
 
@@ -294,6 +474,7 @@ def play(ws: Path, sessions: list, model: str | None, timeout: int, env: dict) -
     agent reported. A resume that quietly did not happen is a failure, not a smaller
     success: the turn would be answering with no memory of the one before, and a case
     that grades only replies and files would never notice."""
+    adapter = adapter or QWEN
     transcript, error, ids = [], None, []
     tokens, skills, mcp, no_init = 0, [], [], False
     snapshots = [vaultdiff.snapshot(ws)]
@@ -306,14 +487,14 @@ def play(ws: Path, sessions: list, model: str | None, timeout: int, env: dict) -
         transcript.append({"role": "human", "text": text, "session": n})
         resumed = session
         try:
-            proc = subprocess.run(session_argv(text, resume=resumed, model=model),
+            proc = subprocess.run(adapter.session_argv(text, resume=resumed, model=model),
                                   cwd=ws, capture_output=True, text=True,
                                   timeout=timeout, env=env)
         except subprocess.TimeoutExpired:
             error = f"turn {len(snapshots)} timed out after {timeout}s"
             break
         try:
-            turn = read_turn(proc.stdout)
+            turn = adapter.read_turn(proc.stdout, env=env)
         except ValueError:
             error = (proc.stderr or proc.stdout)[-2000:] or NO_OUTPUT
             break
@@ -321,7 +502,7 @@ def play(ws: Path, sessions: list, model: str | None, timeout: int, env: dict) -
             error = turn["error"] or (proc.stderr or "")[-2000:] or "non-zero exit"
             break
         if resumed and turn["session_id"] != resumed:
-            error = (f"turn {len(snapshots)} did not resume {resumed}: qwen answered as "
+            error = (f"turn {len(snapshots)} did not resume {resumed}: {adapter.name} answered as "
                      f"{turn['session_id']}")
             break
         no_init = no_init or not turn["init_reported"]
@@ -372,31 +553,33 @@ def apply_judge(scored: dict, verdict: dict, pass_at) -> dict:
     return scored
 
 
-def judge(transcript: list, rubric: Path, model: str | None, timeout: int, env: dict) -> dict:
+def judge(transcript: list, rubric: Path, model: str | None, timeout: int, env: dict, adapter=None) -> dict:
     """The part a regex can't decide, such as whether a reply takes a position.
 
     A reply with nothing to read graded the pipe rather than the transcript, so the judge
     is asked once more before its answer is believed — the rule an empty turn already gets
     (`run_with_retry`). Two broken asks is a real event: the verdict says `asks: 2`."""
-    verdict = ask_judge(transcript, rubric, model, timeout, env)
+    adapter = adapter or QWEN
+    verdict = ask_judge(transcript, rubric, model, timeout, env, adapter=adapter)
     if "score" in verdict:
         return verdict
-    second = ask_judge(transcript, rubric, model, timeout, env)
+    second = ask_judge(transcript, rubric, model, timeout, env, adapter=adapter)
     return second if "score" in second else {**second, "asks": 2}
 
 
 def ask_judge(transcript: list, rubric: Path, model: str | None, timeout: int,
-              env: dict) -> dict:
+              env: dict, adapter=None) -> dict:
     """One ask. On failure returns {"error": ...} so a broken judge shows up in the report.
 
     The transcript arrives in the prompt, so the judge needs no tools: `judge_argv`
     runs it read-only, and a judge that could edit the vault would grade its own work."""
+    adapter = adapter or QWEN
     prompt = (f"{rubric.read_text()}\n\n---\n\nThe transcript under review:\n\n"
               f"{render_transcript(transcript)}\n\nReturn ONLY a JSON object.")
     try:
-        proc = subprocess.run(judge_argv(prompt, model), capture_output=True, text=True,
+        proc = subprocess.run(adapter.judge_argv(prompt, model, env=env), capture_output=True, text=True,
                               timeout=timeout, cwd=tempfile.gettempdir(), env=env)
-        turn = read_turn(proc.stdout)
+        turn = adapter.read_turn(proc.stdout)
         if proc.returncode != 0 or turn["is_error"]:
             return {"error": turn["error"] or "non-zero exit"}
         text = turn["text"]
@@ -443,9 +626,10 @@ def save_summary(outdir: Path, summary: dict) -> None:
     os.replace(side, outdir / "summary.json")
 
 
-def run_case(case: dict, skill: Path, args, tmp: Path, outdir: Path, env: dict) -> dict:
-    ws = build_vault(tmp, case, skill, args.name)
-    session = play(ws, case_sessions(case), args.model, args.timeout, env)
+def run_case(case: dict, skill: Path, args, tmp: Path, outdir: Path, env: dict, adapter=None) -> dict:
+    adapter = adapter or QWEN
+    ws = build_vault(tmp, case, skill, args.name, adapter=adapter)
+    session = play(ws, case_sessions(case), args.model, args.timeout, env, adapter=adapter)
     snaps = session["snapshots"]
     d = vaultdiff.diff(snaps[0], snaps[-1])
     ev = graders.Evidence(transcript=session["transcript"], diff=d,
@@ -469,14 +653,14 @@ def run_case(case: dict, skill: Path, args, tmp: Path, outdir: Path, env: dict) 
     elif args.judge and spec and not session["error"]:
         rubric, pass_at = spec
         apply_judge(scored, judge(session["transcript"], rubric, args.judge_model,
-                                  args.timeout, env), pass_at)
+                                  args.timeout, env, adapter=adapter), pass_at)
     keep(outdir, case, session, d, scored)
     return {"case": case["id"], **scored, "error": session["error"],
             "tokens": session["tokens"], "seconds": session["seconds"]}
 
 
 def transport_flake(row: dict) -> bool:
-    """Whether this case never reached the model at all: qwen printed nothing, spent no
+    """Whether this case never reached the model at all: the agent printed nothing, spent no
     tokens, and so graded no skill. Observed when several runs share one quota. A turn
     that timed out, exited non-zero, or ran and misbehaved is not this — the second is
     the case's own verdict and must not be retried away."""
@@ -561,14 +745,14 @@ def scored_skill(summary: dict) -> str:
 
 
 def promote(summary: dict, stable: Path, candidate: Path, case_ids: list,
-            skill_name: str) -> str | None:
+            skill_name: str, executing_agent: str = BINARY) -> str | None:
     """Copy the named skill's candidate over its stable, on the evidence of a saved
     two-arm run of that skill made by the agent this harness drives. Returns why it
     refused, or None once stable has been replaced."""
     arms = summary.get("arms") or {}
     ran_by = summary.get("agent") or "unknown"
-    if ran_by != BINARY:
-        return (f"this run was made by {ran_by!r}, not {BINARY!r}; its evidence is about "
+    if ran_by != executing_agent:
+        return (f"this run was made by {ran_by!r}, not {executing_agent!r}; its evidence is about "
                 f"another agent — run both arms again")
     if scored_skill(summary) != skill_name:
         return f"this run scored {scored_skill(summary)!r}, not {skill_name!r}"
@@ -642,7 +826,7 @@ def comparison_table(rows: list) -> str:
     return "\n".join(lines)
 
 
-def latest_run(skill_name: str, results: Path = RESULTS) -> Path | None:
+def latest_run(skill_name: str, results: Path = RESULTS, agent: str = BINARY) -> Path | None:
     """The newest saved run that scored both arms of the named skill, so a quick
     one-arm run, or a run of another skill, made after it doesn't hide it."""
     runs = []
@@ -651,13 +835,14 @@ def latest_run(skill_name: str, results: Path = RESULTS) -> Path | None:
             saved = json.loads(summary.read_text())
         except (OSError, json.JSONDecodeError):
             continue
-        if scored_skill(saved) == skill_name and set(saved.get("arms") or {}) == {"stable", "candidate"}:
+        if (scored_skill(saved) == skill_name and saved.get("agent", BINARY) == agent
+                and set(saved.get("arms") or {}) == {"stable", "candidate"}):
             runs.append(summary)
     return max(runs, key=lambda s: s.stat().st_mtime).parent if runs else None
 
 
-def run_promote(skill_name: str, run: Path | None, cases: list) -> int:
-    run = run or latest_run(skill_name)
+def run_promote(skill_name: str, run: Path | None, cases: list, agent: str = BINARY) -> int:
+    run = run or latest_run(skill_name, agent=agent)
     if not run or not (run / "summary.json").exists():
         print(f"error: no saved two-arm run of {skill_name} to promote from; "
               f"run {skill_name} --arm both", file=sys.stderr)
@@ -665,7 +850,7 @@ def run_promote(skill_name: str, run: Path | None, cases: list) -> int:
     summary = json.loads((run / "summary.json").read_text())
     arms = arms_for(skill_name)
     problem = promote(summary, arms["stable"], arms["candidate"],
-                      [c["id"] for c in cases], skill_name)
+                      [c["id"] for c in cases], skill_name, executing_agent=agent)
     if problem:
         print(f"not promoted ({run.name}): {problem}", file=sys.stderr)
         return 1
@@ -680,6 +865,8 @@ def main() -> int:
     ap.add_argument("name", nargs="?", default=DEFAULT_SKILL, metavar="SKILL",
                     help="the Library skill to score: its arms are skills/SKILL and "
                          "labs/SKILL, its cases cases/SKILL.json (default: companion)")
+    ap.add_argument("--agent", choices=sorted(PROCESS_ADAPTERS), default=QWEN.name,
+                    help="agent process adapter to install and invoke (default: qwen)")
     ap.add_argument("--case", help="run only cases whose id contains this")
     ap.add_argument("--arm", choices=["stable", "candidate", "both"],
                     help="which copy of the skill to score (default: stable)")
@@ -688,14 +875,15 @@ def main() -> int:
     ap.add_argument("--promote", nargs="?", const="", metavar="RUN",
                     help="copy the candidate over stable on the evidence of a saved "
                          "two-arm run (default: the latest under results/), then exit")
-    ap.add_argument("--model", help="model for the session under test (default: the one "
-                                    "your qwen settings pick)")
-    ap.add_argument("--judge-model", help="model for the judge (default: the one your "
-                                          "qwen settings pick)")
+    ap.add_argument("--model", help="model for the session under test (default: the selected "
+                                    "agent's configured model)")
+    ap.add_argument("--judge-model", help="model for the judge (default: the selected agent's "
+                                          "configured model)")
     ap.add_argument("--no-judge", dest="judge", action="store_false", default=True)
     ap.add_argument("--timeout", type=int, default=600, help="seconds per turn")
     ap.add_argument("--output-dir", help="default: labs/evals/results/<timestamp>")
     args = ap.parse_args()
+    adapter = process_adapter(args.agent)
 
     try:
         all_cases = load_cases(args.name)
@@ -704,7 +892,7 @@ def main() -> int:
         return 2
     if args.promote is not None:
         return run_promote(args.name, Path(args.promote) if args.promote else None,
-                           all_cases)
+                           all_cases, agent=adapter.name)
 
     if args.skill and args.arm:
         print("error: --skill and --arm are alternatives", file=sys.stderr)
@@ -720,12 +908,12 @@ def main() -> int:
         if not (skill / "SKILL.md").exists():
             print(f"error: no SKILL.md for {name} in {skill}", file=sys.stderr)
             return 2
-    if not shutil.which(BINARY):
-        print(f"error: `{BINARY}` not on PATH", file=sys.stderr)
+    if not shutil.which(adapter.binary):
+        print(f"error: `{adapter.binary}` not on PATH", file=sys.stderr)
         return 2
-    if not login_found(real_home(), os.environ):
-        print(f"error: no {BINARY} login to seed a run with — sign in first, or set the "
-              f"API key your {BINARY} settings use", file=sys.stderr)
+    if not adapter.login_found(adapter.real_home(), os.environ):
+        print(f"error: no {adapter.binary} login to seed a run with — sign in first, or set the "
+              f"API key your {adapter.binary} settings use", file=sys.stderr)
         return 2
 
     cases = [c for c in all_cases if args.case in c["id"]] if args.case else all_cases
@@ -742,12 +930,12 @@ def main() -> int:
               else RESULTS / datetime.now().strftime("%Y-%m-%d_%H%M%S"))
     outdir.mkdir(parents=True, exist_ok=True)
 
-    summary = {"skill": args.name, "agent": BINARY, "arms": {}, "case_filter": args.case,
+    summary = {"skill": args.name, "agent": adapter.name, "arms": {}, "case_filter": args.case,
                "judge": args.judge}
     with tempfile.TemporaryDirectory(prefix=f"{args.name}-evals-") as tmpdir:
         # One isolated home for the run: it holds the login and the session history
         # every resume reads back, and nothing of the developer's own.
-        env = agent_env(make_isolated_home(Path(tmpdir), real_home()))
+        env = adapter.agent_env(adapter.make_isolated_home(Path(tmpdir), adapter.real_home()))
         for name, skill in arms.items():
             where = skill.relative_to(REPO) if skill.is_relative_to(REPO) else skill
             print(f"\n{name}: {where}")
@@ -759,7 +947,7 @@ def main() -> int:
                 def attempt(n, case=case):
                     return run_case(case, skill, args,
                                     case_workspace(Path(tmpdir), name, n),
-                                    outdir / name, env)
+                                    outdir / name, env, adapter=adapter)
 
                 row = run_with_retry(attempt)
                 if row["attempts"] > 1:

@@ -93,6 +93,8 @@ Claude sessions can therefore identify another active session; this fallback is 
 reliable per-process identity mechanism. Qwen identity comes from the session environment
 its CLI exports, so parallel Qwen sessions are told apart; with no session environment,
 `current-session` reports `unavailable` and a note is still filed without an identity.
+Kimi identity comes from `KIMI_CODE_SESSION_ID` and `KIMI_CODE_WORKSPACE_ID`; both opaque values
+are retained in current identity, and the workspace ID is retained in the note when present.
 
 ### Multi-session
 
@@ -133,6 +135,17 @@ command sent to the model, or a Skill tool call), so an empty skills line is not
 that none was used. No process registry, credential file, or generated memory index is
 read; an empty store is a data-availability warning, not an empty history.
 
+Kimi discovery reads `$KIMI_CODE_HOME/session_index.jsonl` (default `~/.kimi-code`), using
+`$KIMI_CODE_HOME/sessions/<workspaceId>/<sessionId>/` as the storage fallback. Only
+`agents/main/wire.jsonl` is a session's main event stream; subagent wire files are never sessions
+or human evidence. Native `turn.prompt` and `turn.steer` origins distinguish human input from
+tasks, injections, Skill activations, and other system-originated input. Native `skill.activated`
+events and activation origins supply Skill evidence where available. `state.json` supplies titles
+and the originating working directory; a workspace bucket is never reverse-decoded into a path.
+Unknown events are tolerated, malformed metadata and wire records produce warnings, and missing
+identity does not prevent a note. Persistent print sessions are included; unavailable or damaged
+native metadata is disclosed as a data limitation.
+
 ## Prepare the report
 
 Read the current destination state by passing up to seven retro_candidate objects through
@@ -154,8 +167,9 @@ Retro candidate destination fields:
 - **Memory:** kebab-case `name`, `title`, `description`, `memory_type`
   (`user`, `feedback`, `project`, or `reference`), exact body `text`, and for
   feedback/project memories the `why` and `how_to_apply` lines. Memory is a Claude
-  destination: where capabilities omit it, propose the observation as a Rule or an Issue
-  instead, and never write a generated memory index.
+  destination: where capabilities omit it, never write a generated memory index. Qwen may
+  surface the observation as a Rule or Issue for human review; for Kimi, do not silently recast a
+  durable observation as an instruction.
 - **Rule:** exact insertion `text`; optional exact `anchor` after which to insert. Which file
   a Rule lands in is the adapter's own `rule_destinations` answer in `capabilities`, always
   inside the originating project. `scope: "cross_tool"` selects the generic
@@ -265,7 +279,8 @@ The shared Retro inbox is `~/.retrospective/inbox.jsonl`. Set
 `RETROSPECTIVE_STATE_DIR` to use a different parent directory. Reviewed and declined
 state use `reviewed.txt` and `declined.txt` there. Reviewed identities are
 `<adapter>:<complete opaque session ID>`; legacy bare UUIDs remain Claude IDs.
-Declined keys and notes are shared across adapters.
+Declined keys and notes are shared across adapters. Kimi notes may also carry the complete
+native `workspace_id`; no session or workspace ID is truncated in state.
 
 Manual state operations remain available:
 

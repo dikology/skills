@@ -120,6 +120,8 @@ def render_digest(
             ]
         )
         lines.append(f"- session-id: {session['session_id']}")
+        if session.get("workspace_id"):
+            lines.append(f"- workspace-id: {session['workspace_id']}")
         tools = " ".join(
             f"{name}×{count}" for name, count in session["tools"].most_common(8)
         )

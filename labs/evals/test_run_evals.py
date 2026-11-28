@@ -291,6 +291,109 @@ class RunIntegrity(unittest.TestCase):
         self.assertIn("MCP", problem)
 
 
+class KimiProcessAdapter(unittest.TestCase):
+    def test_kimi_uses_native_print_resume_install_and_stream_evidence(self):
+        adapter = run_evals.process_adapter("kimi")
+        argv = adapter.session_argv("review the native session", resume="session-1", model="kimi-for-coding")
+        self.assertEqual(argv[0], "kimi")
+        self.assertEqual(argv[argv.index("-p") + 1], "review the native session")
+        self.assertEqual(argv[argv.index("--output-format") + 1], "stream-json")
+        self.assertEqual(argv[argv.index("-S") + 1], "session-1")
+        self.assertEqual(argv[argv.index("-m") + 1], "kimi-for-coding")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill = root / "skill"
+            (skill / "scripts").mkdir(parents=True)
+            (skill / "SKILL.md").write_text("synthetic\n")
+            case = {"id": "x", "vault": "band-or-pottery", "overlay": None}
+            ws = run_evals.build_vault(root, case, skill, "retrospective", adapter=adapter)
+            self.assertTrue((ws / ".kimi-code" / "skills" / "retrospective" / "SKILL.md").is_file())
+            home = adapter.make_isolated_home(root, root / "unused-real-home")
+            env = adapter.agent_env(home)
+            self.assertEqual(env["KIMI_CODE_HOME"], str(home))
+            self.assertEqual(env["HOME"], str(root / "os-home"))
+            self.assertEqual(env["KIMI_DISABLE_TELEMETRY"], "1")
+
+        output = "\n".join([
+            json.dumps({"role": "meta", "type": "system.version", "version": "2.7.2"}),
+            json.dumps({"role": "assistant", "content": "Native reply", "tool_calls": [{
+                "type": "function", "id": "call-1",
+                "function": {"name": "Skill", "arguments": "{\"skill\":\"retrospective\"}"},
+            }]}),
+            json.dumps({"role": "meta", "type": "session.resume_hint", "session_id": "session-1"}),
+        ]) + "\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            home = adapter.make_isolated_home(Path(tmp), Path(tmp) / "real")
+            turn = adapter.read_turn(output, env=adapter.agent_env(home))
+            self.assertEqual(turn["text"], "Native reply")
+            self.assertEqual(turn["session_id"], "session-1")
+            self.assertEqual(turn["skills"], ["retrospective"])
+            self.assertFalse(turn["is_error"])
+            self.assertTrue(turn["init_reported"])
+            self.assertEqual(turn["mcp_servers"], [])
+
+    def test_kimi_turns_resume_the_same_native_session(self):
+        adapter = run_evals.process_adapter("kimi")
+        calls = []
+
+        def output(text, session_id):
+            return "\n".join([
+                json.dumps({"role": "meta", "type": "system.version", "version": "2.7.2"}),
+                json.dumps({"role": "assistant", "content": text}),
+                json.dumps({"role": "meta", "type": "session.resume_hint", "session_id": session_id}),
+            ]) + "\n"
+
+        replies = iter([output("one", "session-1"), output("two", "session-1")])
+        def fake_run(argv, **kwargs):
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0, next(replies), "")
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
+            run_evals.subprocess, "run", side_effect=fake_run,
+        ):
+            session = run_evals.play(Path(tmp), [["first", "second"]], None, 60, {}, adapter=adapter)
+
+        self.assertIsNone(session["error"])
+        self.assertEqual(session["session_ids"], ["session-1"])
+        self.assertEqual(calls[1][calls[1].index("-S") + 1], "session-1")
+        self.assertEqual([t["text"] for t in session["transcript"]], ["first", "one", "second", "two"])
+
+    def test_kimi_mcp_evidence_comes_from_the_isolated_configuration(self):
+        adapter = run_evals.process_adapter("kimi")
+        output = "\n".join([
+            json.dumps({"role": "meta", "type": "system.version", "version": "2.7.2"}),
+            json.dumps({"role": "assistant", "content": "done"}),
+            json.dumps({"role": "meta", "type": "session.resume_hint", "session_id": "session-1"}),
+        ]) + "\n"
+        self.assertFalse(adapter.read_turn(output)["init_reported"])
+        with tempfile.TemporaryDirectory() as tmp:
+            home = adapter.make_isolated_home(Path(tmp), Path(tmp) / "real")
+            env = adapter.agent_env(home)
+            clean = adapter.read_turn(output, env=env)
+            self.assertTrue(clean["init_reported"])
+            self.assertEqual(clean["mcp_servers"], [])
+            (home / "mcp.json").write_text('{"mcpServers": {"live-server": {}}}\n', encoding="utf-8")
+            contaminated = adapter.read_turn(output, env=env)
+            self.assertEqual(contaminated["mcp_servers"], ["live-server"])
+            session = {
+                "skills_invoked": ["retrospective"], "mcp_servers": contaminated["mcp_servers"],
+                "init_reported": True,
+            }
+            self.assertIn("MCP", run_evals.check_run("retrospective", session))
+
+    def test_kimi_judge_has_no_tools(self):
+        adapter = run_evals.process_adapter("kimi")
+        with tempfile.TemporaryDirectory() as tmp:
+            home = adapter.make_isolated_home(Path(tmp), Path(tmp) / "real")
+            env = adapter.agent_env(home)
+            argv = adapter.judge_argv("rubric", env=env)
+            agent_file = Path(argv[argv.index("--agent-file") + 1])
+            self.assertTrue(agent_file.is_file())
+            self.assertIn("tools: []", agent_file.read_text(encoding="utf-8"))
+            self.assertNotIn("--plan", argv)
+
+
 class SessionTurn(unittest.TestCase):
     """The process adapter: one place holds the binary and every flag a turn needs."""
 
@@ -325,11 +428,10 @@ class SessionTurn(unittest.TestCase):
         self.assertNotIn("-m", run_evals.session_argv("x"))
 
     def test_no_flag_of_the_agent_this_harness_left_behind_survives(self):
-        """The runner drives one agent. Its `CLAUDE.md` stays a filename, not a CLI."""
+        """Claude remains absent; Kimi's native --output-format is now intentional."""
         source = Path(run_evals.__file__).read_text()
         for gone in ("claude", "--permission-mode", "--strict-mcp-config",
-                     "--setting-sources", "--output-format", "--resume ",
-                     "total_cost_usd"):
+                     "--setting-sources", "--resume ", "total_cost_usd"):
             self.assertNotIn(gone, source)
 
 
@@ -665,9 +767,9 @@ class Promote(unittest.TestCase):
         s.update(over)
         return s
 
-    def promote(self, summary, case_ids=("orient", "voice")):
+    def promote(self, summary, case_ids=("orient", "voice"), executing_agent="qwen"):
         return run_evals.promote(summary, self.stable, self.candidate, list(case_ids),
-                                 "companion")
+                                 "companion", executing_agent=executing_agent)
 
     def winning(self) -> dict:
         return self.summary([row("orient", True, 0.5), row("voice", True, 1.0)],
@@ -722,6 +824,11 @@ class Promote(unittest.TestCase):
 
     def test_refuses_a_run_of_another_skill(self):
         self.assertRefused(self.promote({**self.winning(), "skill": "improve"}), "improve")
+
+    def test_kimi_evidence_can_promote_only_as_kimi(self):
+        saved = {**self.winning(), "agent": "kimi"}
+        self.assertRefused(self.promote(saved), "kimi")
+        self.assertIsNone(self.promote(saved, executing_agent="kimi"))
 
     def test_refuses_evidence_gathered_by_another_agent(self):
         """A saved run from the claude days scores the same folders and hashes the

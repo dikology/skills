@@ -9,6 +9,7 @@ python3 labs/evals/run_evals.py                         # companion, every case,
 python3 labs/evals/run_evals.py <skill>                 # any Library skill, by name
 python3 labs/evals/run_evals.py <skill> --arm both      # stable and candidate, compared case by case
 python3 labs/evals/run_evals.py <skill> --promote       # candidate -> stable, if it lost nothing
+python3 labs/evals/run_evals.py companion --agent kimi  # the same harness through native Kimi print mode
 python3 labs/evals/span_audit.py labs/evals/results/<run>   # every mark in a saved run, graded or not
 python3 -m unittest discover -s labs/evals -v           # harness's own tests: graders, runner, audit (no API calls)
 ```
@@ -21,10 +22,10 @@ command below without a name runs companion. The name decides three things:
 - **The arms**: Stable is `skills/<skill>/`, Candidate is `labs/<skill>/`.
 - **The cases**: `cases/<skill>.json`, the skill's own case set. A name with no
   case set is a setup error.
-- **The install path**: the skill is copied into each temp vault as
-  `.qwen/skills/<skill>/`, so `/<skill>` invokes it — the folder qwen looks for,
-  which is not the folder the plugin ships into. That holds for `--skill`
-  too: a mutant folder is installed under the skill's name, not its own.
+- **The install path**: the skill is copied into each temp vault's native project Skill folder:
+  `.qwen/skills/<skill>/` for Qwen (the default), `.kimi-code/skills/<skill>/` with
+  `--agent kimi`. That holds for `--skill` too: a mutant folder is installed under the skill's
+  name, not its own.
 
 A run saved before the harness took a name counts as a companion run.
 
@@ -33,9 +34,10 @@ so `--promote improve` would read `improve` as one.
 
 Fixture vaults, graders and judge rubrics are shared; a case names the ones it uses.
 
-Requires `qwen` on PATH, and a qwen that can reach a model with its own settings —
-the run seeds an isolated `QWEN_HOME` from those settings and nothing else. Python
-3.9+, standard library only.
+Requires the selected agent on PATH and a login it can use. Qwen is the default; `--agent kimi`
+uses native `kimi -p --output-format stream-json` and `-S <session-id>` resume. The run records
+the selected agent in `summary.json`, and only evidence from that same agent can promote a skill.
+Python 3.9+, standard library only.
 
 ## The loop: edit the candidate, compare, promote
 
@@ -69,8 +71,8 @@ For each case in `cases/<skill>.json`:
 
 1. Copy `fixtures/vaults/<vault>/` to a temp directory and append the case's
    Overlay to its `CLAUDE.md`.
-2. Install the skill under `.qwen/skills/<skill>/`, unmodified, the way a
-   Consuming vault installs it.
+2. Install the skill under the selected agent's native project Skill folder, unmodified, the way
+   a Consuming vault installs it.
 3. Play each session's human turns in headless `qwen`, resuming the session
    for each turn after the first and starting fresh for the next session. Every
    turn runs against a `QWEN_HOME` the run made for itself, seeded with nothing
@@ -83,7 +85,10 @@ For each case in `cases/<skill>.json`:
    login arrives. A turn that loaded an MCP server anyway, reported no session
    setup, never invoked the skill, or answered as a different session than the one
    it was told to resume, fails the case — a reply that merely looks like the
-   skill is not evidence.
+   skill is not evidence. Kimi uses an isolated `KIMI_CODE_HOME` plus an isolated OS `HOME`, so
+   generic `~/.agents` resources are controlled too; telemetry and auto-update are off, MCP is
+   empty, and its judge is a native agent profile with `tools: []`. Kimi's stream has no token
+   usage event, so Kimi runs report zero tokens rather than inventing a count.
 4. Snapshot the vault before the first turn and after every turn, then grade the
    **transcript**, the **vault diff** and, where order matters (first-run setup,
    one log line per session), the snapshots between turns.
@@ -261,16 +266,19 @@ tests beside the harness rather than cases in `cases/`:
 ```
 python3 -m unittest discover -s labs/evals      # offline: the harness and every adapter suite
 RETROSPECTIVE_QWEN_LIVE=1 python3 -u -m unittest labs.evals.test_retrospective_qwen_live -v
+RETROSPECTIVE_KIMI_LIVE=1 python3 -u -m unittest labs.evals.test_retrospective_kimi_live -v
 ```
 
 `test_retrospective.py` holds the neutral core and state, `test_retrospective_claude.py` the
 Claude adapter, `test_retrospective_integration.py` the whole workflow against a synthetic
-Claude home, and `test_retrospective_qwen.py` the Qwen adapter against synthetic Qwen 0.28.3
-transcripts. The live check is skipped by default: it spends a real model session, and one
-session says what came out rather than what the copy is. It builds its own isolated
-`QWEN_HOME`, its own retrospective state, its own destination files, and a `gh` that only
-ever logs, so the run touches no real conversation, credential, memory, retrospective state,
-or GitHub.
+Claude home, `test_retrospective_qwen.py` the Qwen 0.28.3 adapter, and
+`test_retrospective_kimi.py` the Kimi Code 2.7.2 adapter against synthetic native storage and
+wire events. Live checks are skipped by default: they spend real model sessions, and one session
+says what came out rather than what the copy is. Each builds its own native home, retrospective
+state and destinations, and a `gh` that only ever logs. The Kimi check also controls the OS home
+behind generic `.agents` resources and requires a 2.7.2 executable; set
+`RETROSPECTIVE_KIMI_BINARY` when another version is on PATH. No real conversation, memory,
+retrospective state, or GitHub destination is read or written.
 
 ## Fixture vaults
 

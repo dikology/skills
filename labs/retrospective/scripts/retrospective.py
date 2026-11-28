@@ -49,6 +49,8 @@ def save_note(adapter, adapter_name, text, context):
         "text": text,
         "context": context,
     }
+    if identity.get("workspace_id"):
+        note["workspace_id"] = identity["workspace_id"]
     with state_lock() as state:
         inbox = state / "inbox.jsonl"
         append_lines(inbox, [json.dumps(note, ensure_ascii=False, sort_keys=True)])
@@ -211,6 +213,8 @@ def selected_adapter_name(requested):
         return "claude"
     if os.environ.get("QWEN_CODE_SESSION_ID") or os.environ.get("QWEN_CODE") == "1":
         return "qwen"
+    if os.environ.get("KIMI_CODE_SESSION_ID") or os.environ.get("KIMI_CODE_WORKSPACE_ID"):
+        return "kimi"
     return None
 
 

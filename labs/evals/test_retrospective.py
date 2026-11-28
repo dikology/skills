@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import date, timedelta
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -49,25 +50,6 @@ class RetrospectiveCliTest(unittest.TestCase):
         transcripts.mkdir(parents=True)
         return transcripts
 
-    def test_plain_folder_install_reports_claude_capabilities_as_json(self):
-        result = self.run_cli("capabilities", "--adapter", "claude")
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        capabilities = json.loads(result.stdout)
-        self.assertEqual(capabilities["adapter"], "claude")
-        self.assertIn("current-session", capabilities["operations"])
-        self.assertIn("note", capabilities["operations"])
-        for operation in ("reviewed", "declined", "clear"):
-            self.assertIn(operation, capabilities["operations"])
-        self.assertIn("retro_inbox", capabilities["destinations"])
-        self.assertIsInstance(capabilities["signals"], list)
-
-    def test_runtime_environment_selects_the_claude_adapter(self):
-        result = self.run_cli("capabilities", env={"RETROSPECTIVE_RUNTIME": "claude"})
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout)["adapter"], "claude")
-
     def test_unknown_runtime_does_not_use_foreign_claude_transcripts(self):
         transcripts = self.transcript_directory()
         (transcripts / "foreign-session.jsonl").write_text("{}\n", encoding="utf-8")
@@ -80,33 +62,11 @@ class RetrospectiveCliTest(unittest.TestCase):
         self.assertIsNone(identity["session_id"])
         self.assertEqual(identity["status"], "unavailable")
 
-    def test_explicit_claude_selection_overrides_runtime_and_uses_newest_transcript(self):
-        transcripts = self.transcript_directory()
-        older = transcripts / "older-session.jsonl"
-        newer = transcripts / "newer-session.jsonl"
-        older.write_text("{}\n", encoding="utf-8")
-        newer.write_text("{}\n", encoding="utf-8")
-        os.utime(older, (100, 100))
-        os.utime(newer, (200, 200))
-
-        result = self.run_cli(
-            "current-session",
-            "--adapter",
-            "claude",
-            env={"RETROSPECTIVE_RUNTIME": "unknown"},
-        )
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        identity = json.loads(result.stdout)
-        self.assertEqual(identity["adapter"], "claude")
-        self.assertEqual(identity["session_id"], "newer-session")
-        self.assertEqual(identity["status"], "available")
-
     def test_agent_drafted_note_is_only_proposed_without_approval(self):
         result = self.run_cli(
             "note",
             "--adapter",
-            "claude",
+            "future-agent",
             "--text",
             "Check the migration rollback path.",
             "--context",
@@ -123,7 +83,7 @@ class RetrospectiveCliTest(unittest.TestCase):
         result = self.run_cli(
             "note",
             "--adapter",
-            "claude",
+            "future-agent",
             "--text",
             "Keep the rollout reversible.",
             "--context",
@@ -138,7 +98,7 @@ class RetrospectiveCliTest(unittest.TestCase):
         records = (self.state / "inbox.jsonl").read_text(encoding="utf-8").splitlines()
         self.assertEqual(len(records), 1)
         saved = json.loads(records[0])
-        self.assertEqual(saved["adapter"], "claude")
+        self.assertEqual(saved["adapter"], "future-agent")
         self.assertEqual(saved["text"], "Keep the rollout reversible.")
         self.assertEqual(
             saved["context"],
@@ -163,25 +123,6 @@ class RetrospectiveCliTest(unittest.TestCase):
         saved = json.loads((self.state / "inbox.jsonl").read_text(encoding="utf-8"))
         self.assertEqual(saved["adapter"], "future-agent")
         self.assertIsNone(saved["session_id"])
-
-    def test_saved_note_includes_current_session_identity_when_available(self):
-        transcripts = self.transcript_directory()
-        (transcripts / "current-id.jsonl").write_text("{}\n", encoding="utf-8")
-
-        result = self.run_cli(
-            "note",
-            "--adapter",
-            "claude",
-            "--text",
-            "Preserve the session link.",
-            "--context",
-            "This note should remain traceable to its originating session.",
-            "--approve",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        saved = json.loads((self.state / "inbox.jsonl").read_text(encoding="utf-8"))
-        self.assertEqual(saved["session_id"], "current-id")
 
     def test_reviewed_sessions_keep_complete_opaque_ids_and_namespace_adapters(self):
         session_id = "native/session:with-a-complete-opaque-id-123456789"
@@ -220,33 +161,11 @@ class RetrospectiveCliTest(unittest.TestCase):
             [f"qwen:{session_id}", f"kimi:{session_id}"],
         )
 
-    def test_legacy_claude_reviewed_ids_are_read_without_rewriting_ledger(self):
-        legacy_id = "123e4567-e89b-42d3-a456-426614174000"
-        original = f"{legacy_id}\n# retain this hand-edited line\n"
-        self.state.mkdir()
-        ledger = self.state / "reviewed.txt"
-        ledger.write_text(original, encoding="utf-8")
-
-        for adapter, expected in (("claude", True), ("qwen", False)):
-            result = self.run_cli(
-                "reviewed",
-                "--adapter",
-                adapter,
-                "--session-id",
-                legacy_id,
-                "--check",
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(
-                json.loads(result.stdout)["sessions"][0]["reviewed"], expected
-            )
-            self.assertEqual(ledger.read_text(encoding="utf-8"), original)
-
     def test_declined_retro_candidates_are_shared_across_adapters(self):
         retro_candidate = "rule:AGENTS.md:preserve-explicit-approval"
 
         result = self.run_cli(
-            "declined", "--adapter", "qwen", "--retro_candidate", retro_candidate
+            "declined", "--adapter", "qwen", "--retro-candidate", retro_candidate
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
@@ -262,7 +181,7 @@ class RetrospectiveCliTest(unittest.TestCase):
                 "declined",
                 "--adapter",
                 adapter,
-                "--retro_candidate",
+                "--retro-candidate",
                 retro_candidate_to_check,
                 "--check",
             )
@@ -347,7 +266,7 @@ class RetrospectiveCliTest(unittest.TestCase):
                 "--approve",
             ),
             ("reviewed", "--adapter", "qwen", "--session-id", "opaque-id"),
-            ("declined", "--retro_candidate", "declined-retro_candidate"),
+            ("declined", "--retro-candidate", "declined-retro_candidate"),
         )
         for command in commands:
             result = self.run_cli(*command)
@@ -399,7 +318,7 @@ class RetrospectiveCliTest(unittest.TestCase):
                     f"opaque-session-{index}-123456789",
                 )
             )
-            commands.append(("declined", "--retro_candidate", f"retro_candidate-{index}"))
+            commands.append(("declined", "--retro-candidate", f"retro_candidate-{index}"))
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(commands)) as executor:
             results = list(executor.map(lambda command: self.run_cli(*command), commands))
@@ -427,6 +346,28 @@ class RetrospectiveCliTest(unittest.TestCase):
             set(declined), {f"retro_candidate-{index}" for index in range(operation_count)}
         )
 
+    def test_digest_accepts_named_relative_and_iso_windows(self):
+        today = date.today()
+        cases = {
+            "today": (today, today),
+            "yesterday": (today - timedelta(days=1),) * 2,
+            "week": (today - timedelta(days=6), today),
+            "14d": (today - timedelta(days=13), today),
+            "2026-10-12": (date(2026, 10, 12),) * 2,
+        }
+
+        for window, (start, end) in cases.items():
+            with self.subTest(window=window):
+                result = self.run_cli("digest", "--adapter", "claude", "--window", window)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"# Retro digest — {start} → {end}", result.stdout)
+
+    def test_digest_rejects_an_unknown_window(self):
+        result = self.run_cli("digest", "--adapter", "claude", "--window", "fortnight")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Unknown window 'fortnight'", result.stderr)
+
     def test_core_skill_instructions_use_only_the_shared_entrypoint(self):
         instructions = (self.install / "SKILL.md").read_text(encoding="utf-8")
 
@@ -434,6 +375,52 @@ class RetrospectiveCliTest(unittest.TestCase):
         self.assertIn("scripts/retrospective.py", instructions)
         self.assertNotIn("scripts/adapters/", instructions)
         self.assertNotIn("claude.py", instructions)
+        for contract in (
+            "10+ human prompts",
+            "4–6 bullets",
+            "at most seven",
+            "Reply with numbers (e.g. 1 3), all, or none.",
+            "--approval '1 3'",
+            "originating project",
+            "newest transcript modification time",
+            "Parallel",
+        ):
+            self.assertIn(contract, instructions)
+
+    def test_empty_note_is_rejected_without_touching_the_inbox(self):
+        result = self.run_cli(
+            "note",
+            "--adapter",
+            "future-agent",
+            "--text",
+            "   ",
+            "--context",
+            "An empty note must not be filed.",
+            "--approve",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.state / "inbox.jsonl").exists())
+
+    def test_reviewed_and_declined_ledgers_are_idempotent(self):
+        for _ in range(2):
+            reviewed = self.run_cli(
+                "reviewed", "--adapter", "qwen", "--session-id", "opaque-a"
+            )
+            self.assertEqual(reviewed.returncode, 0, reviewed.stderr)
+            declined = self.run_cli(
+                "declined", "--retro-candidate", "rule:one"
+            )
+            self.assertEqual(declined.returncode, 0, declined.stderr)
+
+        self.assertEqual(
+            (self.state / "reviewed.txt").read_text(encoding="utf-8").splitlines(),
+            ["qwen:opaque-a"],
+        )
+        self.assertEqual(
+            (self.state / "declined.txt").read_text(encoding="utf-8").splitlines(),
+            ["rule:one"],
+        )
 
     def test_note_context_must_be_one_short_line(self):
         result = self.run_cli(

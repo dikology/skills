@@ -156,12 +156,12 @@ Retro candidate destination fields:
   feedback/project memories the `why` and `how_to_apply` lines. Memory is a Claude
   destination: where capabilities omit it, propose the observation as a Rule or an Issue
   instead, and never write a generated memory index.
-- **Rule:** exact insertion `text`; optional exact `anchor` after which to insert.
-  Claude selects the originating project's `AGENTS.md` when it exists, otherwise
-  `CLAUDE.md`. Qwen writes a Qwen-only rule to the originating project's `QWEN.md`, and
-  `scope: "cross_tool"` selects `AGENTS.md` for a rule meant for every agent. A personal or
-  global instruction file needs `scope: "global"` and `explicit_user_direction: true` — the
-  human's own request, never the run's inference.
+- **Rule:** exact insertion `text`; optional exact `anchor` after which to insert. Which file
+  a Rule lands in is the adapter's own `rule_destinations` answer in `capabilities`, always
+  inside the originating project. `scope: "cross_tool"` selects the generic
+  shared-instructions file, for a rule meant for every agent rather than this runtime alone.
+  `scope: "global"` selects a personal or global instruction file and additionally needs
+  `explicit_user_direction: true` — the human's own request, never the run's inference.
 - **Skill edit:** loaded Skill `name`, exact `old` source text, and exact replacement
   `text`. The adapter resolves symlinks to the canonical source. Plugin, built-in,
   extension, retrospective-self, and missing sources are never edited in place.
@@ -227,15 +227,14 @@ Close with exactly:
 
 ## Execute and finish bookkeeping
 
-The human's reply is the only approval. Do not confirm each item again. Execution uses
-the objects `report` returned, field for field: their `target` and `expected` contents are
-the conflict snapshot, and a candidate re-typed without them is refused as a conflict and
-writes nothing. When the approval arrives in a later turn than the report — so those objects
-are no longer in hand — save the `report` response to a file when the report is printed (for
-example `"$TMPDIR/retrospective-report.json"`) and pass its `retro_candidates` back
-unchanged. Pass every included
-retro_candidate in report order, the original numeric/`all`/`none` response, every
-session ID shown in the digest, and every Retro note ID shown:
+The human's reply is the only approval. Do not confirm each item again. Execution uses the
+objects `report` returned, field for field, copied from that response in this session's own
+context: their `target` and `expected` contents are the conflict snapshot, and a candidate
+re-typed without them is refused as a conflict and writes nothing. Those objects carry
+transcript text, so they stay in the conversation — never write them to a file, and never
+rebuild them from the report printed to me. Pass every included retro_candidate in report
+order, the original numeric/`all`/`none` response, every session ID shown in the digest, and
+every Retro note ID shown:
 
 ```bash
 python3 <entrypoint> execute [--adapter <name>] --approval '1 3' \

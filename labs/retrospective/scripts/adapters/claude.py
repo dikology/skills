@@ -37,6 +37,18 @@ CAPABILITIES = {
     ],
     "signals": ["current_session_identity", "insights_facets", "claude_reflect_queue"],
     "destinations": ["retro_inbox", "memory", "rule", "skill_edit", "issue"],
+    "unsupported_destinations": [],
+    "rule_destinations": {
+        "project": "AGENTS.md when it exists, otherwise CLAUDE.md",
+    },
+    "disclosures": [
+        "Current-session identity is the newest transcript by modification time, so a "
+        "parallel Claude session can be mistaken for this one.",
+        "The insights facets and claude-reflect queue are read-only; the queue is never "
+        "cleared.",
+        "Claude ignores a retro_candidate's Rule `scope`: a Rule is always the originating "
+        "project's shared instructions, never a personal or global file.",
+    ],
 }
 
 BUILTIN_COMMANDS = {
@@ -148,6 +160,7 @@ def parse_session(path):
     session = {
         "session_id": path.stem,
         "path": path,
+        "project_label": path.parent.name,
         "project_path": "",
         "title": "",
         "first": None,

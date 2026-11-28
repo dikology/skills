@@ -465,6 +465,30 @@ class QwenRetrospectiveCliTest(unittest.TestCase):
         self.assertIn("recording may be disabled", result.stderr)
         self.assertIn("data limitation", result.stderr)
 
+    def test_the_runtime_output_setting_moves_the_storage_root(self):
+        today = date.today().isoformat()
+        redirect = self.root / "runtime-redirect"
+        chats = redirect / "projects" / "-work-project" / "chats"
+        chats.mkdir(parents=True)
+        self.write_session("wwwwwwww-1111", rich_session(today), folder=chats)
+        settings = self.home / ".qwen" / "settings.json"
+        settings.parent.mkdir(parents=True, exist_ok=True)
+        settings.write_text(
+            json.dumps(
+                {
+                    "advanced": {"runtimeOutputDir": str(redirect)},
+                    "env": {"ANTHROPIC_API_KEY": "not-read-by-the-adapter"},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = self.digest("--window", "today")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("wwwwwwww", result.stdout)
+        self.assertNotIn("not-read-by-the-adapter", result.stdout + result.stderr)
+
     def test_qwen_home_and_runtime_dir_move_the_storage_root(self):
         today = date.today().isoformat()
         other = self.root / "redirected" / "projects" / "-work-project" / "chats"
@@ -492,6 +516,31 @@ class QwenRetrospectiveCliTest(unittest.TestCase):
 
     # --- current identity ---
 
+    def test_a_tool_call_that_never_ran_is_an_error_not_an_interruption(self):
+        today = date.today().isoformat()
+        self.write_session("vvvvvvvv-1111", [
+            human("first prompt", f"{today}T09:00:00Z"),
+            assistant(f"{today}T09:00:01Z", [("brand_new_tool", {})]),
+            tool_result(
+                f"{today}T09:00:02Z", status="error", execution="not_started",
+                error_type="tool_not_registered", error="Tool brand_new_tool is not registered",
+            ),
+            tool_result(
+                f"{today}T09:00:03Z", status="error", execution="not_started",
+                error_type="execution_denied", error="The human refused this command",
+            ),
+            tool_result(f"{today}T09:00:04Z", status="cancelled", execution="cancelled"),
+            human("keep going", f"{today}T09:00:05Z"),
+            human("and now", f"{today}T09:00:06Z"),
+        ])
+
+        result = self.digest("--window", "today")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("errors: 2 · interruptions: 1", result.stdout)
+        self.assertIn("- error: tool_not_registered: Tool brand_new_tool is not registered", result.stdout)
+        self.assertIn("- error: execution_denied: The human refused this command", result.stdout)
+
     def test_current_identity_comes_from_the_native_session_environment(self):
         chats = self.transcript_directory()
         self.write_session("pppppppp-1111", rich_session())
@@ -502,6 +551,7 @@ class QwenRetrospectiveCliTest(unittest.TestCase):
             env={
                 "QWEN_CODE_SESSION_ID": "pppppppp-1111",
                 "QWEN_CODE_PROJECT_DIR": str(chats.parent),
+                "QWEN_CODE_STARTUP_VERSION": "0.28.3",
             },
         )
 
@@ -511,6 +561,7 @@ class QwenRetrospectiveCliTest(unittest.TestCase):
         self.assertEqual(identity["session_id"], "pppppppp-1111")
         self.assertEqual(identity["status"], "available")
         self.assertEqual(identity["identity_source"], "environment")
+        self.assertEqual(identity["qwen_version"], "0.28.3")
         self.assertEqual(Path(identity["transcript_path"]).name, "pppppppp-1111.jsonl")
 
     def test_the_storage_root_is_the_documented_fallback_for_the_project_pointer(self):
@@ -619,7 +670,8 @@ class QwenRetrospectiveCliTest(unittest.TestCase):
             {"project": "QWEN.md", "cross_tool": "AGENTS.md", "global": "explicit user direction only"},
         )
         joined = " ".join(capabilities["disclosures"]).lower()
-        self.assertIn("skill attribution is incomplete", joined)
+        self.assertIn("skill attribution is partial", joined)
+        self.assertIn("custom slash command", joined)
         self.assertIn("subagent", joined)
         self.assertIn("recording", joined)
         for signal in capabilities["signals"]:
@@ -796,6 +848,31 @@ class QwenRetrospectiveCliTest(unittest.TestCase):
         self.assertEqual(extension.read_text(encoding="utf-8"), "# Grilling\n\nUpstream pack.\n")
         self.assertEqual(bundled.read_text(encoding="utf-8"), "# Bundled\n\nBuilt in.\n")
         self.assertTrue(installed.is_symlink())
+
+    def test_a_user_level_skill_source_is_the_editable_canonical(self):
+        canonical = self.home / ".agents" / "skills" / "reflect" / "SKILL.md"
+        canonical.parent.mkdir(parents=True)
+        canonical.write_text("# Reflect\n\nAsk what changed.\n", encoding="utf-8")
+        candidate = {
+            "type": "skill_edit", "key": "skill:reflect:user-level", "project": str(self.project),
+            "name": "reflect", "old": "Ask what changed.\n",
+            "text": "Ask what changed since the last review.\n",
+        }
+
+        prepared = self.prepare([candidate])[0]
+        self.assertEqual(prepared["status"], "ready")
+        self.assertEqual(Path(prepared["target"]), canonical.resolve())
+
+        result = self.run_cli(
+            "execute", "--adapter", "qwen", "--approval", "1",
+            "--retro-candidate", json.dumps(prepared),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["actions"][0]["status"], "saved")
+        self.assertEqual(
+            canonical.read_text(encoding="utf-8"),
+            "# Reflect\n\nAsk what changed since the last review.\n",
+        )
 
     def test_the_loaded_retrospective_skill_is_never_a_destination(self):
         before = (self.install / "SKILL.md").read_bytes()

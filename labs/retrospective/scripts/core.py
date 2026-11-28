@@ -139,7 +139,7 @@ def render_digest(
             )
         commands = session["signals"].get("slash_commands")
         if commands:
-            lines.append(f"- slash commands: {', '.join(commands[:8])}")
+            lines.append(f"- slash commands: {', '.join(commands)}")
         facets = session["signals"].get("insights_facets")
         if facets:
             lines.append(

@@ -61,15 +61,19 @@ CAPABILITIES = {
     "disclosures": [
         "Memory is unsupported: Qwen's generated memory indexes are never edited, and a "
         "Memory Retro candidate is reported rather than written.",
-        "Skill attribution is incomplete: only slash commands recorded as sent to the model "
-        "and Skill tool calls are counted, so a skill loaded another way leaves no trace.",
+        "Skill attribution is partial: it comes from slash commands recorded as sent to the "
+        "model and from Skill tool calls, so a Skill loaded another way leaves no trace and a "
+        "custom slash command can be counted as one. A headless run that invokes a Skill by "
+        "name records neither, so an empty skills line there proves nothing.",
         "Sessions exist only where transcript recording was enabled; an empty storage root is "
         "a data limitation, not an empty history.",
         "Subagent transcripts under projects/<slug>/subagents/ are not sessions and their "
         "contents are not merged into the parent session.",
         "The current session comes from QWEN_CODE_SESSION_ID, so parallel sessions are told "
         "apart; identity is unavailable when the CLI exported no session environment.",
-        "Verified on macOS with Qwen Code 0.28.3.",
+        "Shapes were read from Qwen Code 0.28.3 on macOS; no older or newer release is "
+        "claimed. `current-session` reports the running version, so a different one is "
+        "visible in the summary rather than assumed.",
     ],
 }
 
@@ -112,11 +116,32 @@ def qwen_home():
 def runtime_base():
     """Where Qwen writes runtime data (`projects/`, `tmp/`).
 
-    `QWEN_RUNTIME_DIR` takes priority over the config directory when it is set."""
+    `QWEN_RUNTIME_DIR` takes priority, then the `advanced.runtimeOutputDir` setting, then the
+    config directory. All three are documented in Qwen's own settings reference."""
     configured = os.environ.get("QWEN_RUNTIME_DIR")
     if configured:
         return Path(configured).expanduser()
+    redirect = configured_runtime_dir()
+    if redirect is not None:
+        return redirect
     return qwen_home()
+
+
+def configured_runtime_dir():
+    """Only `advanced.runtimeOutputDir` is read out of settings.json.
+
+    That file can hold secrets in other keys, so its contents are never returned, printed, or
+    carried into a warning."""
+    settings = qwen_home() / "settings.json"
+    try:
+        data = json.loads(settings.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    advanced = data.get("advanced") if isinstance(data, dict) else None
+    value = advanced.get("runtimeOutputDir") if isinstance(advanced, dict) else None
+    if isinstance(value, str) and value.strip():
+        return Path(value.strip().replace("~", str(Path.home()), 1))
+    return None
 
 
 def projects_root():
@@ -172,6 +197,9 @@ def current_session():
         "status": "available",
         "identity_source": "environment",
     }
+    version = (os.environ.get("QWEN_CODE_STARTUP_VERSION") or "").strip()
+    if version:
+        identity["qwen_version"] = version
     transcript = transcript_path(session_id)
     if transcript is not None:
         identity["transcript_path"] = str(transcript)
@@ -372,9 +400,13 @@ def parse_session(path):
             result = result if isinstance(result, dict) else {}
             status = result.get("status")
             execution = result.get("executionStatus")
-            if status == "cancelled" or execution in ("cancelled", "not_started"):
+            if status == "cancelled" or execution == "cancelled":
                 session["interruptions"] += 1
             elif status == "error" or execution == "error":
+                # 0.28.3 also reports `status: error` with `executionStatus: not_started`: the
+                # tool never ran because its params were invalid, it isn't registered, or the
+                # human refused it. That is a failed call, not the human stopping one, so it
+                # counts as an error and not as an interruption.
                 session["error_count"] += 1
                 if len(session["errors"]) < 3:
                     detail = " ".join(str(result.get("error") or "").split())
@@ -507,6 +539,7 @@ def find_skill(retro_candidate):
         for directory in (
             *(project / folder / "skills" for folder in SKILL_CONFIG_DIRS),
             home / "skills",
+            *(Path.home() / folder / "skills" for folder in SKILL_CONFIG_DIRS if folder != ".qwen"),
         )
     )
     return classify_skill_source(

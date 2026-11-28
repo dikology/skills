@@ -73,6 +73,12 @@ def parse_window(spec, today=None):
     return selected, selected
 
 
+def incomplete_attribution(session):
+    """Whether the adapter says its Skill evidence is partial rather than complete."""
+    attribution = session["signals"].get("skill_attribution")
+    return isinstance(attribution, dict) and attribution.get("complete") is False
+
+
 def render_digest(
     sessions,
     start,
@@ -101,7 +107,7 @@ def render_digest(
             project_name = (
                 Path(project_path).name
                 if project_path
-                else session["path"].parent.name
+                else session.get("project_label") or session["path"].parent.name
             )
             lines.extend(["", f"## {project_name} — {project_path or '?'} ({count})"])
         day = session["first"].astimezone().strftime("%Y-%m-%d") if session["first"] else "?"
@@ -122,7 +128,18 @@ def render_digest(
             f"interruptions: {session['interruptions']}"
         )
         if session["skills"]:
-            lines.append(f"- skills: {', '.join(session['skills'])}")
+            line = f"- skills: {', '.join(session['skills'])}"
+            if incomplete_attribution(session):
+                line += " (partial: recorded slash commands and Skill tool calls only)"
+            lines.append(line)
+        elif incomplete_attribution(session):
+            lines.append(
+                "- skills: none recorded; attribution is partial, so this is not proof "
+                "that no Skill was used"
+            )
+        commands = session["signals"].get("slash_commands")
+        if commands:
+            lines.append(f"- slash commands: {', '.join(commands[:8])}")
         facets = session["signals"].get("insights_facets")
         if facets:
             lines.append(

@@ -1,6 +1,6 @@
-from . import claude
+from . import claude, qwen
 
-ADAPTERS = {"claude": claude}
+ADAPTERS = {"claude": claude, "qwen": qwen}
 
 
 def get_adapter(name):

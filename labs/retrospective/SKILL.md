@@ -33,7 +33,8 @@ python3 <entrypoint> capabilities [--adapter <name>]
 
 The JSON response is the only machine-readable source of supported operations,
 signals, and destinations. Omit unsupported operations, signals, and destinations
-rather than substituting Claude-shaped behavior.
+rather than substituting Claude-shaped behavior. `disclosures` names each known
+limitation of that runtime; say which ones shaped the review in the final summary.
 
 ## Modes and modifiers
 
@@ -89,7 +90,9 @@ python3 <entrypoint> notes [--adapter <name>] --session-id '<complete ID>'
 If identity is unavailable, do not attribute other sessions' notes to this
 conversation. Claude identity uses the newest transcript modification time. Parallel
 Claude sessions can therefore identify another active session; this fallback is not a
-reliable per-process identity mechanism.
+reliable per-process identity mechanism. Qwen identity comes from the session environment
+its CLI exports, so parallel Qwen sessions are told apart; with no session environment,
+`current-session` reports `unavailable` and a note is still filed without an identity.
 
 ### Multi-session
 
@@ -118,6 +121,18 @@ Both stores are read-only. Never clear the reflect queue; if covered items remai
 mention `/claude-reflect:skip-reflect` in the final summary. Missing signal stores
 produce no empty signal sections.
 
+Qwen discovery reads its native transcript store — `projects/<slug>/chats/` under
+`$QWEN_RUNTIME_DIR`, else `$QWEN_HOME`, else `~/.qwen` — preferring the project folder the
+CLI points at and traversing that storage root when the pointer is absent. A slug is a
+lossy rendering of a path: the originating project comes from the transcript's own working
+directory records, never from the folder name, and a session whose project cannot be
+recovered still supports Insights while its project-bound writes stay blocked. Transcripts
+of delegated agents under `projects/<slug>/subagents/` are not sessions and add nothing to
+a human-prompt count. Qwen attributes a Skill only where the run recorded one (a slash
+command sent to the model, or a Skill tool call), so an empty skills line is not evidence
+that none was used. No process registry, credential file, or generated memory index is
+read; an empty store is a data-availability warning, not an empty history.
+
 ## Prepare the report
 
 Read the current destination state by passing up to seven retro_candidate objects through
@@ -138,10 +153,15 @@ Retro candidate destination fields:
 
 - **Memory:** kebab-case `name`, `title`, `description`, `memory_type`
   (`user`, `feedback`, `project`, or `reference`), exact body `text`, and for
-  feedback/project memories the `why` and `how_to_apply` lines.
+  feedback/project memories the `why` and `how_to_apply` lines. Memory is a Claude
+  destination: where capabilities omit it, propose the observation as a Rule or an Issue
+  instead, and never write a generated memory index.
 - **Rule:** exact insertion `text`; optional exact `anchor` after which to insert.
   Claude selects the originating project's `AGENTS.md` when it exists, otherwise
-  `CLAUDE.md`.
+  `CLAUDE.md`. Qwen writes a Qwen-only rule to the originating project's `QWEN.md`, and
+  `scope: "cross_tool"` selects `AGENTS.md` for a rule meant for every agent. A personal or
+  global instruction file needs `scope: "global"` and `explicit_user_direction: true` — the
+  human's own request, never the run's inference.
 - **Skill edit:** loaded Skill `name`, exact `old` source text, and exact replacement
   `text`. The adapter resolves symlinks to the canonical source. Plugin, built-in,
   extension, retrospective-self, and missing sources are never edited in place.
@@ -207,8 +227,14 @@ Close with exactly:
 
 ## Execute and finish bookkeeping
 
-The human's reply is the only approval. Do not confirm each item again. Pass every
-included retro_candidate in report order, the original numeric/`all`/`none` response, every
+The human's reply is the only approval. Do not confirm each item again. Execution uses
+the objects `report` returned, field for field: their `target` and `expected` contents are
+the conflict snapshot, and a candidate re-typed without them is refused as a conflict and
+writes nothing. When the approval arrives in a later turn than the report — so those objects
+are no longer in hand — save the `report` response to a file when the report is printed (for
+example `"$TMPDIR/retrospective-report.json"`) and pass its `retro_candidates` back
+unchanged. Pass every included
+retro_candidate in report order, the original numeric/`all`/`none` response, every
 session ID shown in the digest, and every Retro note ID shown:
 
 ```bash

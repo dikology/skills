@@ -4,11 +4,20 @@ import json
 import os
 from pathlib import Path
 import re
-import subprocess
-import tempfile
-from urllib.parse import urlparse
 
 from core import atomic_write
+from adapters.shared import (
+    classify_skill_source,
+    execute_issue,
+    execute_rule,
+    execute_skill_edit,
+    is_temp_project,
+    originating_project,
+    prepare_issue,
+    prepare_rule,
+    prepare_skill_edit,
+    read_optional,
+)
 
 
 CAPABILITIES = {
@@ -83,14 +92,6 @@ def session_exists(session_id):
 
 def encode_project(path):
     return re.sub(r"[^A-Za-z0-9-]", "-", str(Path(path).expanduser()))
-
-
-def is_temp_project(project_path):
-    if not project_path:
-        return False
-    path = Path(project_path).expanduser().resolve()
-    temp_roots = (Path(tempfile.gettempdir()).resolve(), Path("/private/var/folders"))
-    return any(path == root or root in path.parents for root in temp_roots)
 
 
 def timestamp(record):
@@ -326,20 +327,6 @@ def load_optional_signals(sessions, start, end):
     return {"claude_reflect_queue": items} if items else {}, warnings
 
 
-def originating_project(retro_candidate):
-    raw = retro_candidate.get("project")
-    if not isinstance(raw, str) or not raw.strip():
-        return None, "originating project is unavailable"
-    project = Path(raw).expanduser().resolve()
-    if not project.is_dir():
-        return None, f"originating project is unavailable: {project}"
-    return project, None
-
-
-def read_optional(path):
-    return path.read_text(encoding="utf-8") if path.exists() else None
-
-
 def memory_paths(retro_candidate):
     project, error = originating_project(retro_candidate)
     if error:
@@ -384,6 +371,9 @@ def rule_path(retro_candidate):
     return (generic if generic.exists() else project / "CLAUDE.md"), None
 
 
+UPSTREAM_PARTS = {"plugins", "extensions", "extension", "builtins", "builtin", "built-in"}
+
+
 def find_skill(retro_candidate):
     project, error = originating_project(retro_candidate)
     if error:
@@ -391,23 +381,15 @@ def find_skill(retro_candidate):
     name = retro_candidate.get("name", "")
     if retro_candidate.get("upstream") or ":" in name:
         return None, "upstream", f"Skill is upstream: {name}"
-    if not re.fullmatch(r"[A-Za-z0-9._-]+", name):
-        return None, "skipped", "invalid Skill name"
-    retro_candidates = (
-        project / ".claude" / "skills" / name / "SKILL.md",
-        claude_home() / "skills" / name / "SKILL.md",
+    return classify_skill_source(
+        name,
+        (
+            project / ".claude" / "skills" / name / "SKILL.md",
+            claude_home() / "skills" / name / "SKILL.md",
+        ),
+        UPSTREAM_PARTS,
+        (Path(__file__).resolve().parents[2],),
     )
-    installed = next((path for path in retro_candidates if path.exists()), None)
-    if installed is None:
-        return None, "skipped", f"Skill source not found: {name}"
-    resolved = installed.resolve()
-    upstream_parts = {"plugins", "extensions", "extension", "builtins", "builtin", "built-in"}
-    if any(part in upstream_parts for part in resolved.parts):
-        return None, "upstream", f"Skill is upstream: {name}"
-    retrospective_root = Path(__file__).resolve().parents[2]
-    if resolved == retrospective_root or retrospective_root in resolved.parents:
-        return None, "skipped", "retrospective's own Skill is not a write destination"
-    return resolved, "ready", None
 
 
 def prepare_retro_candidate(original):
@@ -443,61 +425,17 @@ def prepare_retro_candidate(original):
             return retro_candidate
         if retro_candidate_type == "rule":
             target, error = rule_path(retro_candidate)
-            if error:
-                retro_candidate.update(status="skipped", warning=error)
-                return retro_candidate
-            if not isinstance(retro_candidate.get("text"), str) or not retro_candidate["text"].strip():
-                retro_candidate.update(status="skipped", warning="Rule text is required")
-                return retro_candidate
-            current = read_optional(target)
-            retro_candidate.update(target=str(target), expected=current, status="ready")
-            if current and retro_candidate["text"].strip() in current:
-                retro_candidate.update(status="duplicate", warning="Rule text already exists")
-            return retro_candidate
+            return prepare_rule(retro_candidate, target, error)
         if retro_candidate_type == "skill_edit":
             target, status, warning = find_skill(retro_candidate)
-            if status != "ready":
-                retro_candidate.update(status=status, warning=warning)
-                return retro_candidate
-            if not all(isinstance(retro_candidate.get(field), str) and retro_candidate[field] for field in ("old", "text")):
-                retro_candidate.update(status="skipped", warning="Skill edit requires old and exact new text")
-                return retro_candidate
-            current = read_optional(target)
-            retro_candidate.update(target=str(target), expected=current, status="ready")
-            if current and retro_candidate["old"] not in current and retro_candidate["text"] in current:
-                retro_candidate.update(status="duplicate", warning="Skill edit text already exists")
-            return retro_candidate
+            return prepare_skill_edit(retro_candidate, target, status, warning)
         if retro_candidate_type == "issue":
-            _, error = originating_project(retro_candidate)
-            if error:
-                retro_candidate.update(status="skipped", warning=error)
-                return retro_candidate
-            if not all(isinstance(retro_candidate.get(field), str) and retro_candidate[field].strip() for field in ("title", "text")):
-                retro_candidate.update(status="skipped", warning="Issue title and body are required")
-                return retro_candidate
-            retro_candidate.update(status="ready")
-            return retro_candidate
+            return prepare_issue(retro_candidate)
     except (OSError, ValueError) as error:
         retro_candidate.update(status="skipped", warning=str(error))
         return retro_candidate
     retro_candidate.update(status="skipped", warning=f"unsupported destination: {retro_candidate_type}")
     return retro_candidate
-
-
-def github_repository(remote):
-    remote = remote.strip()
-    if remote.startswith("git@github.com:"):
-        path = remote.removeprefix("git@github.com:")
-    else:
-        parsed = urlparse(remote)
-        if parsed.hostname != "github.com":
-            return None
-        path = parsed.path.lstrip("/")
-    path = path.removesuffix(".git")
-    parts = path.split("/")
-    if len(parts) != 2 or not all(parts):
-        return None
-    return "/".join(parts)
 
 
 def execute_retro_candidate(retro_candidate):
@@ -530,105 +468,10 @@ def execute_retro_candidate(retro_candidate):
         return {"status": "saved", "key": retro_candidate.get("key"), "target": str(target)}
     if retro_candidate_type == "rule":
         target, error = rule_path(retro_candidate)
-        if error:
-            return {"status": "skipped", "key": retro_candidate.get("key"), "warning": error}
-        if str(target) != retro_candidate.get("target"):
-            return {"status": "conflict", "key": retro_candidate.get("key"), "warning": "Rule destination changed"}
-        current = read_optional(target)
-        if current and retro_candidate["text"].strip() in current:
-            return {"status": "duplicate", "key": retro_candidate.get("key"), "warning": "Rule text already exists"}
-        if current != retro_candidate.get("expected"):
-            return {"status": "conflict", "key": retro_candidate.get("key"), "warning": "Rule target changed after the report"}
-        content = current or ""
-        anchor = retro_candidate.get("anchor")
-        if anchor:
-            if anchor not in content:
-                return {"status": "conflict", "key": retro_candidate.get("key"), "warning": "Rule anchor is missing"}
-            content = content.replace(anchor, anchor + retro_candidate["text"], 1)
-        else:
-            if content and not content.endswith("\n"):
-                content += "\n"
-            if content and not retro_candidate["text"].startswith("\n"):
-                content += "\n"
-            content += retro_candidate["text"]
-        atomic_write(target, content)
-        return {"status": "saved", "key": retro_candidate.get("key"), "target": str(target)}
+        return execute_rule(retro_candidate, target, error)
     if retro_candidate_type == "skill_edit":
         target, status, warning = find_skill(retro_candidate)
-        if status != "ready":
-            return {"status": status, "key": retro_candidate.get("key"), "warning": warning}
-        if str(target) != retro_candidate.get("target"):
-            return {"status": "conflict", "key": retro_candidate.get("key"), "warning": "Skill source changed after the report"}
-        current = read_optional(target)
-        if current and retro_candidate["old"] not in current and retro_candidate["text"] in current:
-            return {"status": "duplicate", "key": retro_candidate.get("key"), "warning": "Skill edit text already exists"}
-        if current != retro_candidate.get("expected"):
-            return {"status": "conflict", "key": retro_candidate.get("key"), "warning": "Skill source changed after the report"}
-        if retro_candidate["old"] not in current:
-            return {"status": "conflict", "key": retro_candidate.get("key"), "warning": "Skill edit source text is missing"}
-        content = current.replace(retro_candidate["old"], retro_candidate["text"], 1)
-        atomic_write(target, content)
-        return {"status": "saved", "key": retro_candidate.get("key"), "target": str(target)}
+        return execute_skill_edit(retro_candidate, target, status, warning)
     if retro_candidate_type == "issue":
-        project, error = originating_project(retro_candidate)
-        if error:
-            return {"status": "skipped", "key": retro_candidate.get("key"), "warning": error}
-        try:
-            remote_result = subprocess.run(
-                ["git", "-C", str(project), "remote", "get-url", "origin"],
-                text=True,
-                capture_output=True,
-                check=False,
-                timeout=30,
-            )
-        except (OSError, subprocess.TimeoutExpired) as error:
-            return {"status": "skipped", "key": retro_candidate.get("key"), "warning": str(error)}
-        if remote_result.returncode != 0:
-            return {"status": "skipped", "key": retro_candidate.get("key"), "warning": "origin remote is unavailable"}
-        repository = github_repository(remote_result.stdout)
-        if not repository:
-            return {"status": "skipped", "key": retro_candidate.get("key"), "warning": "origin is not a GitHub repository"}
-        label_result = subprocess.run(
-            ["gh", "label", "list", "--repo", repository, "--json", "name"],
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=30,
-        )
-        if label_result.returncode != 0:
-            return {"status": "skipped", "key": retro_candidate.get("key"), "warning": "GitHub labels could not be checked; issue not created"}
-        try:
-            labels = json.loads(label_result.stdout)
-        except json.JSONDecodeError:
-            labels = []
-        command = [
-            "gh",
-            "issue",
-            "create",
-            "--repo",
-            repository,
-            "--title",
-            retro_candidate["title"],
-            "--body",
-            retro_candidate["text"],
-        ]
-        if isinstance(labels, list) and any(
-            isinstance(label, dict) and label.get("name") == "needs-triage"
-            for label in labels
-        ):
-            command.extend(["--label", "needs-triage"])
-        issue_result = subprocess.run(
-            command,
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=60,
-        )
-        if issue_result.returncode != 0:
-            return {"status": "skipped", "key": retro_candidate.get("key"), "warning": "GitHub issue creation failed"}
-        return {
-            "status": "saved",
-            "key": retro_candidate.get("key"),
-            "url": issue_result.stdout.strip(),
-        }
+        return execute_issue(retro_candidate)
     return {"status": "skipped", "key": retro_candidate.get("key"), "warning": "unsupported destination"}

@@ -253,6 +253,25 @@ being counted bare, and this round's own 3 bare forms had already joined the cor
 over the corpus the claim was made from, it is 130. Reproduce a figure against the corpus it was
 computed from, and say which definition you used.
 
+## Testing a skill that reads agent sessions
+
+`retrospective` runs over agent transcripts rather than a vault, so most of its coverage is
+tests beside the harness rather than cases in `cases/`:
+
+```
+python3 -m unittest discover -s labs/evals      # offline: the harness and every adapter suite
+RETROSPECTIVE_QWEN_LIVE=1 python3 -u -m unittest labs.evals.test_retrospective_qwen_live -v
+```
+
+`test_retrospective.py` holds the neutral core and state, `test_retrospective_claude.py` the
+Claude adapter, `test_retrospective_integration.py` the whole workflow against a synthetic
+Claude home, and `test_retrospective_qwen.py` the Qwen adapter against synthetic Qwen 0.28.3
+transcripts. The live check is skipped by default: it spends a real model session, and one
+session says what came out rather than what the copy is. It builds its own isolated
+`QWEN_HOME`, its own retrospective state, its own destination files, and a `gh` that only
+ever logs, so the run touches no real conversation, credential, memory, retrospective state,
+or GitHub.
+
 ## Fixture vaults
 
 Small, hand-written and synthetic. Each one is built to provoke one behaviour.

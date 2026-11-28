@@ -209,6 +209,8 @@ def selected_adapter_name(requested):
         return os.environ["RETROSPECTIVE_RUNTIME"]
     if os.environ.get("CLAUDECODE"):
         return "claude"
+    if os.environ.get("QWEN_CODE_SESSION_ID") or os.environ.get("QWEN_CODE") == "1":
+        return "qwen"
     return None
 
 
